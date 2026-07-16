@@ -29,6 +29,10 @@ __pycache__/
 .vscode/
 .idea/
 
+# Private/proprietary files (do NOT commit)
+test/circuits_private_tsmc/
+test/models_private_tsmc/
+
 # OS
 .DS_Store
 Thumbs.db
