@@ -1,0 +1,11 @@
+--- a/src/spicelib/devices/bsim4v5/b4v5temp.c
++++ b/src/spicelib/devices/bsim4v5/b4v5temp.c
+@@ -1176,8 +1176,8 @@
+                   pParam->BSIM4v5litl = sqrt(3.0 * pParam->BSIM4v5xj
+                                     * model->BSIM4v5toxe);
+-                  pParam->BSIM4v5vbi = Vtm0 * log(pParam->BSIM4v5nsd
+-                                   * pParam->BSIM4v5ndep / (ni * ni));
++                  pParam->BSIM4v5vbi = (SPICE_REAL)((double)Vtm0 * log((double)pParam->BSIM4v5nsd
++                                   * (double)pParam->BSIM4v5ndep / ((double)ni * (double)ni)));
+ 
+                   if (pParam->BSIM4v5ngate > 0.0)

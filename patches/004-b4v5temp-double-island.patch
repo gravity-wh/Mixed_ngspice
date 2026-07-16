@@ -1,5 +1,5 @@
---- /dev/fd/63	2026-07-16 23:07:45.414890012 +0800
-+++ /mnt/e/MyResearch/Ngspice/ngspice-46_fp32/src/spicelib/devices/bsim4v5/b4v5temp.c	2026-07-14 13:14:20.112081900 +0800
+--- /dev/fd/63	2026-07-17 01:35:43.076400006 +0800
++++ /mnt/e/MyResearch/Ngspice/ngspice-46_mixed/src/spicelib/devices/bsim4v5/b4v5temp.c	2026-07-17 00:40:04.288850500 +0800
 @@ -22,6 +22,31 @@
  #include "ngspice/sperror.h"
  #include "ngspice/suffix.h"
@@ -142,7 +142,13 @@
 -
 -                  pParam->BSIM4v5leffCV = Lnew - 2.0 * pParam->BSIM4v5dlc;
 -                  if (pParam->BSIM4v5leffCV <= 0.0)
--                  {
++                  /* MIXED-PRECISION FIX: compute size-dependent params
++                   * (dl, dw, leff, weff) in double precision even when
++                   * the rest of ngspice uses SPICE_REAL=float.  The binning
++                   * parameters span 20+ orders of magnitude and the final
++                   * subtraction Lnew-2*dl involves close numbers — both
++                   * are catastrophic-cancellation risks in fp32. */
+                   {
 -                      SPfrontEnd->IFerrorf (ERR_FATAL,
 -                      "BSIM4v5: mosfet %s, model %s: Effective channel length for C-V <= 0",
 -                       model->BSIM4v5modName, here->BSIM4v5name);
@@ -160,13 +166,7 @@
 -
 -                  pParam->BSIM4v5weffCJ = Wnew - 2.0 * pParam->BSIM4v5dwj;
 -                  if (pParam->BSIM4v5weffCJ <= 0.0)
-+                  /* MIXED-PRECISION FIX: compute size-dependent params
-+                   * (dl, dw, leff, weff) in double precision even when
-+                   * the rest of ngspice uses SPICE_REAL=float.  The binning
-+                   * parameters span 20+ orders of magnitude and the final
-+                   * subtraction Lnew-2*dl involves close numbers — both
-+                   * are catastrophic-cancellation risks in fp32. */
-                   {
+-                  {
 -                      SPfrontEnd->IFerrorf (ERR_FATAL,
 -                      "BSIM4v5: mosfet %s, model %s: Effective channel width for S/D junctions <= 0",
 -                       model->BSIM4v5modName, here->BSIM4v5name);
@@ -255,3 +255,14 @@
                    }
  
  
+@@ -1113,8 +1176,8 @@
+                   pParam->BSIM4v5sqrtXdep0 = sqrt(pParam->BSIM4v5Xdep0);
+                   pParam->BSIM4v5litl = sqrt(3.0 * pParam->BSIM4v5xj
+                                     * model->BSIM4v5toxe);
+-                  pParam->BSIM4v5vbi = Vtm0 * log(pParam->BSIM4v5nsd
+-                                   * pParam->BSIM4v5ndep / (ni * ni));
++                  pParam->BSIM4v5vbi = (SPICE_REAL)((double)Vtm0 * log((double)pParam->BSIM4v5nsd
++                                   * (double)pParam->BSIM4v5ndep / ((double)ni * (double)ni)));
+ 
+                   if (pParam->BSIM4v5ngate > 0.0)
+                   {   pParam->BSIM4v5vfbsd = Vtm0 * log(pParam->BSIM4v5ngate

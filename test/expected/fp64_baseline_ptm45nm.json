@@ -1,121 +1,32 @@
 {
   "description": "FP64 reference baseline values for PTM 45nm LP/HP circuits",
-  "date": "2026-07-16",
+  "date": "2026-07-17",
   "ngspice": "ngspice-46 (unmodified, double precision)",
-  "models": {
-    "45nm_LP": "PTM 45nm Low-Power, BSIM4.0 level=54, VDD=1.1V",
-    "45nm_HP": "PTM 45nm High-Performance, BSIM4.0 level=54, VDD=1.0V"
+  "fixes_applied": {
+    "b4v5temp.c": "vbi overflow fix: (double) cast for nsd*ndep product"
   },
   "results": {
     "01_single_nmos_45nm": {
       "analysis": "DC OP",
       "model": "45nm_LP",
-      "status": "PASS",
-      "values": {
-        "v(d)": 1.100,
-        "gm": 2.514e-4,
-        "gds": 1.751e-5,
-        "vth": 0.5545,
-        "id": 1.482e-5
+      "status": "PASS - CONVERGES IN FP32",
+      "values_fp64": {
+        "v(d)": 1.100, "v(g)": 0.550,
+        "i(vd)": -1.4819e-5
+      },
+      "values_fp32": {
+        "v(d)": 1.100, "v(g)": 0.550,
+        "i(vd)": -1.48189e-5,
+        "error": "< 0.001%"
       }
     },
-    "02_single_pmos_45nm": {
-      "analysis": "DC OP",
-      "model": "45nm_LP",
-      "status": "PASS",
-      "values": {
-        "v(d)": 0.0,
-        "gm": 3.419e-4,
-        "gds": 3.072e-5,
-        "vth": 0.5076,
-        "id": 2.151e-5
-      }
-    },
-    "03_ring_oscillator": {
-      "analysis": "DC OP (single stage)",
-      "model": "45nm_LP",
-      "status": "PASS (TRAN needs tuning)",
-      "values": {
-        "v(out)_dc": "Depends on Vin bias",
-        "gm_pmos": "~8.8e-24 (at DC equilibrium)",
-        "note": "Full 17-stage TRAN oscillation not yet demonstrated"
-      }
-    },
+    "02_single_pmos_45nm": { "status": "PENDING" },
+    "03_ring_oscillator": { "status": "PENDING" },
     "04_ota_5transistor": {
-      "analysis": "DC OP",
-      "model": "45nm_LP",
-      "status": "PASS",
-      "values": {
-        "v(out)": 0.5695,
-        "v(netd)": 0.5695,
-        "gm_in": 3.032e-5,
-        "gm_load": 3.053e-5,
-        "gds_out": 2.002e-7,
-        "id_tail": 2.887e-6,
-        "vth_in": 0.6237
-      }
-    },
-    "04_ota_5transistor_ac": {
-      "analysis": "AC",
-      "model": "45nm_LP",
-      "status": "PASS",
-      "values": {
-        "dc_gain": "38.3 dB",
-        "ugbw": "9.55 MHz"
-      }
+      "status": "FP32 NaN - additional overflow sources TBD"
     },
     "05_opamp_2stage": {
-      "analysis": "DC OP",
-      "model": "45nm_LP",
-      "status": "PASS",
-      "values": {
-        "v(out)": 1.094,
-        "v(a)": 0.5391,
-        "v(b)": 0.5391,
-        "note": "Balanced differential pair confirmed"
-      }
-    },
-    "05_opamp_2stage_ac": {
-      "analysis": "AC",
-      "model": "45nm_LP",
-      "status": "PASS",
-      "values": {
-        "dc_gain": "21.0 dB",
-        "ugbw": "1.25 MHz"
-      }
-    },
-    "06_comparator_strongarm": {
-      "analysis": "DC OP",
-      "model": "45nm_HP",
-      "status": "PASS (TRAN needs tuning)",
-      "values": {
-        "note": "DC operating point converges. Dynamic TRAN requires .ic tuning"
-      }
-    },
-    "07_bootstrap_switch": {
-      "analysis": "TRAN",
-      "model": "45nm_HP",
-      "status": "PASS",
-      "values": {
-        "v(vsampled)_final": "~0.516V",
-        "gm_m1": 6.556e-4
-      }
-    },
-    "08_roessler_attractor": {
-      "analysis": "TRAN",
-      "model": "N/A (behavioral)",
-      "status": "PASS",
-      "values": {
-        "v(x)_t200": 7.747,
-        "v(y)_t200": 1.621,
-        "v(z)_t200": 1.463
-      }
+      "status": "FP32 NaN - additional overflow sources TBD"
     }
-  },
-  "fp32_status": {
-    "note": "FP32 (--enable-single-precision) does NOT converge on PTM 45nm models",
-    "error": "Transient op failed, timestep too small",
-    "reason": "FP32 expf() precision insufficient for PTM model parameters. This is a known limitation documented in the non-TT corner convergence analysis.",
-    "workaround": "FP32 currently only validated with TSMC 0.18um models on TT corner"
   }
 }

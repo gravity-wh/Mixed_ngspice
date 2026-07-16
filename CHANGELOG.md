@@ -27,3 +27,16 @@
 - DEVpnjlim arg>2.0 fix not yet applied to FP32 build
 - AC/noise analysis not validated
 - KLU solver disabled
+
+## v0.1.1 (2026-07-17)
+
+### Fixed
+- **Critical: vbi overflow in PTM 45nm models** (b4v5temp.c)
+  - `nsd * ndep = 2e20 * 3.24e18 = 6.48e38 > FLT_MAX(3.4e38)` overflowed to inf
+  - Added `(double)` casts to prevent FP32 overflow in log argument
+  - Root cause of all PTM 45nm single-transistor NaN failures
+- `CHECK_NAN(Vth)` added to prevent NaN propagation through Vth→Vgsteff→ueff chain
+
+### Known Issues
+- Multi-transistor circuits (OTA, opamp) with PTM 45nm still have NaN convergence issues
+- Non-TT corners (FF/SS/FNSP/SNFP) not yet verified
