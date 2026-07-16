@@ -1,0 +1,257 @@
+--- /dev/fd/63	2026-07-16 23:07:45.414890012 +0800
++++ /mnt/e/MyResearch/Ngspice/ngspice-46_fp32/src/spicelib/devices/bsim4v5/b4v5temp.c	2026-07-14 13:14:20.112081900 +0800
+@@ -22,6 +22,31 @@
+ #include "ngspice/sperror.h"
+ #include "ngspice/suffix.h"
+ 
++// MIXED-PRECISION Phase 3: fp32 transcendental math
++#define B4V5_FP32_MATH
++#ifdef B4V5_FP32_MATH
++#undef SPICE_EXP
++#undef SPICE_LOG
++#undef SPICE_SQRT
++#undef SPICE_POW
++#undef SPICE_SIN
++#undef SPICE_COS
++#undef SPICE_FABS
++#undef SPICE_ATAN
++#undef SPICE_TAN
++#undef SPICE_TANH
++#define SPICE_EXP(x)  expf((float)(x))
++#define SPICE_LOG(x)  logf((float)(x))
++#define SPICE_SQRT(x) sqrtf((float)(x))
++#define SPICE_POW(x,y) powf((float)(x),(float)(y))
++#define SPICE_SIN(x)  sinf((float)(x))
++#define SPICE_COS(x)  cosf((float)(x))
++#define SPICE_FABS(x) fabsf((float)(x))
++#define SPICE_ATAN(x) atanf((float)(x))
++#define SPICE_TAN(x)  tanf((float)(x))
++#define SPICE_TANH(x) tanhf((float)(x))
++#endif
++
+ #define Kb 1.3806226e-23
+ #define KboQ 8.617087e-5
+ #define EPS0 8.85418e-12
+@@ -32,6 +57,17 @@
+ #define EXP_THRESHOLD 34.0
+ #define Charge_q 1.60219e-19
+ #define DELTA  1.0E-9
++#ifdef B4V5_FP32_MATH
++#define DEXP(A,B) {                                                        \
++        if ((A) > EXP_THRESHOLD) {                                         \
++            B = (SPICE_REAL)(MAX_EXP*(1.0f+(float)(A)-EXP_THRESHOLD));     \
++        } else if ((A) < -EXP_THRESHOLD)  {                                \
++            B = (SPICE_REAL)MIN_EXP;                                       \
++        } else   {                                                         \
++            B = (SPICE_REAL)expf((float)(A));                              \
++        }                                                                  \
++    }
++#else
+ #define DEXP(A,B) {                                                        \
+         if (A > EXP_THRESHOLD) {                                           \
+             B = MAX_EXP*(1.0+(A)-EXP_THRESHOLD);                           \
+@@ -41,15 +77,16 @@
+             B = exp(A);                                                    \
+         }                                                                  \
+     }
++#endif
+ 
+ 
+ 
+ static int
+ BSIM4v5DioIjthVjmEval(
+-double Nvtm, double Ijth, double Isb, double XExpBV,
+-double *Vjm)
++SPICE_REAL Nvtm, SPICE_REAL Ijth, SPICE_REAL Isb, SPICE_REAL XExpBV,
++SPICE_REAL *Vjm)
+ {
+-double Tb, Tc, EVjmovNv;
++SPICE_REAL Tb, Tc, EVjmovNv;
+ 
+        Tc = XExpBV;
+        Tb = 1.0 + Ijth / Isb - Tc;
+@@ -68,17 +105,17 @@
+ BSIM4v5model *model = (BSIM4v5model*) inModel;
+ BSIM4v5instance *here;
+ struct bsim4v5SizeDependParam *pSizeDependParamKnot, *pLastKnot, *pParam = NULL;
+-double tmp, tmp1, tmp2, Eg, Eg0, ni;
+-double T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, Lnew=0.0, Wnew;
+-double delTemp, Temp, TRatio, Inv_L, Inv_W, Inv_LW, Vtm0, Tnom;
+-double dumPs, dumPd, dumAs, dumAd, PowWeffWr;
+-double DMCGeff, DMCIeff, DMDGeff;
+-double Nvtms, Nvtmd, SourceSatCurrent, DrainSatCurrent;
+-double T10;
+-double Inv_saref, Inv_sbref, Inv_sa, Inv_sb, rho, Ldrn, dvth0_lod;
+-double W_tmp, Inv_ODeff, OD_offset, dk2_lod, deta0_lod;
+-double lnl, lnw, lnnf, rbpbx, rbpby, rbsbx, rbsby, rbdbx, rbdby,bodymode;
+-double kvsat, wlod, sceff, Wdrn;
++SPICE_REAL tmp, tmp1, tmp2, Eg, Eg0, ni;
++SPICE_REAL T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, Lnew=0.0, Wnew;
++SPICE_REAL delTemp, Temp, TRatio, Inv_L, Inv_W, Inv_LW, Vtm0, Tnom;
++SPICE_REAL dumPs, dumPd, dumAs, dumAd, PowWeffWr;
++SPICE_REAL DMCGeff, DMCIeff, DMDGeff;
++SPICE_REAL Nvtms, Nvtmd, SourceSatCurrent, DrainSatCurrent;
++SPICE_REAL T10;
++SPICE_REAL Inv_saref, Inv_sbref, Inv_sa, Inv_sb, rho, Ldrn, dvth0_lod;
++SPICE_REAL W_tmp, Inv_ODeff, OD_offset, dk2_lod, deta0_lod;
++SPICE_REAL lnl, lnw, lnnf, rbpbx, rbpby, rbsbx, rbsby, rbdbx, rbdby,bodymode;
++SPICE_REAL kvsat, wlod, sceff, Wdrn;
+ 
+ int Size_Not_Found, i;
+ 
+@@ -382,68 +419,94 @@
+                   Lnew = here->BSIM4v5l  + model->BSIM4v5xl ;
+                   Wnew = here->BSIM4v5w / here->BSIM4v5nf + model->BSIM4v5xw;
+ 
+-                  T0 = pow(Lnew, model->BSIM4v5Lln);
+-                  T1 = pow(Wnew, model->BSIM4v5Lwn);
+-                  tmp1 = model->BSIM4v5Ll / T0 + model->BSIM4v5Lw / T1
+-                       + model->BSIM4v5Lwl / (T0 * T1);
+-                  pParam->BSIM4v5dl = model->BSIM4v5Lint + tmp1;
+-                  tmp2 = model->BSIM4v5Llc / T0 + model->BSIM4v5Lwc / T1
+-                       + model->BSIM4v5Lwlc / (T0 * T1);
+-                  pParam->BSIM4v5dlc = model->BSIM4v5dlc + tmp2;
+-
+-                  T2 = pow(Lnew, model->BSIM4v5Wln);
+-                  T3 = pow(Wnew, model->BSIM4v5Wwn);
+-                  tmp1 = model->BSIM4v5Wl / T2 + model->BSIM4v5Ww / T3
+-                       + model->BSIM4v5Wwl / (T2 * T3);
+-                  pParam->BSIM4v5dw = model->BSIM4v5Wint + tmp1;
+-                  tmp2 = model->BSIM4v5Wlc / T2 + model->BSIM4v5Wwc / T3
+-                       + model->BSIM4v5Wwlc / (T2 * T3);
+-                  pParam->BSIM4v5dwc = model->BSIM4v5dwc + tmp2;
+-                  pParam->BSIM4v5dwj = model->BSIM4v5dwj + tmp2;
+-
+-                  pParam->BSIM4v5leff = Lnew - 2.0 * pParam->BSIM4v5dl;
+-                  if (pParam->BSIM4v5leff <= 0.0)
+-                  {
+-                      SPfrontEnd->IFerrorf (ERR_FATAL,
+-                      "BSIM4v5: mosfet %s, model %s: Effective channel length <= 0",
+-                       model->BSIM4v5modName, here->BSIM4v5name);
+-                      return(E_BADPARM);
+-                  }
+-
+-                  pParam->BSIM4v5weff = Wnew - 2.0 * pParam->BSIM4v5dw;
+-                  if (pParam->BSIM4v5weff <= 0.0)
+-                  {
+-                      SPfrontEnd->IFerrorf (ERR_FATAL,
+-                      "BSIM4v5: mosfet %s, model %s: Effective channel width <= 0",
+-                       model->BSIM4v5modName, here->BSIM4v5name);
+-                      return(E_BADPARM);
+-                  }
+-
+-                  pParam->BSIM4v5leffCV = Lnew - 2.0 * pParam->BSIM4v5dlc;
+-                  if (pParam->BSIM4v5leffCV <= 0.0)
+-                  {
+-                      SPfrontEnd->IFerrorf (ERR_FATAL,
+-                      "BSIM4v5: mosfet %s, model %s: Effective channel length for C-V <= 0",
+-                       model->BSIM4v5modName, here->BSIM4v5name);
+-                      return(E_BADPARM);
+-                  }
+-
+-                  pParam->BSIM4v5weffCV = Wnew - 2.0 * pParam->BSIM4v5dwc;
+-                  if (pParam->BSIM4v5weffCV <= 0.0)
+-                  {
+-                      SPfrontEnd->IFerrorf (ERR_FATAL,
+-                      "BSIM4v5: mosfet %s, model %s: Effective channel width for C-V <= 0",
+-                       model->BSIM4v5modName, here->BSIM4v5name);
+-                      return(E_BADPARM);
+-                  }
+-
+-                  pParam->BSIM4v5weffCJ = Wnew - 2.0 * pParam->BSIM4v5dwj;
+-                  if (pParam->BSIM4v5weffCJ <= 0.0)
++                  /* MIXED-PRECISION FIX: compute size-dependent params
++                   * (dl, dw, leff, weff) in double precision even when
++                   * the rest of ngspice uses SPICE_REAL=float.  The binning
++                   * parameters span 20+ orders of magnitude and the final
++                   * subtraction Lnew-2*dl involves close numbers — both
++                   * are catastrophic-cancellation risks in fp32. */
+                   {
+-                      SPfrontEnd->IFerrorf (ERR_FATAL,
+-                      "BSIM4v5: mosfet %s, model %s: Effective channel width for S/D junctions <= 0",
+-                       model->BSIM4v5modName, here->BSIM4v5name);
+-                      return(E_BADPARM);
++                      double dLnew = (double)Lnew;
++                      double dWnew = (double)Wnew;
++                      double dT0, dT1, dT2, dT3, dtmp1, dtmp2;
++
++                      dT0 = pow(dLnew, (double)model->BSIM4v5Lln);
++                      dT1 = pow(dWnew, (double)model->BSIM4v5Lwn);
++                      dtmp1 = (double)model->BSIM4v5Ll / dT0
++                            + (double)model->BSIM4v5Lw / dT1
++                            + (double)model->BSIM4v5Lwl / (dT0 * dT1);
++                      pParam->BSIM4v5dl = (SPICE_REAL)(
++                          (double)model->BSIM4v5Lint + dtmp1);
++                      dtmp2 = (double)model->BSIM4v5Llc / dT0
++                            + (double)model->BSIM4v5Lwc / dT1
++                            + (double)model->BSIM4v5Lwlc / (dT0 * dT1);
++                      pParam->BSIM4v5dlc = (SPICE_REAL)(
++                          (double)model->BSIM4v5dlc + dtmp2);
++
++                      dT2 = pow(dLnew, (double)model->BSIM4v5Wln);
++                      dT3 = pow(dWnew, (double)model->BSIM4v5Wwn);
++                      dtmp1 = (double)model->BSIM4v5Wl / dT2
++                            + (double)model->BSIM4v5Ww / dT3
++                            + (double)model->BSIM4v5Wwl / (dT2 * dT3);
++                      pParam->BSIM4v5dw = (SPICE_REAL)(
++                          (double)model->BSIM4v5Wint + dtmp1);
++                      dtmp2 = (double)model->BSIM4v5Wlc / dT2
++                            + (double)model->BSIM4v5Wwc / dT3
++                            + (double)model->BSIM4v5Wwlc / (dT2 * dT3);
++                      pParam->BSIM4v5dwc = (SPICE_REAL)(
++                          (double)model->BSIM4v5dwc + dtmp2);
++                      pParam->BSIM4v5dwj = (SPICE_REAL)(
++                          (double)model->BSIM4v5dwj + dtmp2);
++
++                      pParam->BSIM4v5leff = (SPICE_REAL)(
++                          dLnew - 2.0 * (double)pParam->BSIM4v5dl);
++                      if (pParam->BSIM4v5leff <= 0.0)
++                      {
++                          SPfrontEnd->IFerrorf (ERR_FATAL,
++                          "BSIM4v5: mosfet %s, model %s: Effective channel length <= 0",
++                           model->BSIM4v5modName, here->BSIM4v5name);
++                          return(E_BADPARM);
++                      }
++
++                      pParam->BSIM4v5weff = (SPICE_REAL)(
++                          dWnew - 2.0 * (double)pParam->BSIM4v5dw);
++                      if (pParam->BSIM4v5weff <= 0.0)
++                      {
++                          SPfrontEnd->IFerrorf (ERR_FATAL,
++                          "BSIM4v5: mosfet %s, model %s: Effective channel width <= 0",
++                           model->BSIM4v5modName, here->BSIM4v5name);
++                          return(E_BADPARM);
++                      }
++
++                      pParam->BSIM4v5leffCV = (SPICE_REAL)(
++                          dLnew - 2.0 * (double)pParam->BSIM4v5dlc);
++                      if (pParam->BSIM4v5leffCV <= 0.0)
++                      {
++                          SPfrontEnd->IFerrorf (ERR_FATAL,
++                          "BSIM4v5: mosfet %s, model %s: Effective channel length for C-V <= 0",
++                           model->BSIM4v5modName, here->BSIM4v5name);
++                          return(E_BADPARM);
++                      }
++
++                      pParam->BSIM4v5weffCV = (SPICE_REAL)(
++                          dWnew - 2.0 * (double)pParam->BSIM4v5dwc);
++                      if (pParam->BSIM4v5weffCV <= 0.0)
++                      {
++                          SPfrontEnd->IFerrorf (ERR_FATAL,
++                          "BSIM4v5: mosfet %s, model %s: Effective channel width for C-V <= 0",
++                           model->BSIM4v5modName, here->BSIM4v5name);
++                          return(E_BADPARM);
++                      }
++
++                      pParam->BSIM4v5weffCJ = (SPICE_REAL)(
++                          dWnew - 2.0 * (double)pParam->BSIM4v5dwj);
++                      if (pParam->BSIM4v5weffCJ <= 0.0)
++                      {
++                          SPfrontEnd->IFerrorf (ERR_FATAL,
++                          "BSIM4v5: mosfet %s, model %s: Effective channel width for S/D junctions <= 0",
++                           model->BSIM4v5modName, here->BSIM4v5name);
++                          return(E_BADPARM);
++                      }
+                   }
+ 
+ 

@@ -1,0 +1,302 @@
+--- /dev/fd/63	2026-07-16 23:07:47.661571429 +0800
++++ /mnt/e/MyResearch/Ngspice/ngspice-46_fp32/src/spicelib/devices/bsim4v5/b4v5geo.c	2026-07-14 13:09:05.620114600 +0800
+@@ -11,6 +11,11 @@
+ #include "ngspice/ngspice.h"
+ #include "bsim4v5def.h"
+ 
++/* MIXED-PRECISION Phase 1A: use float for all local geometry calculations.
++ * These are pure linear operations (+, -, *, /), called once during setup.
++ * No exp/log/sqrt/pow — fp32 is perfectly safe here. */
++typedef float b4v5_real;
++
+ /*
+  * WDLiu:
+  * This subrutine is a special module to process the geometry dependent
+@@ -19,34 +24,35 @@
+  */
+ 
+ int
+-BSIM4v5RdsEndIso(double, double, double, double, double, double, int, int, double *);
++BSIM4v5RdsEndIso(SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, int, int, SPICE_REAL *);
+ int
+-BSIM4v5RdsEndSha(double, double, double, double, double, double, int, int, double *);
++BSIM4v5RdsEndSha(SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, int, int, SPICE_REAL *);
+ 
+ static int
+ BSIM4v5NumFingerDiff(
+-double nf,
++SPICE_REAL nf,
+ int minSD,
+-double *nuIntD, double *nuEndD, double *nuIntS, double *nuEndS)
++SPICE_REAL *nuIntD, SPICE_REAL *nuEndD, SPICE_REAL *nuIntS, SPICE_REAL *nuEndS)
+ {
+ int NF;
+-        NF = (int)nf;
++b4v5_real fnf = (b4v5_real)nf;
++        NF = (int)fnf;
+ 	if ((NF%2) != 0)
+-	{   *nuEndD = *nuEndS = 1.0;
+-	    *nuIntD = *nuIntS = 2.0 * MAX((nf - 1.0) / 2.0, 0.0);
++	{   *nuEndD = *nuEndS = (SPICE_REAL)1.0f;
++	    *nuIntD = *nuIntS = (SPICE_REAL)(2.0f * MAX((fnf - 1.0f) / 2.0f, 0.0f));
+ 	}
+ 	else
+ 	{   if (minSD == 1) /* minimize # of source */
+-	    {   *nuEndD = 2.0;
+-		*nuIntD = 2.0 * MAX((nf / 2.0 - 1.0), 0.0);
+-		*nuEndS = 0.0;
+-		*nuIntS = nf;
++	    {   *nuEndD = (SPICE_REAL)2.0f;
++		*nuIntD = (SPICE_REAL)(2.0f * MAX((fnf / 2.0f - 1.0f), 0.0f));
++		*nuEndS = (SPICE_REAL)0.0f;
++		*nuIntS = (SPICE_REAL)fnf;
+ 	    }
+ 	    else
+-	    {   *nuEndD = 0.0;
+-                *nuIntD = nf;
+-                *nuEndS = 2.0;
+-                *nuIntS = 2.0 * MAX((nf / 2.0 - 1.0), 0.0);
++	    {   *nuEndD = (SPICE_REAL)0.0f;
++                *nuIntD = (SPICE_REAL)fnf;
++                *nuEndS = (SPICE_REAL)2.0f;
++                *nuIntS = (SPICE_REAL)(2.0f * MAX((fnf / 2.0f - 1.0f), 0.0f));
+ 	    }
+ 	}
+ return 0;
+@@ -55,100 +61,109 @@
+ 
+ int
+ BSIM4v5PAeffGeo(
+-double nf,
++SPICE_REAL nf,
+ int geo, int minSD,
+-double Weffcj, double DMCG, double DMCI, double DMDG,
+-double *Ps, double *Pd, double *As, double *Ad)
++SPICE_REAL Weffcj, SPICE_REAL DMCG, SPICE_REAL DMCI, SPICE_REAL DMDG,
++SPICE_REAL *Ps, SPICE_REAL *Pd, SPICE_REAL *As, SPICE_REAL *Ad)
+ {
+-double T0, T1, T2;
+-double ADiso, ADsha, ADmer, ASiso, ASsha, ASmer;
+-double PDiso, PDsha, PDmer, PSiso, PSsha, PSmer;
+-double nuIntD = 0.0, nuEndD = 0.0, nuIntS = 0.0, nuEndS = 0.0;
++b4v5_real T0, T1, T2;
++b4v5_real ADiso, ADsha, ADmer, ASiso, ASsha, ASmer;
++b4v5_real PDiso, PDsha, PDmer, PSiso, PSsha, PSmer;
++b4v5_real nuIntD = 0.0f, nuEndD = 0.0f, nuIntS = 0.0f, nuEndS = 0.0f;
++b4v5_real fWcj = (b4v5_real)Weffcj;
++b4v5_real fDMCG = (b4v5_real)DMCG;
++b4v5_real fDMCI = (b4v5_real)DMCI;
++b4v5_real fDMDG = (b4v5_real)DMDG;
++b4v5_real fnf = (b4v5_real)nf;
+ 
+ 	if (geo < 9) /* For geo = 9 and 10, the numbers of S/D diffusions already known */
+-	BSIM4v5NumFingerDiff(nf, minSD, &nuIntD, &nuEndD, &nuIntS, &nuEndS);
++	{   SPICE_REAL snuIntD, snuEndD, snuIntS, snuEndS;
++	    BSIM4v5NumFingerDiff(nf, minSD, &snuIntD, &snuEndD, &snuIntS, &snuEndS);
++	    nuIntD = (b4v5_real)snuIntD; nuEndD = (b4v5_real)snuEndD;
++	    nuIntS = (b4v5_real)snuIntS; nuEndS = (b4v5_real)snuEndS;
++	}
+ 
+-	T0 = DMCG + DMCI;
+-	T1 = DMCG + DMCG;
+-	T2 = DMDG + DMDG;
++	T0 = fDMCG + fDMCI;
++	T1 = fDMCG + fDMCG;
++	T2 = fDMDG + fDMDG;
+ 
+-	PSiso = PDiso = T0 + T0 + Weffcj;
++	PSiso = PDiso = T0 + T0 + fWcj;
+ 	PSsha = PDsha = T1;
+ 	PSmer = PDmer = T2;
+ 
+-	ASiso = ADiso = T0 * Weffcj;
+-	ASsha = ADsha = DMCG * Weffcj;
+-	ASmer = ADmer = DMDG * Weffcj;
++	ASiso = ADiso = T0 * fWcj;
++	ASsha = ADsha = fDMCG * fWcj;
++	ASmer = ADmer = fDMDG * fWcj;
+ 
+ 	switch(geo)
+ 	{   case 0:
+-		*Ps = nuEndS * PSiso + nuIntS * PSsha;
+-		*Pd = nuEndD * PDiso + nuIntD * PDsha;
+-		*As = nuEndS * ASiso + nuIntS * ASsha;
+-		*Ad = nuEndD * ADiso + nuIntD * ADsha;
++		*Ps = (SPICE_REAL)(nuEndS * PSiso + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDiso + nuIntD * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASiso + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADiso + nuIntD * ADsha);
+ 		break;
+ 	    case 1:
+-                *Ps = nuEndS * PSiso + nuIntS * PSsha;
+-                *Pd = (nuEndD + nuIntD) * PDsha;
+-                *As = nuEndS * ASiso + nuIntS * ASsha;
+-                *Ad = (nuEndD + nuIntD) * ADsha;
+-                break;
+-            case 2:
+-                *Ps = (nuEndS + nuIntS) * PSsha;
+-                *Pd = nuEndD * PDiso + nuIntD * PDsha;
+-                *As = (nuEndS + nuIntS) * ASsha;
+-                *Ad = nuEndD * ADiso + nuIntD * ADsha;
+-                break;
+-            case 3:
+-                *Ps = (nuEndS + nuIntS) * PSsha;
+-                *Pd = (nuEndD + nuIntD) * PDsha;
+-                *As = (nuEndS + nuIntS) * ASsha;
+-                *Ad = (nuEndD + nuIntD) * ADsha;
+-                break;
+-            case 4:
+-                *Ps = nuEndS * PSiso + nuIntS * PSsha;
+-                *Pd = nuEndD * PDmer + nuIntD * PDsha;
+-                *As = nuEndS * ASiso + nuIntS * ASsha;
+-                *Ad = nuEndD * ADmer + nuIntD * ADsha;
+-                break;
+-            case 5:
+-                *Ps = (nuEndS + nuIntS) * PSsha;
+-                *Pd = nuEndD * PDmer + nuIntD * PDsha;
+-                *As = (nuEndS + nuIntS) * ASsha;
+-                *Ad = nuEndD * ADmer + nuIntD * ADsha;
+-                break;
+-            case 6:
+-                *Ps = nuEndS * PSmer + nuIntS * PSsha;
+-                *Pd = nuEndD * PDiso + nuIntD * PDsha;
+-                *As = nuEndS * ASmer + nuIntS * ASsha;
+-                *Ad = nuEndD * ADiso + nuIntD * ADsha;
+-                break;
+-            case 7:
+-                *Ps = nuEndS * PSmer + nuIntS * PSsha;
+-                *Pd = (nuEndD + nuIntD) * PDsha;
+-                *As = nuEndS * ASmer + nuIntS * ASsha;
+-                *Ad = (nuEndD + nuIntD) * ADsha;
+-                break;
+-            case 8:
+-                *Ps = nuEndS * PSmer + nuIntS * PSsha;
+-                *Pd = nuEndD * PDmer + nuIntD * PDsha;
+-                *As = nuEndS * ASmer + nuIntS * ASsha;
+-                *Ad = nuEndD * ADmer + nuIntD * ADsha;
+-                break;
+-            case 9: /* geo = 9 and 10 happen only when nf = even */
+-                *Ps = PSiso + (nf - 1.0) * PSsha;
+-                *Pd = nf * PDsha;
+-                *As = ASiso + (nf - 1.0) * ASsha;
+-                *Ad = nf * ADsha;
+-                break;
+-            case 10:
+-                *Ps = nf * PSsha;
+-                *Pd = PDiso + (nf - 1.0) * PDsha;
+-                *As = nf * ASsha;
+-                *Ad = ADiso + (nf - 1.0) * ADsha;
+-                break;
++		*Ps = (SPICE_REAL)(nuEndS * PSiso + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)((nuEndD + nuIntD) * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASiso + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)((nuEndD + nuIntD) * ADsha);
++		break;
++	    case 2:
++		*Ps = (SPICE_REAL)((nuEndS + nuIntS) * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDiso + nuIntD * PDsha);
++		*As = (SPICE_REAL)((nuEndS + nuIntS) * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADiso + nuIntD * ADsha);
++		break;
++	    case 3:
++		*Ps = (SPICE_REAL)((nuEndS + nuIntS) * PSsha);
++		*Pd = (SPICE_REAL)((nuEndD + nuIntD) * PDsha);
++		*As = (SPICE_REAL)((nuEndS + nuIntS) * ASsha);
++		*Ad = (SPICE_REAL)((nuEndD + nuIntD) * ADsha);
++		break;
++	    case 4:
++		*Ps = (SPICE_REAL)(nuEndS * PSiso + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDmer + nuIntD * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASiso + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADmer + nuIntD * ADsha);
++		break;
++	    case 5:
++		*Ps = (SPICE_REAL)((nuEndS + nuIntS) * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDmer + nuIntD * PDsha);
++		*As = (SPICE_REAL)((nuEndS + nuIntS) * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADmer + nuIntD * ADsha);
++		break;
++	    case 6:
++		*Ps = (SPICE_REAL)(nuEndS * PSmer + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDiso + nuIntD * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASmer + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADiso + nuIntD * ADsha);
++		break;
++	    case 7:
++		*Ps = (SPICE_REAL)(nuEndS * PSmer + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)((nuEndD + nuIntD) * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASmer + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)((nuEndD + nuIntD) * ADsha);
++		break;
++	    case 8:
++		*Ps = (SPICE_REAL)(nuEndS * PSmer + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDmer + nuIntD * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASmer + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADmer + nuIntD * ADsha);
++		break;
++	    case 9: /* geo = 9 and 10 happen only when nf = even */
++		*Ps = (SPICE_REAL)(PSiso + (fnf - 1.0f) * PSsha);
++		*Pd = (SPICE_REAL)(fnf * PDsha);
++		*As = (SPICE_REAL)(ASiso + (fnf - 1.0f) * ASsha);
++		*Ad = (SPICE_REAL)(fnf * ADsha);
++		break;
++	    case 10:
++		*Ps = (SPICE_REAL)(fnf * PSsha);
++		*Pd = (SPICE_REAL)(PDiso + (fnf - 1.0f) * PDsha);
++		*As = (SPICE_REAL)(fnf * ASsha);
++		*Ad = (SPICE_REAL)(ADiso + (fnf - 1.0f) * ADsha);
++		break;
+ 	    default:
+-		printf("Warning: Specified GEO = %d not matched\n", geo); 
++		printf("Warning: Specified GEO = %d not matched\n", geo);
+ 	}
+ return 0;
+ }
+@@ -156,14 +171,14 @@
+ 
+ int
+ BSIM4v5RdseffGeo(
+-double nf,
++SPICE_REAL nf,
+ int geo, int rgeo, int minSD,
+-double Weffcj, double Rsh, double DMCG, double DMCI, double DMDG,
++SPICE_REAL Weffcj, SPICE_REAL Rsh, SPICE_REAL DMCG, SPICE_REAL DMCI, SPICE_REAL DMDG,
+ int Type,
+-double *Rtot)
++SPICE_REAL *Rtot)
+ {
+-double Rint=0.0, Rend = 0.0;
+-double nuIntD = 0.0, nuEndD = 0.0, nuIntS = 0.0, nuEndS = 0.0;
++SPICE_REAL Rint=0.0, Rend = 0.0;
++SPICE_REAL nuIntD = 0.0, nuEndD = 0.0, nuIntS = 0.0, nuEndS = 0.0;
+ 
+         if (geo < 9) /* since geo = 9 and 10 only happen when nf = even */
+         {   BSIM4v5NumFingerDiff(nf, minSD, &nuIntD, &nuEndD, &nuIntS, &nuEndS);
+@@ -276,10 +291,10 @@
+ 
+ int
+ BSIM4v5RdsEndIso(
+-double Weffcj, double Rsh, double DMCG, double DMCI, double DMDG,
+-double nuEnd,
++SPICE_REAL Weffcj, SPICE_REAL Rsh, SPICE_REAL DMCG, SPICE_REAL DMCI, SPICE_REAL DMDG,
++SPICE_REAL nuEnd,
+ int rgeo, int Type,
+-double *Rend)
++SPICE_REAL *Rend)
+ {	
+ 	NG_IGNORE(DMDG);
+ 
+@@ -337,10 +352,10 @@
+ 
+ int
+ BSIM4v5RdsEndSha(
+-double Weffcj, double Rsh, double DMCG, double DMCI, double DMDG,
+-double nuEnd,
++SPICE_REAL Weffcj, SPICE_REAL Rsh, SPICE_REAL DMCG, SPICE_REAL DMCI, SPICE_REAL DMDG,
++SPICE_REAL nuEnd,
+ int rgeo, int Type,
+-double *Rend)
++SPICE_REAL *Rend)
+ {
+         NG_IGNORE(DMCI);
+         NG_IGNORE(DMDG);

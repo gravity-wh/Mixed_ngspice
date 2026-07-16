@@ -1,0 +1,18 @@
+--- /dev/fd/63	2026-07-16 23:07:48.711607170 +0800
++++ /mnt/e/MyResearch/Ngspice/ngspice-46_fp32/src/maths/sparse/spconfig.h	2026-07-13 14:40:24.000000000 +0800
+@@ -1,3 +1,4 @@
++#include "ngspice/typedefs.h"
+ /*
+  *  CONFIGURATION MACRO DEFINITIONS for sparse matrix routines
+  *
+@@ -53,8 +54,8 @@
+  *      The precision of the arithmetic used by Sparse can be set by
+  *      changing changing the spREAL macro.  This macro is
+  *      contained in the file spMatrix.h.  It is strongly suggested to
+- *      used double precision with circuit simulators.  Note that
+- *      because C always performs arithmetic operations in double
++ *      used SPICE_REAL precision with circuit simulators.  Note that
++ *      because C always performs arithmetic operations in SPICE_REAL
+  *      precision, the only benefit to using single precision is that
+  *      less storage is required.  There is often a noticeable speed
+  *      penalty when using single precision.  Sparse internally refers

@@ -1,0 +1,50 @@
+{
+  "description": "FP64 reference values for TT corner. Used by run_all.sh for cross-validation.",
+  "process": "SMIC 0.18um BCD BSIM4v5",
+  "corner": "TT",
+  "temperature": 27,
+  "vdd": 1.8,
+  "circuits": {
+    "01_single_pmos": {
+      "analysis": "OP",
+      "nodes": {
+        "v(vb2)": {"value": 0.85, "tolerance": 0.01}
+      },
+      "devices": {
+        "m1": {
+          "gm": {"value": 2.5e-5, "tolerance_rel": 0.05},
+          "gds": {"value": 1.0e-7, "tolerance_rel": 0.2},
+          "id": {"value": 1.0e-5, "tolerance_rel": 0.05}
+        }
+      }
+    },
+    "02_single_nmos": {
+      "analysis": "OP",
+      "nodes": {
+        "v(vb1)": {"value": 0.45, "tolerance": 0.01}
+      },
+      "devices": {
+        "m1": {
+          "gm": {"value": 5.0e-5, "tolerance_rel": 0.05},
+          "gds": {"value": 1.0e-7, "tolerance_rel": 0.2},
+          "id": {"value": 1.0e-5, "tolerance_rel": 0.05}
+        }
+      }
+    },
+    "03_bias_6t": {
+      "analysis": "OP",
+      "nodes": {
+        "v(vb1)": {"value": 0.45, "tolerance": 0.01},
+        "v(vb2)": {"value": 0.95, "tolerance": 0.01},
+        "v(vb3)": {"value": 0.50, "tolerance": 0.01}
+      }
+    },
+    "04_opamp_22t": {
+      "analysis": "OP",
+      "nodes": {
+        "v(vout)": {"value": 1.80, "tolerance": 0.01},
+        "v(d1)": {"value": 0.90, "tolerance": 0.01}
+      }
+    }
+  }
+}

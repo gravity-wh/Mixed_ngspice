@@ -1,0 +1,43 @@
+name: Test
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential autoconf automake libtool \
+            bison flex libx11-dev libice-dev libsm-dev wget
+
+      - name: Build FP32 and FP64
+        run: bash scripts/build.sh -j 2
+
+      - name: Verify binaries
+        run: |
+          file build_fp32/src/ngspice
+          file build_fp64/src/ngspice
+          build_fp32/src/ngspice --version 2>&1 || true
+          build_fp64/src/ngspice --version 2>&1 || true
+
+      - name: Run test suite
+        run: bash test/run_all.sh --quick
+
+      - name: Archive logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: logs/
+          retention-days: 7
