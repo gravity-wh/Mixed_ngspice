@@ -5,7 +5,7 @@
 
 VDD VDD 0 1.1
 VG  G   0 0.55
-MP1 D G VDD VDD pmos W=2u L=45n
+M1  D G VDD VDD pmos W=2u L=45n
 
 VD D 0 0
 

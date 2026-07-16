@@ -3,7 +3,7 @@
 
 .include ../../models/45nm_LP_BSIM4/ptm45lp.lib
 
-MN1 D G 0 0 nmos W=1u L=45n
+M1  D G 0 0 nmos W=1u L=45n
 VD D 0 0
 VG G 0 0
 
