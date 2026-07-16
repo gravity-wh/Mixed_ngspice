@@ -1,5 +1,5 @@
---- /dev/fd/63	2026-07-17 01:35:43.076400006 +0800
-+++ /mnt/e/MyResearch/Ngspice/ngspice-46_mixed/src/spicelib/devices/bsim4v5/b4v5temp.c	2026-07-17 00:40:04.288850500 +0800
+--- /dev/fd/63	2026-07-17 02:20:57.920146194 +0800
++++ /mnt/e/MyResearch/Ngspice/ngspice-46_mixed/src/spicelib/devices/bsim4v5/b4v5temp.c	2026-07-17 01:54:06.027127700 +0800
 @@ -22,6 +22,31 @@
  #include "ngspice/sperror.h"
  #include "ngspice/suffix.h"
