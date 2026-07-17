@@ -1,0 +1,54 @@
+--- a/src/spicelib/devices/bsim4v5/b4v5ld.c
++++ b/src/spicelib/devices/bsim4v5/b4v5ld.c
+@@ -28,8 +28,12 @@
+ */
+ #define MAX_EXP 5.834617425e14
++#ifdef SINGLE_PRECISION
++#define MIN_EXP 1.0e-7
++#else
+ #define MIN_EXP 1.713908431e-15
++#endif
+ #define EXP_THRESHOLD 34.0
+ 
+@@ -98,6 +102,17 @@
+     }
+ 
++/* Double-precision operation counter for mixed-precision analysis */
++#ifdef SINGLE_PRECISION
++static unsigned long long g_double_ops = 0;
++#define COUNT_DOUBLE_OPS(n) g_double_ops += (n)
++unsigned long long b4v5_get_double_ops(void) { return g_double_ops; }
++void b4v5_reset_double_ops(void) { g_double_ops = 0; }
++#else
++#define COUNT_DOUBLE_OPS(n) do {} while(0)
++unsigned long long b4v5_get_double_ops(void) { return 0; }
++void b4v5_reset_double_ops(void) {}
++#endif
++
+ int BSIM4v5polyDepletion(SPICE_REAL phi, SPICE_REAL ngate, SPICE_REAL coxe, SPICE_REAL Vgs, SPICE_REAL *Vgs_eff, SPICE_REAL *dVgs_eff_dVg);
+ 
+@@ -241,6 +256,7 @@
+ SPICE_REAL Lpe_Vb, dDITS_Sft_dVb, dDITS_Sft_dVd;
++SPICE_REAL Delt_k1ox;
+ 
+@@ -1199,6 +1215,16 @@
+ 	  Lpe_Vb = sqrt(1.0 + pParam->BSIM4v5lpeb / Leff);
++          /* DOUBLE PRECISION ISLAND: (k1ox*sqrtPhis - k1*sqrtPhi) catastrophic cancellation in FP32 */
++#ifdef SINGLE_PRECISION
++          {   double d_diff = (double)pParam->BSIM4v5k1ox * (double)sqrtPhis
++                            - (double)pParam->BSIM4v5k1 * (double)pParam->BSIM4v5sqrtPhi;
++              COUNT_DOUBLE_OPS(4);
++              Delt_k1ox = (SPICE_REAL)d_diff;
++          }
++#else
++          Delt_k1ox = pParam->BSIM4v5k1ox * sqrtPhis - pParam->BSIM4v5k1 * pParam->BSIM4v5sqrtPhi;
++#endif
+           /* Vth + derivatives [FP32] */
+@@ -1231,7 +1257,7 @@
+ 
+-              f_Vth = f_type * f_vth0 + (f_k1ox * f_sqrtPhis - f_k1 * f_sqrtPhi) * f_LpeVb
++              f_Vth = f_type * f_vth0 + (float)Delt_k1ox * f_LpeVb
+ 
+@@ -1370,7 +1396,7 @@
+-                  f_T3 = f_Vtm * logf(1.0f + f_ExpVgst);
++                  f_T3 = f_Vtm * log1pf(f_ExpVgst);
