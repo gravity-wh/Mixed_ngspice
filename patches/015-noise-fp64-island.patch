@@ -1,0 +1,21 @@
+From: Mixed_ngspice
+Subject: Add FP64 noise island to fix 1/f flicker noise NaN in FP32
+
+BSIM4 flicker noise model (fnoimod=1) uses oxideTrapDensity defaults
+(NOIA=6.25e41 for NMOS, 6.188e40 for PMOS) that exceed FLT_MAX(3.4e38)
+in FP32 → stored as +Inf → NaN cascade in noise analysis.
+
+Two FP64 islands added to b4v5noi.c:
+1. BSIM4v5Eval1ovFNoise(): full double-precision recomputation
+   of the oxideTrapDensity values and T3-T9/Ssi (~52 double ops/call)
+2. fnoimod==1 Swi branch: T10/T11/Swi/T1 in double (~18 double ops/call)
+
+Total overhead: ~28,000 double ops per .noise run (<30% of single DC analysis).
+Post-fix: NaN eliminated, 1/f noise component now visible.
+Remaining ~30-40% accuracy gap from Nintegrate FP32 path (separate task).
+
+Also: g_double_ops changed from static to extern for cross-file sharing.
+
+Files modified:
+  src/spicelib/devices/bsim4v5/b4v5ld.c  — g_double_ops → extern
+  src/spicelib/devices/bsim4v5/b4v5noi.c — FP64 islands × 2
