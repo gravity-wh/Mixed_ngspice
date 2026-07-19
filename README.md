@@ -38,42 +38,63 @@ The build produces two binaries:
 
 The approach is **FP32 storage + selective FP64 compute**, analogous to mixed-precision training in deep learning (FP16 gradients + FP32 accumulation).
 
-## Test Suite
+## Validation Coverage (2026-07-19)
 
-| Circuit | Transistors | Analysis | Expected Error |
-|---------|------------|----------|----------------|
-| Single PMOS | 1 | .OP | < 0.001% |
-| Single NMOS | 1 | .OP | < 0.001% |
-| Bias 6T | 6 | .OP + .TRAN | < 0.003% |
-| Op-amp 22T | 22 | .OP + .TRAN | < 0.005% |
+| Dataset | Circuits | FP32 PASS | Pass Rate |
+|---------|----------|:--:|:--:|
+| **PTM 45nm** (open) | 8 circuits | 10/12 tests | 83% |
+| **SKY130A** (Analog_blocks) | 58 circuits | 58/58 | **100%** |
+| **SKY130** (AnalogGym LDO) | 4 circuits | 4/4 | **100%** |
+| **SMIC 180nm BCD** (AnalogSizing) | 8 circuits | 4/8 | 50% |
+| **TRAN validation** | 14 circuits | 11/14 | 79% |
+| **Total** | **104 files** | **88** | **85%** |
+
+### DC Precision
+| Circuit | Metric | FP32 | FP64 | Error |
+|---------|--------|------|------|-------|
+| NMOS 45nm | id | 1.48189e-05 | 1.48189e-05 | **0.00007%** |
+| PMOS 45nm | id | 2.15147e-05 | 2.15147e-05 | **0%** |
+| OpAmp DC | v(out) | 1.098757 | 1.093652 | **0.47%** |
+
+### TRAN Milestones
+- ✅ BGR startup (SKY130A, BJT+MOSFET)
+- ✅ OTA closed-loop step (PTM45, unity-gain buffer)
+- ✅ OpAmp closed-loop step (PTM45, 2-stage Miller, 100mV step)
+- ✅ Comparator clocked (PTM45, 1GHz/50ps edge)
+- ✅ Buck converter (SKY130A, PWM switching)
+- ✅ LDO load step (SKY130A, feedback network)
 
 ## Supported Process Corners
 
-| Corner | Status |
-|--------|--------|
-| TT (Typical-Typical) | Verified |
-| FF (Fast-Fast) | In progress |
-| SS (Slow-Slow) | In progress |
-| FNSP (Fast-NMOS Slow-PMOS) | In progress |
-| SNFP (Slow-NMOS Fast-PMOS) | In progress |
-
-Generated via `scripts/gen_corners.py` from HSPICE corner libraries.
+| Corner | PTM 45nm | SKY130A | SMIC 180nm BCD |
+|--------|:--:|:--:|:--:|
+| TT (Typical) | ✅ Verified | ✅ Verified | ⚠️ NMOS only |
+| FF (Fast-Fast) | In progress | Model available | ⚠️ |
+| SS (Slow-Slow) | In progress | Model available | ⚠️ |
 
 ## Documentation
 
+- [FP32 Full Coverage Report v2](docs/FP32_全覆盖最终报告_v2_20260719.md)
+- [FP32 TRAN Validation Report](docs/FP32_TRAN验证报告_20260719.md)
 - [Complete Reproduction Guide](docs/FP32混合精度_完整复现指南.md)
 - [Precision Loss Validation](docs/FP32_精度损失验证报告.md)
 - [FP64 Retention Strategy](docs/FP64_保留策略分析.md)
-- [Non-TT Corner Convergence Solutions](docs/非TT工艺角FP32收敛_解决方案调研.md)
+- [Noise Analysis Boundary](docs/Mixed_ngspice_噪声分析边界.md)
+- [TRAN Validation Methodology](docs/Mixed_ngspice_TRAN瞬态验证方案.md)
+- [P0 Test Results](docs/Mixed_ngspice_P0测试结果.md)
 
 ## Repository Structure
 
 ```
 Mixed_ngspice/
-├── patches/          # 11 patches against vanilla ngspice-46
-├── scripts/          # Build, comparison, and corner-generation scripts
-├── test/             # Test circuits, models, and automation
-├── docs/             # Technical documentation
+├── patches/          # 15 patches against vanilla ngspice-46
+├── scripts/          # Build, batch validation, waveform comparison
+├── test/
+│   ├── circuits/     # 8 PTM45 test circuits (DC/AC/TRAN)
+│   ├── circuits_tran/# T1-T5 custom TRAN testbenches
+│   ├── models/       # PTM 45nm LP/HP (TT/FF/SS/FS/SF)
+│   └── expected/     # FP64 baseline JSON
+├── docs/             # Technical documentation & validation reports
 └── .github/          # CI workflows
 ```
 

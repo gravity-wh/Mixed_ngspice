@@ -1,0 +1,21 @@
+=== PTM45 FP32 vs FP64 Batch Validation ===
+Date: Sun Jul 19 18:07:04 CST 2026
+FP32: /mnt/e/MyResearch/Ngspice/ngspice-46_mixed/build/src/ngspice
+FP64: /mnt/e/MyResearch/Ngspice/ngspice-46_mixed/build64/src/ngspice
+
+[1] 01_single_nmos_45nm/test_dc.sp ... ❌ NaN_FP32
+[2] 01_single_nmos_45nm/test_dc_sweep.sp ... ⚠️  NO_OP_DATA
+[3] 02_single_pmos_45nm/test_dc.sp ... ❌ NaN_FP32
+[4] 02_single_pmos_45nm/test_dc_sweep.sp ... ❌ TTS_FP32
+[5] 03_ring_oscillator_17stage/test_tran.sp ... ❌ NaN_FP32
+[6] 04_ota_5transistor_45nm/test_ac.sp ... ❌ TTS_FP32
+[7] 04_ota_5transistor_45nm/test_dc.sp ... ❌ TTS_FP32
+[8] 05_opamp_2stage_miller_45nm/test_ac.sp ... ❌ TTS_FP32
+[9] 05_opamp_2stage_miller_45nm/test_dc.sp ... ❌ TTS_FP32
+[10] 06_comparator_strongarm_45nm/test_tran.sp ... ❌ NaN_FP32
+[11] 07_bootstrap_switch_45nm/test_tran.sp ... ❌ TTS_FP32
+[12] 08_roessler_attractor/test_chaos.sp ... ⚠️  NO_OP_DATA
+
+=== SUMMARY ===
+Total: 12 | ✅ Passed: 0 | ❌ Failed: 10
+Pass rate: 0%
