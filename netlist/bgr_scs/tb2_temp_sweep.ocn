@@ -1,0 +1,144 @@
+; TB2 Ocean Script: Temperature Sweep + PPM Fitting
+; BGR + HORDER joint simulation
+; FOMs: PPM, V_CONTROL_RANGE, VBG_TC, VCTAT_TC
+;
+; V_ideal(T) = -1.2062e-10*(T-25)^5 - 1.2997e-09*(T-25)^4
+;            + 3.3020e-06*(T-25)^3 - 1.6192e-02*(T-25) + 1.05
+; PPM = max(|V_CONTROL(T) - V_ideal(T)|) / pp_V_ideal * 20
+
+simulator('spectre)
+
+; Initialize variables
+vctrl_max = 0.0
+vctrl_min = 0.0
+vctrl_range = 0.0
+vbg_max = 0.0
+vbg_min = 0.0
+vbg_nom = 0.0
+vbg_tc = 0.0
+vctat_max = 0.0
+vctat_min = 0.0
+vctat_nom = 0.0
+vctat_tc = 0.0
+ppm = 0.0
+v_ideal_max = 0.0
+v_ideal_min = 0.0
+v_ideal_pp = 0.0
+
+; Open results
+openResults("/share/home/chentianyang/nloa/testdata_input/psf_data/tb2_temp_sweep")
+
+; Select DC analysis results
+selectResults("dc_op-dc")
+
+; Extract V_CONTROL waveform
+vctrl_raw = getData("V_CONTROL")
+when(vctrl_raw != nil
+    vctrl_max = ymax(vctrl_raw)
+    vctrl_min = ymin(vctrl_raw)
+    vctrl_range = vctrl_max - vctrl_min
+    printf("V_CONTROL_max = %.6f V\n" vctrl_max)
+    printf("V_CONTROL_min = %.6f V\n" vctrl_min)
+    printf("V_CONTROL_RANGE = %.6f V\n" vctrl_range)
+)
+
+; Extract VBG waveform
+vbg_raw = getData("VBG")
+when(vbg_raw != nil
+    vbg_max = ymax(vbg_raw)
+    vbg_min = ymin(vbg_raw)
+    ; Get VBG at 27C using value() interpolation
+    vbg_nom = value(vbg_raw 27.0)
+    ; TC = (max-min)/nominal/180 * 1e6 (ppm/C)
+    vbg_tc = (vbg_max - vbg_min) / vbg_nom / 180.0 * 1.0e6
+    printf("VBG_max = %.6f V\n" vbg_max)
+    printf("VBG_min = %.6f V\n" vbg_min)
+    printf("VBG_TC = %.3f ppm/C\n" vbg_tc)
+)
+
+; Extract VCTAT waveform
+vctat_raw = getData("VCTAT")
+when(vctat_raw != nil
+    vctat_max = ymax(vctat_raw)
+    vctat_min = ymin(vctat_raw)
+    ; Get VCTAT at 27C using value() interpolation
+    vctat_nom = value(vctat_raw 27.0)
+    ; TC = (max-min)/nominal/180 * 1e6 (ppm/C)
+    vctat_tc = (vctat_max - vctat_min) / vctat_nom / 180.0 * 1.0e6
+    printf("VCTAT_max = %.6f V\n" vctat_max)
+    printf("VCTAT_min = %.6f V\n" vctat_min)
+    printf("VCTAT_TC = %.3f ppm/C\n" vctat_tc)
+)
+
+; Compute PPM: iterate through temperature points, compute V_ideal and error
+when(vctrl_raw != nil
+    ; Get temperature vector (X axis) and V_CONTROL vector (Y axis)
+    xvec = drGetWaveformXVec(vctrl_raw)
+    yvec = drGetWaveformYVec(vctrl_raw)
+
+    ; Initialize tracking variables
+    max_error = 0.0
+    v_ideal_max = -1.0e30
+    v_ideal_min = 1.0e30
+    num_pts = drVectorLength(xvec)
+
+    ; Iterate through each temperature point
+    i = 0
+    while(i < num_pts
+        temp = drGetElem(xvec i)
+        v_ctrl = drGetElem(yvec i)
+
+        ; Compute V_ideal(T) =
+        ;   -1.2062e-10*(T-25)^5 - 1.2997e-09*(T-25)^4
+        ;   + 3.3020e-06*(T-25)^3 - 1.6192e-02*(T-25) + 1.05
+        dt = temp - 25.0
+        dt2 = dt * dt
+        dt3 = dt2 * dt
+        dt4 = dt3 * dt
+        dt5 = dt4 * dt
+        v_ideal = -1.2062e-10 * dt5 - 1.2997e-09 * dt4 + 3.3020e-06 * dt3 - 1.6192e-02 * dt + 1.05
+
+        ; Track max/min of V_ideal
+        if(v_ideal > v_ideal_max then
+            v_ideal_max = v_ideal
+        else
+            ; keep current max
+        )
+        if(v_ideal < v_ideal_min then
+            v_ideal_min = v_ideal
+        else
+            ; keep current min
+        )
+
+        ; Compute absolute error
+        err = abs(v_ctrl - v_ideal)
+        if(err > max_error then
+            max_error = err
+        else
+            ; keep current max error
+        )
+
+        i = i + 1
+    )
+
+    v_ideal_pp = v_ideal_max - v_ideal_min
+    if(v_ideal_pp > 0.0 then
+        ppm = max_error / v_ideal_pp * 20.0
+    else
+        ppm = 0.0
+    )
+
+    printf("V_ideal_max = %.6f V\n" v_ideal_max)
+    printf("V_ideal_min = %.6f V\n" v_ideal_min)
+    printf("max_error = %.6f V\n" max_error)
+    printf("PPM = %.6f\n" ppm)
+)
+
+; FOM Summary
+printf("\n===== FOM Summary =====\n")
+printf("PPM = %.6f\n" ppm)
+printf("V_CONTROL_RANGE = %.6f V\n" vctrl_range)
+printf("VBG_TC = %.3f ppm/C\n" vbg_tc)
+printf("VCTAT_TC = %.3f ppm/C\n" vctat_tc)
+
+exit

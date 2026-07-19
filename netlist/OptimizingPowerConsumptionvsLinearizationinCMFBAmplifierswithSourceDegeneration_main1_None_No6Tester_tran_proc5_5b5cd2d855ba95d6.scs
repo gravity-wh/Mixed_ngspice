@@ -1,0 +1,440 @@
+
+
+
+
+
+
+model _ideal_switch_ vswitch vt=1e-3 roff=1e12 ron=1
+parameters l_origin=1e-06
+parameters l_M2=1.2e-06
+parameters w_M2=4.8e-05
+parameters m_M2=2
+parameters c_CLrepeat0=2e-12
+parameters l_M4=8e-07
+parameters w_M4=1e-05
+parameters m_M4=2
+parameters l_M7=8e-07
+parameters w_M7=2.64e-05
+parameters m_M7=2
+parameters l_M9=3e-06
+parameters w_M9=3.6e-05
+parameters m_M9=2
+parameters l_M11=3e-07
+parameters w_M11=1.44e-05
+parameters m_M11=2
+parameters l_M5=3e-06
+parameters w_M5=1.8e-06
+parameters m_M5=2
+parameters r_R2=100000.0
+parameters l_M26=2e-06
+parameters w_M26=4e-06
+parameters m_M26=1
+parameters l_M22=1e-06
+parameters w_M22=1e-05
+parameters m_M22=2
+parameters l_M23=2e-06
+parameters w_M23=6e-06
+parameters m_M23=1
+parameters i_Ip1=5e-06
+parameters i_Ip=2e-05
+
+// OptimizingPowerConsumptionvsLinearizationinCMFBAmplifierswithSourceDegeneration_main1_None_No6Tester_7e656674b3631635
+include "/share/project/TEDprocess/SMIC/smic18mse_1833_1P6M_5Ia_1TMa1_MIM20_oa_cds_2019_01_15_v1.11_4/models/spectre/ms018_enhanced_v1p11_spe.lib" section=tt
+include "/share/project/TEDprocess/SMIC/smic18mse_1833_1P6M_5Ia_1TMa1_MIM20_oa_cds_2019_01_15_v1.11_4/models/spectre/ms018_enhanced_v1p11_spe.lib" section=dio_tt
+include "/share/project/TEDprocess/SMIC/smic18mse_1833_1P6M_5Ia_1TMa1_MIM20_oa_cds_2019_01_15_v1.11_4/models/spectre/ms018_enhanced_v1p11_spe.lib" section=bjt_tt
+include "/share/project/TEDprocess/SMIC/smic18mse_1833_1P6M_5Ia_1TMa1_MIM20_oa_cds_2019_01_15_v1.11_4/models/spectre/ms018_enhanced_v1p11_spe.lib" section=res_tt
+include "/share/project/TEDprocess/SMIC/smic18mse_1833_1P6M_5Ia_1TMa1_MIM20_oa_cds_2019_01_15_v1.11_4/models/spectre/ms018_enhanced_v1p11_spe.lib" section=var_tt
+include "/share/project/TEDprocess/SMIC/smic18mse_1833_1P6M_5Ia_1TMa1_MIM20_oa_cds_2019_01_15_v1.11_4/models/spectre/ms018_enhanced_v1p11_spe.lib" section=mim_tt
+// stdcell_inc is None, skip
+global 0 __root_VSS__ __root_VDD__
+// _v0_ _vss_ 0 resistor r=0
+_v1_ __root_VSS__ 0 resistor r=0
+// _v2_ _vdd_ __root_VDD__ resistor r=0
+
+
+subckt NMOS_96c2247a5f871a g d s _vdd_ _vss_
+xmos (g d s _vdd_ _vss_) Mos_41fc1667291e9350 // l=l_M5, w=w_M5, m=int(m_M5), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, obs=None, builtin=True, nf=None, left_dummy_gate=0, right_dummy_gate=0, connect_gate=None, confine=None
+
+ends
+    
+
+subckt Mosfet_14fca161ffdb6a7 d g s b
+
+ends
+    
+
+subckt OptimizingPowerConsumptionvsLinearizationinCMFBAmplifierswithSourceDegeneration_main1_2600eeae3962018 Vcm VINN VINP VOUTN VOUTP OUTP_CMFB OUTN_CMFB _vdd_ _vss_
+xdifferentialpair_1 (VINN VINP n9_\<4\>_ n9_\<5\>_ n9_\<0\>_ _vdd_ _vss_) DifferentialPair_740087b4bf30eeba // l=l_M2, w=w_M2, model=nch, m=int(m_M2), mode=cross, nf=None, dummy_l=None, dummy_m=0, y_spacing=1000, builtin=True, d_via=1
+ccapacitor_1 (VOUTP _vss_) capacitor c=c_CLrepeat0 // c=2e-12, model=capacitor
+ccapacitor_2 (VOUTN _vss_) capacitor c=c_CLrepeat0 // c=2e-12, model=capacitor
+xpmos_1 (n9_\<12\>_ n9_\<5\>_ _vdd_ _vdd_ _vss_) PMOS_8871922644e2f858 // w=w_M4, l=l_M4, m=int(m_M4), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, nf=None, model=None, obs=None, builtin=True
+xnmos_1 (n9_\<8\>_ n9_\<2\>_ _vss_ _vdd_ _vss_) NMOS_dd303b9005062fcc // w=w_M11, l=l_M11, m=int(m_M11), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, nf=None, model=None, obs=None, builtin=True
+xnmos_2 (n9_\<7\>_ VOUTN n9_\<2\>_ _vdd_ _vss_) NMOS_544525508e4498a7 // w=w_M9, l=l_M9, m=int(m_M9), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, nf=None, obs=None, builtin=True
+xpmos_2 (n9_\<6\>_ VOUTN n9_\<5\>_ _vdd_ _vss_) PMOS_86f5e1721e50a6ec // w=w_M7, l=l_M7, m=int(m_M7), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, nf=None, obs=None, builtin=True
+xnmos_3 (n9_\<7\>_ VOUTP n9_\<1\>_ _vdd_ _vss_) NMOS_544525508e4498a7 // w=w_M9, l=l_M9, m=int(m_M9), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, nf=None, obs=None, builtin=True
+xpmos_3 (n9_\<12\>_ n9_\<4\>_ _vdd_ _vdd_ _vss_) PMOS_8871922644e2f858 // w=w_M4, l=l_M4, m=int(m_M4), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, nf=None, model=None, obs=None, builtin=True
+xnmos_4 (n9_\<8\>_ n9_\<1\>_ _vss_ _vdd_ _vss_) NMOS_dd303b9005062fcc // w=w_M11, l=l_M11, m=int(m_M11), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, nf=None, model=None, obs=None, builtin=True
+xnmos_5 (n9_\<9\>_ n9_\<3\>_ _vss_ _vdd_ _vss_) NMOS_96c2247a5f871a // w=w_M5, l=l_M5, m=int(m_M5), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, nf=None, model=None, obs=None, builtin=True
+xpmos_4 (n9_\<6\>_ VOUTP n9_\<4\>_ _vdd_ _vss_) PMOS_86f5e1721e50a6ec // w=w_M7, l=l_M7, m=int(m_M7), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, nf=None, obs=None, builtin=True
+xnmos_6 (n9_\<10\>_ n9_\<0\>_ n9_\<3\>_ _vdd_ _vss_) NMOS_f61e13f7571a3fd7 // w=w_M5, l=l_M5, m=int(m_M5), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, nf=None, obs=None, builtin=True
+vvsource_1 (n9_\<6\>_ _vss_) vsource dc=0.5 // dc=0.5, ac=None, mode=None, model=vsource
+vvsource_2 (n9_\<7\>_ _vss_) vsource dc=1.2 // dc=1.2, ac=None, mode=None, model=vsource
+vvsource_3 (n9_\<8\>_ _vss_) vsource dc=0.8 // dc=0.8, ac=None, mode=None, model=vsource
+vvsource_4 (n9_\<9\>_ _vss_) vsource dc=0.8 // dc=0.8, ac=None, mode=None, model=vsource
+vvsource_5 (n9_\<10\>_ _vss_) vsource dc=1.2 // dc=1.2, ac=None, mode=None, model=vsource
+ccapacitor_3 (VOUTP VINP) capacitor c=3e-12 // c=3e-12, model=capacitor
+ccapacitor_4 (VOUTN VINN) capacitor c=3e-12 // c=3e-12, model=capacitor
+xpmos_5 (n9_\<11\>_ n9_\<11\>_ _vdd_ _vdd_ _vss_) PMOS_7ac8b8a9c244c625 // w=w_M26, l=l_M26, m=int(m_M26), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, nf=None, obs=None, builtin=True
+xpmos_6 (n9_\<11\>_ n9_\<12\>_ _vdd_ _vdd_ _vss_) PMOS_7ac8b8a9c244c625 // w=w_M26, l=l_M26, m=int(m_M26), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, nf=None, obs=None, builtin=True
+xdifferentialpair_2 (Vcm n9_\<15\>_ n9_\<12\>_ n9_\<11\>_ n9_\<13\>_ _vdd_ _vss_) DifferentialPair_285bede8993664da // l=l_M22, w=w_M22, model=nch, m=int(m_M22), nf=None, mode=abba, dummy_l=None, dummy_m=0, y_spacing=1000, builtin=True, d_via=1
+xnmos_7 (n9_\<14\>_ n9_\<13\>_ _vss_ _vdd_ _vss_) NMOS_360d5b04259913b1 // w=w_M23, l=l_M23, m=int(m_M23), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, nf=None, obs=None, builtin=True
+xnmos_8 (n9_\<14\>_ n9_\<14\>_ _vss_ _vdd_ _vss_) NMOS_360d5b04259913b1 // w=w_M23, l=l_M23, m=int(m_M23), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, nf=None, obs=None, builtin=True
+xrhrpo_1 (OUTN_CMFB n9_\<15\>_) rhrpo r=r_R2 // r=r_R2
+xrhrpo_2 (OUTP_CMFB n9_\<15\>_) rhrpo r=r_R2 // r=r_R2
+ccapacitor_5 (VOUTP n9_\<12\>_) capacitor c=2e-12 // c=2e-12, model=capacitor
+ccapacitor_6 (VOUTN n9_\<12\>_) capacitor c=2e-12 // c=2e-12, model=capacitor
+iisource_1 (_vdd_ n9_\<14\>_) isource dc=i_Ip1 // dc=i_Ip1, ac=0, model=isource, mode=None
+
+ends
+    
+
+subckt MosfetLvs_4c4cc77eb93fccd d g s b
+
+ends
+    
+
+subckt VSource_5c674318fdc56f6 a b
+
+ends
+    
+
+subckt VSource_7f335e536b4a09a a b
+
+ends
+    
+
+subckt VSource_a9b722f785f5c77 a b
+
+ends
+    
+
+subckt rhrpo_f000470245f9d5e n0 n1
+
+ends
+    
+
+subckt Mosfet_fc10e6663cac7ad d g s b
+
+ends
+    
+
+subckt VSource_1446abbd77ff695d a b
+
+ends
+    
+
+subckt MosfetLvs_1c6d6bc4d4ec8dbf d g s b
+
+ends
+    
+
+subckt VSource_1db28cdfd7642c17 a b
+
+ends
+    
+
+subckt Capacitor_22f39a48932239d0 a b
+
+ends
+    
+
+subckt DifferentialPair_285bede8993664da g1 g2 d1 d2 s _vdd_ _vss_
+mmosfet_1 (d1 g1 s _vss_) n18 l=l_M22 w=w_M22 m=int(m_M22)  // model=n18, w=w_M22, l=l_M22, m=int(m_M22), nf=None
+mmosfet_2 (d2 g2 s _vss_) n18 l=l_M22 w=w_M22 m=int(m_M22)  // model=n18, w=w_M22, l=l_M22, m=int(m_M22), nf=None
+mmosfet_3 (_vss_ _vss_ d1 _vss_) n18 l=9e-07 w=w_M22 m=1  // model=n18, w=w_M22, l=9e-7, m=1, nf=None
+mmosfet_4 (d1 _vss_ _vss_ _vss_) n18 l=9e-07 w=w_M22 m=1  // model=n18, w=w_M22, l=9e-7, m=1, nf=None
+
+ends
+    
+
+subckt Mos_2935b7173e8dac5d g d s _vdd_ _vss_
+mmosfet_1 (d g s _vss_) n18 l=l_M9 w=w_M9 m=int(m_M9)  // model=n18, w=w_M9, l=l_M9, m=int(m_M9), nf=None
+
+ends
+    
+
+subckt MosfetLvs_2a91f6f61442d7f2 d g s b
+
+ends
+    
+
+subckt VSource_2cfdb437549897d2 a b
+
+ends
+    
+
+subckt NMOS_360d5b04259913b1 g d s _vdd_ _vss_
+xmos (g d s _vdd_ _vss_) Mos_a9152153212e9c06 // l=l_M23, w=w_M23, m=int(m_M23), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, obs=None, builtin=True, nf=None, left_dummy_gate=0, right_dummy_gate=0, connect_gate=None, confine=None
+
+ends
+    
+
+subckt MosfetLvs_36d10d96da76f591 d g s b
+
+ends
+    
+
+subckt Mosfet_3a28cbdbae1123dc d g s b
+
+ends
+    
+
+subckt Mos_41fc1667291e9350 g d s _vdd_ _vss_
+mmosfet_1 (d g s _vss_) n18 l=l_M5 w=w_M5 m=int(m_M5)  // model=n18, w=w_M5, l=l_M5, m=int(m_M5), nf=None
+
+ends
+    
+
+subckt Capacitor_455ff18989871c65 a b
+
+ends
+    
+
+subckt ISource_480e6a6e22b53dbf a b
+
+ends
+    
+
+subckt NMOS_544525508e4498a7 g d s _vdd_ _vss_
+xmos (g d s _vdd_ _vss_) Mos_2935b7173e8dac5d // l=l_M9, w=w_M9, m=int(m_M9), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, obs=None, builtin=True, nf=None, left_dummy_gate=0, right_dummy_gate=0, connect_gate=None, confine=None
+
+ends
+    
+
+subckt Mosfet_579b69af56716726 d g s b
+
+ends
+    
+
+subckt Capacitor_57bbc9dd713d4350 a b
+
+ends
+    
+
+subckt Mos_5cd04b5d3e6e7274 g d s _vdd_ _vss_
+mmosfet_1 (d g s _vdd_) p18 l=l_M7 w=w_M7 m=int(m_M7)  // model=p18, w=w_M7, l=l_M7, m=int(m_M7), nf=None
+
+ends
+    
+
+subckt Capacitor_5cf216a64f88c635 a b
+
+ends
+    
+
+subckt VSource_5ff421cce4089485 a b
+
+ends
+    
+
+subckt Mos_661396d6356097ce g d s _vdd_ _vss_
+mmosfet_1 (d g s _vss_) n18 l=l_M5 w=w_M5 m=int(m_M5)  // model=n18, w=w_M5, l=l_M5, m=int(m_M5), nf=None
+
+ends
+    
+
+subckt DifferentialPair_740087b4bf30eeba g1 g2 d1 d2 s _vdd_ _vss_
+mmosfet_1 (d1 g1 s _vss_) n18 l=l_M2 w=w_M2 m=int(m_M2)  // model=n18, w=w_M2, l=l_M2, m=int(m_M2), nf=None
+mmosfet_2 (d2 g2 s _vss_) n18 l=l_M2 w=w_M2 m=int(m_M2)  // model=n18, w=w_M2, l=l_M2, m=int(m_M2), nf=None
+
+ends
+    
+
+subckt PMOS_7ac8b8a9c244c625 g d s _vdd_ _vss_
+xmos (g d s _vdd_ _vss_) Mos_d20435b2094c751e // l=l_M26, w=w_M26, m=int(m_M26), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, obs=None, builtin=True, nf=None, left_dummy_gate=0, right_dummy_gate=0, connect_gate=None, confine=None
+
+ends
+    
+
+subckt PMOS_86f5e1721e50a6ec g d s _vdd_ _vss_
+xmos (g d s _vdd_ _vss_) Mos_5cd04b5d3e6e7274 // l=l_M7, w=w_M7, m=int(m_M7), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, obs=None, builtin=True, nf=None, left_dummy_gate=0, right_dummy_gate=0, connect_gate=None, confine=None
+
+ends
+    
+
+subckt MosfetLvs_8730e2fef0490f5c d g s b
+
+ends
+    
+
+subckt PMOS_8871922644e2f858 g d s _vdd_ _vss_
+xmos (g d s _vdd_ _vss_) Mos_dba25d8b6d1a3b4d // l=l_M4, w=w_M4, m=int(m_M4), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, obs=None, builtin=True, nf=None, left_dummy_gate=0, right_dummy_gate=0, connect_gate=None, confine=None
+
+ends
+    
+
+subckt Mosfet_8959872d471aaca8 d g s b
+
+ends
+    
+
+subckt Mosfet_8d47b4bd30b39795 d g s b
+
+ends
+    
+
+subckt MosfetLvs_8d5cc0261bbd28f1 d g s b
+
+ends
+    
+
+subckt OptimizingPowerConsumptionvsLinearizationinCMFBAmplifierswithSourceDegeneration_main1_wrapper_9080990592a485d6 VCM VINP VINN VOUTP VOUTN OUTP_CMFB OUTN_CMFB _vdd_ _vss_
+xdut (VCM VINP VINN VOUTP VOUTN OUTP_CMFB OUTN_CMFB _vdd_ _vss_) OptimizingPowerConsumptionvsLinearizationinCMFBAmplifierswithSourceDegeneration_main1_2600eeae3962018 // 
+
+ends
+    
+
+subckt Mosfet_95e29e2a298423d3 d g s b
+
+ends
+    
+
+subckt Mos_a9152153212e9c06 g d s _vdd_ _vss_
+mmosfet_1 (d g s _vss_) n18 l=l_M23 w=w_M23 m=int(m_M23)  // model=n18, w=w_M23, l=l_M23, m=int(m_M23), nf=None
+
+ends
+    
+
+subckt Mos_ac18818ad7e597e9 g d s _vdd_ _vss_
+mmosfet_1 (d g s _vss_) n18 l=l_M11 w=w_M11 m=int(m_M11)  // model=n18, w=w_M11, l=l_M11, m=int(m_M11), nf=None
+
+ends
+    
+
+subckt Mosfet_b5c7239ed707bcf7 d g s b
+
+ends
+    
+
+subckt MosfetLvs_bd290894a4949477 d g s b
+
+ends
+    
+
+subckt MosfetLvs_be92dd0a81622a27 d g s b
+
+ends
+    
+
+subckt VSource_cbb725a418ee2ae5 a b
+
+ends
+    
+
+subckt MosfetLvs_cd85a93124348682 d g s b
+
+ends
+    
+
+subckt MosfetLvs_ce917e8e88f0ca6d d g s b
+
+ends
+    
+
+subckt Mos_d20435b2094c751e g d s _vdd_ _vss_
+mmosfet_1 (d g s _vdd_) p18 l=l_M26 w=w_M26 m=int(m_M26)  // model=p18, w=w_M26, l=l_M26, m=int(m_M26), nf=None
+
+ends
+    
+
+subckt Mosfet_d5353e833fae3833 d g s b
+
+ends
+    
+
+subckt Mosfet_db38a22f264de596 d g s b
+
+ends
+    
+
+subckt Mos_dba25d8b6d1a3b4d g d s _vdd_ _vss_
+mmosfet_1 (d g s _vdd_) p18 l=l_M4 w=w_M4 m=int(m_M4)  // model=p18, w=w_M4, l=l_M4, m=int(m_M4), nf=None
+
+ends
+    
+
+subckt NMOS_dd303b9005062fcc g d s _vdd_ _vss_
+xmos (g d s _vdd_ _vss_) Mos_ac18818ad7e597e9 // l=l_M11, w=w_M11, m=int(m_M11), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, obs=None, builtin=True, nf=None, left_dummy_gate=0, right_dummy_gate=0, connect_gate=None, confine=None
+
+ends
+    
+
+subckt MosfetLvs_f143813bd1ba9e86 d g s b
+
+ends
+    
+
+subckt NMOS_f61e13f7571a3fd7 g d s _vdd_ _vss_
+xmos (g d s _vdd_ _vss_) Mos_661396d6356097ce // l=l_M5, w=w_M5, m=int(m_M5), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, obs=None, builtin=True, nf=None, left_dummy_gate=0, right_dummy_gate=0, connect_gate=None, confine=None
+
+ends
+    
+
+subckt Mosfet_fff39d34cd70422b d g s b
+
+ends
+    
+vVD (v_dd __root_VDD__) vsource dc=0 // dc=0, ac=None, mode=None, model=vsource
+vVS (v_ss __root_VSS__) vsource dc=0 // dc=0, ac=None, mode=None, model=vsource
+vVDD (v_dd v_ss) vsource dc=1.8 // dc=1.8, ac=None, mode=None, model=vsource
+vVcm (VCM v_ss) vsource dc=0.9 // dc=0.9, ac=None, mode=None, model=vsource
+vV1 (v_inp v_ss) vsource type=pulse dc=0 val0=0 delay=10e-6 val1=1.8 width=20e-6 period=40e-6 rise=10e-12 fall=10e-12 // dc=0, ac=None, mode=None, model=vsource
+vV2 (v_inn v_ss) vsource type=pulse dc=0 val0=1.8 delay=10e-6 val1=0 width=20e-6 period=40e-6 rise=10e-12 fall=10e-12 // dc=0, ac=None, mode=None, model=vsource
+cCload_p (v_outp v_ss) capacitor c=1e-12 // c=1e-12, model=capacitor
+cCload_n (v_outn v_ss) capacitor c=1e-12 // c=1e-12, model=capacitor
+xdut (VCM v_inp v_inn v_outp v_outn v_outp v_outn __root_VDD__ __root_VSS__) OptimizingPowerConsumptionvsLinearizationinCMFBAmplifierswithSourceDegeneration_main1_wrapper_9080990592a485d6 // 
+
+simulatorOptions options checklimitdest=psf cols=80 digits=5 gmin=1e-12 iabstol=1e-12 maxnotes=5 maxwarns=5 pivrel=0.001 reltol=0.001 rforce=1 scale=1.0 scalem=1.0 temp=27 tnom=27 useterms=name vabstol=1e-06
+// saveOptions options save=allpub
+
+
+swp sweep paramset=sweepdata {
+tran tran step=1e-10 stop=4e-05  errpreset=moderate    
+}        
+        
+
+
+sweepdata paramset {
+l_origin   l_M2       w_M2       m_M2       c_CLrepeat0 l_M4       w_M4       m_M4       l_M7       w_M7       m_M7       l_M9       w_M9       m_M9       l_M11      w_M11      m_M11      l_M5       w_M5       m_M5       r_R2       l_M26      w_M26      m_M26      l_M22      w_M22      m_M22      l_M23      w_M23      m_M23      i_Ip1      i_Ip      
+6.8000e-07 1.8000e-07 2.0000e-05 1.0000e+01 1.0000e-11 7.8000e-07 1.7150e-05 1.8000e+01 1.8000e-07 1.7140e-05 1.0000e+01 5.8000e-06 1.5700e-05 4.0000e+00 3.7000e-06 1.7700e-05 2.0000e+00 3.0000e-07 1.8000e-05 1.0000e+01 1.0000e+04 3.7000e-06 4.3000e-06 2.0000e+00 2.2000e-06 8.6000e-06 6.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 1.0000e-05 5.9000e-05
+7.8000e-07 1.8000e-07 2.0000e-05 1.2000e+01 5.2000e-12 6.8000e-07 1.7150e-05 1.8000e+01 1.8000e-07 1.6840e-05 1.2000e+01 1.0000e-05 1.4400e-05 4.0000e+00 3.7000e-06 1.6900e-05 6.0000e+00 3.0000e-07 1.8000e-05 1.0000e+01 1.0000e+04 4.1000e-06 4.5000e-06 2.0000e+00 2.0000e-06 8.2000e-06 6.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 8.0000e-06 6.1000e-05
+5.8000e-07 1.8000e-07 2.0000e-05 1.0000e+01 2.4000e-12 7.8000e-07 1.7150e-05 1.8000e+01 1.8000e-07 1.8040e-05 1.2000e+01 8.4000e-06 1.4800e-05 4.0000e+00 1.6000e-06 1.7200e-05 4.0000e+00 3.0000e-07 1.8000e-05 1.0000e+01 1.0000e+04 2.0000e-06 4.6000e-06 2.0000e+00 2.4000e-06 8.1000e-06 6.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 1.0000e-05 7.8000e-05
+8.8000e-07 1.8000e-07 2.0000e-05 1.2000e+01 8.8000e-12 6.8000e-07 1.7150e-05 1.8000e+01 1.8000e-07 1.6240e-05 1.2000e+01 5.9000e-06 1.4800e-05 4.0000e+00 3.7000e-06 1.6800e-05 4.0000e+00 3.0000e-07 1.8000e-05 1.0000e+01 1.0000e+04 4.0000e-06 4.5000e-06 2.0000e+00 1.8000e-06 8.8000e-06 6.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 8.0000e-06 6.4000e-05
+7.8000e-07 1.8000e-07 2.0000e-05 1.2000e+01 3.5000e-12 6.8000e-07 1.7150e-05 1.8000e+01 1.8000e-07 1.7140e-05 1.2000e+01 1.0000e-05 1.4800e-05 4.0000e+00 3.7000e-06 1.7100e-05 4.0000e+00 3.0000e-07 1.8000e-05 1.0000e+01 1.0000e+04 4.0000e-06 4.5000e-06 2.0000e+00 2.2000e-06 8.1000e-06 6.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 8.0000e-06 6.4000e-05
+8.8000e-07 1.8000e-07 2.0000e-05 1.2000e+01 3.5000e-12 6.8000e-07 1.7150e-05 1.8000e+01 1.8000e-07 1.7140e-05 1.2000e+01 4.4000e-06 1.4800e-05 4.0000e+00 3.7000e-06 1.6800e-05 6.0000e+00 3.0000e-07 1.8000e-05 1.0000e+01 1.0000e+04 4.0000e-06 4.5000e-06 2.0000e+00 2.2000e-06 8.1000e-06 6.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 8.0000e-06 6.4000e-05
+7.8000e-07 1.8000e-07 2.0000e-05 1.2000e+01 3.5000e-12 6.8000e-07 1.7150e-05 1.8000e+01 3.8000e-07 1.7140e-05 1.2000e+01 1.0000e-05 1.4800e-05 4.0000e+00 3.7000e-06 1.7400e-05 6.0000e+00 3.0000e-07 1.8000e-05 1.0000e+01 1.0000e+04 4.0000e-06 4.5000e-06 2.0000e+00 2.2000e-06 8.9000e-06 6.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 8.0000e-06 6.4000e-05
+7.8000e-07 1.8000e-07 2.0000e-05 1.2000e+01 3.5000e-12 6.8000e-07 1.7150e-05 1.8000e+01 1.8000e-07 1.7140e-05 1.2000e+01 1.0000e-05 1.4800e-05 4.0000e+00 3.7000e-06 1.6800e-05 6.0000e+00 3.0000e-07 1.8000e-05 1.0000e+01 1.0000e+04 4.0000e-06 4.5000e-06 2.0000e+00 2.0000e-06 8.1000e-06 6.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 8.0000e-06 6.4000e-05
+1.8000e-07 1.8000e-07 2.0000e-05 1.0000e+01 1.0000e-11 7.8000e-07 1.7550e-05 1.8000e+01 2.8000e-07 1.8040e-05 1.0000e+01 9.9000e-06 1.7900e-05 6.0000e+00 6.5000e-06 1.7900e-05 4.0000e+00 3.0000e-07 1.8000e-05 1.2000e+01 1.0000e+04 4.8000e-06 4.3000e-06 2.0000e+00 1.7000e-06 7.8000e-06 4.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 1.7000e-05 4.7000e-05
+1.8000e-07 1.8000e-07 2.0000e-05 1.0000e+01 1.0000e-11 7.8000e-07 1.7450e-05 1.8000e+01 2.8000e-07 1.8040e-05 1.0000e+01 9.9000e-06 1.7900e-05 6.0000e+00 6.5000e-06 1.7900e-05 4.0000e+00 3.0000e-07 1.8000e-05 1.2000e+01 1.0000e+04 4.8000e-06 4.3000e-06 2.0000e+00 1.7000e-06 7.9000e-06 4.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 1.7000e-05 4.7000e-05
+1.8000e-07 1.8000e-07 2.0000e-05 1.0000e+01 1.0000e-11 7.8000e-07 1.7550e-05 1.8000e+01 2.8000e-07 2.0000e-05 1.0000e+01 9.9000e-06 1.7900e-05 6.0000e+00 6.5000e-06 1.7900e-05 4.0000e+00 3.0000e-07 1.8000e-05 1.2000e+01 1.0000e+04 4.8000e-06 4.3000e-06 2.0000e+00 1.7000e-06 7.6000e-06 4.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 1.7000e-05 4.7000e-05
+1.8000e-07 1.8000e-07 2.0000e-05 1.0000e+01 1.0000e-11 7.8000e-07 1.7550e-05 1.8000e+01 2.8000e-07 1.8040e-05 1.0000e+01 9.9000e-06 1.7900e-05 6.0000e+00 6.5000e-06 1.7900e-05 4.0000e+00 3.0000e-07 1.8000e-05 1.2000e+01 1.0000e+04 4.8000e-06 4.3000e-06 2.0000e+00 1.8000e-06 7.6000e-06 4.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 1.5000e-05 4.7000e-05
+5.8000e-07 1.8000e-07 1.9500e-05 1.2000e+01 3.7000e-12 6.8000e-07 1.7150e-05 1.8000e+01 4.8000e-07 1.8540e-05 8.0000e+00 3.0000e-07 1.7900e-05 6.0000e+00 6.5000e-06 1.7900e-05 2.0000e+00 3.0000e-07 1.8000e-05 8.0000e+00 1.0000e+04 4.8000e-06 4.8000e-06 2.0000e+00 1.7000e-06 1.0000e-05 2.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 1.7000e-05 4.7000e-05
+1.8000e-07 1.8000e-07 1.9500e-05 1.0000e+01 1.0000e-11 7.8000e-07 1.7550e-05 1.6000e+01 2.8000e-07 1.8040e-05 8.0000e+00 9.9000e-06 2.0000e-05 6.0000e+00 6.5000e-06 1.7900e-05 2.0000e+00 3.0000e-07 1.8000e-05 1.2000e+01 1.0000e+04 4.8000e-06 4.6000e-06 2.0000e+00 1.7000e-06 7.6000e-06 4.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 1.7000e-05 4.7000e-05
+1.8000e-07 1.8000e-07 1.9500e-05 1.0000e+01 1.6000e-12 6.8000e-07 1.7150e-05 1.6000e+01 5.8000e-07 2.0000e-05 8.0000e+00 2.8000e-06 2.0000e-05 2.0000e+00 2.9000e-06 1.8900e-05 4.0000e+00 3.0000e-07 1.8000e-05 1.0000e+01 1.0000e+04 2.1000e-06 5.4000e-06 2.0000e+00 2.1000e-06 9.1000e-06 2.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 1.0000e-05 7.3000e-05
+1.8000e-07 1.8000e-07 1.9500e-05 1.2000e+01 4.4000e-12 6.8000e-07 1.7150e-05 1.6000e+01 4.8000e-07 2.0000e-05 1.0000e+01 4.5000e-06 2.0000e-05 2.0000e+00 2.9000e-06 1.5800e-05 2.0000e+00 3.0000e-07 1.8000e-05 1.0000e+01 1.0000e+04 2.9000e-06 4.3000e-06 2.0000e+00 2.4000e-06 9.1000e-06 2.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 1.2000e-05 7.2000e-05
+1.8000e-07 1.8000e-07 2.0000e-05 1.0000e+01 2.4000e-12 7.8000e-07 1.7150e-05 1.8000e+01 9.8000e-07 1.8040e-05 1.2000e+01 8.4000e-06 1.8900e-05 2.0000e+00 1.6000e-06 1.7500e-05 4.0000e+00 3.0000e-07 1.8000e-05 1.0000e+01 1.0000e+04 2.0000e-06 4.6000e-06 2.0000e+00 2.4000e-06 8.2000e-06 4.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 1.0000e-05 7.4000e-05
+1.8000e-07 1.8000e-07 2.0000e-05 1.0000e+01 2.4000e-12 7.8000e-07 1.7150e-05 1.8000e+01 3.8000e-07 1.8040e-05 1.2000e+01 8.4000e-06 1.8900e-05 2.0000e+00 1.6000e-06 1.7200e-05 4.0000e+00 3.0000e-07 1.8000e-05 1.0000e+01 1.0000e+04 2.0000e-06 4.6000e-06 2.0000e+00 2.0000e-06 8.2000e-06 4.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 1.0000e-05 6.9000e-05
+1.8000e-07 1.8000e-07 2.0000e-05 1.0000e+01 2.4000e-12 7.8000e-07 1.7150e-05 1.8000e+01 3.8000e-07 1.8040e-05 1.2000e+01 8.4000e-06 1.8900e-05 2.0000e+00 1.6000e-06 1.7200e-05 2.0000e+00 3.0000e-07 1.8000e-05 1.0000e+01 1.0000e+04 2.4000e-06 4.6000e-06 2.0000e+00 2.4000e-06 8.2000e-06 4.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 1.0000e-05 7.4000e-05
+1.8000e-07 1.8000e-07 2.0000e-05 1.0000e+01 2.1000e-12 7.8000e-07 1.7150e-05 1.8000e+01 3.8000e-07 1.6340e-05 1.2000e+01 8.4000e-06 1.9100e-05 2.0000e+00 1.6000e-06 1.7200e-05 4.0000e+00 3.0000e-07 1.8000e-05 1.0000e+01 1.0000e+04 2.0000e-06 4.6000e-06 2.0000e+00 2.4000e-06 8.2000e-06 4.0000e+00 2.0000e-06 6.0000e-06 1.0000e+00 1.0000e-05 7.4000e-05
+}
+        
+        
+
+save all
+
+
+saveOptions options save=lvl nestlvl=4
+
+
+
+

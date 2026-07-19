@@ -1,0 +1,8 @@
+{
+    "TB_ID": "TB8",
+    "FOM": {
+        "NOISE_1HZ": {"value": -39.885, "unit": "dB"},
+        "NOISE_1KHZ": {"value": -54.553, "unit": "dB"},
+        "NOISE_1MHZ": {"value": -71.028, "unit": "dB"}
+    }
+}

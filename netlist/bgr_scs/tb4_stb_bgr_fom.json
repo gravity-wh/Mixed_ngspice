@@ -1,0 +1,8 @@
+{
+  "TB_ID": "TB4",
+  "FOM": {
+    "PM_BGR": {"value": 101.941, "unit": "deg"},
+    "GM_BGR": {"value": 0.0, "unit": "dB"},
+    "UGF_BGR": {"value": 8274230.0, "unit": "Hz"}
+  }
+}

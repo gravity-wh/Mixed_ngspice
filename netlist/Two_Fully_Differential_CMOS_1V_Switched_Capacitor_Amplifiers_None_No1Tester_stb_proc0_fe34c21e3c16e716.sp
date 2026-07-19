@@ -1,0 +1,265 @@
+* SPICE netlist — converted from Spectre SCS (ngspice)
+
+.model _ideal_switch_ sw vt=1e-3 roff=1e12 ron=1
+.param l_origin=1e-06
+.param l_M13=1e-06
+.param w_M13=1e-05
+.param m_M13=2
+.param l_M2=2e-06
+.param w_M2=1e-05
+.param m_M2=4
+.param l_M4=1e-06
+.param w_M4=5e-06
+.param m_M4=2
+.param l_M62=4e-06
+.param w_M62=9.9e-06
+.param m_M62=1
+.param w_M61=1e-05
+.param c_c1=1e-12
+.param l_M7=2e-06
+.param w_M7=6e-06
+.param m_M7=1
+.param l_M12=2e-06
+.param w_M12=4e-06
+.param m_M12=6
+.param r_R2=10000.0
+.param r_R4=1000000.0
+.param i_Ip1=5e-06
+.param i_Ip=2e-05
+.param l_M22=1e-06
+.param w_M22=1e-05
+.param m_M22=2
+.param l_M26=2e-06
+.param w_M26=4e-06
+.param m_M26=1
+.param l_M16=2e-06
+.param w_M16=5e-06
+.param m_M16=1
+* Two_Fully_Differential_CMOS_1V_Switched_Capacitor_Amplifiers_None_No1Tester_ba02bd8ac8888049
+.include "/share/project/TEDprocess/SMIC/smic18mse_1833_1P6M_5Ia_1TMa1_MIM20_oa_cds_2019_01_15_v1.11_4/models/spectre/ms018_enhanced_v1p11_spe.lib"
+.include "/share/project/TEDprocess/SMIC/smic18mse_1833_1P6M_5Ia_1TMa1_MIM20_oa_cds_2019_01_15_v1.11_4/models/spectre/ms018_enhanced_v1p11_spe.lib"
+.include "/share/project/TEDprocess/SMIC/smic18mse_1833_1P6M_5Ia_1TMa1_MIM20_oa_cds_2019_01_15_v1.11_4/models/spectre/ms018_enhanced_v1p11_spe.lib"
+.include "/share/project/TEDprocess/SMIC/smic18mse_1833_1P6M_5Ia_1TMa1_MIM20_oa_cds_2019_01_15_v1.11_4/models/spectre/ms018_enhanced_v1p11_spe.lib"
+.include "/share/project/TEDprocess/SMIC/smic18mse_1833_1P6M_5Ia_1TMa1_MIM20_oa_cds_2019_01_15_v1.11_4/models/spectre/ms018_enhanced_v1p11_spe.lib"
+.include "/share/project/TEDprocess/SMIC/smic18mse_1833_1P6M_5Ia_1TMa1_MIM20_oa_cds_2019_01_15_v1.11_4/models/spectre/ms018_enhanced_v1p11_spe.lib"
+* stdcell_inc is None, skip
+.global 0 0 vdd
+* _v0_ _vss_ 0 resistor r=0
+* _v2_ _vdd_ __root_VDD__ resistor r=0
+.subckt Mosfet_14fca161ffdb6a7 d g s b
+.ends
+.subckt MosfetLvs_3f4417978b1ff12 d g s b
+.ends
+.subckt MosfetLvs_4c4cc77eb93fccd d g s b
+.ends
+.subckt VSource_7f335e536b4a09a a b
+.ends
+.subckt Mosfet_a3f75626e602556 d g s b
+.ends
+.subckt Resistor_b5e11dc0ae64f4e a b
+.ends
+.subckt Mosfet_b7c53393d589035 d g s b
+.ends
+.subckt Mosfet_e892d654f1401fd d g s b
+.ends
+.subckt Mos_ea00bbd4361dc40 g d s vdd 0
+mmosfet_1 d g s 0 n18 L=l_M13 W=w_M13 M=m_M13   $ model=n18, w=w_M13, l=l_M13, m=int(m_M13), nf=None
+.ends
+.subckt MosfetLvs_10a66b54bda66479 d g s b
+.ends
+.subckt PCCCS_1f34a85d6db6993b a b
+.ends
+.subckt NMOS_201010eef527cec2 g d s vdd 0
+xmos g d s vdd 0 Mos_ea00bbd4361dc40   $ l=l_M13, w=w_M13, m=int(m_M13), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, obs=None, builtin=True, nf=None, left_dummy_gate=0, right_dummy_gate=0, connect_gate=None, confine=None
+.ends
+.subckt Mosfet_2330c1df3a29df2c d g s b
+.ends
+.subckt NMOS_2648d14367beeb0f g d s vdd 0
+xmos g d s vdd 0 Mos_6dfd9ed2b7078a68   $ l=l_M16, w=w_M16, m=int(m_M16), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, obs=None, builtin=True, nf=None, left_dummy_gate=0, right_dummy_gate=0, connect_gate=None, confine=None
+.ends
+.subckt DifferentialPair_285bede8993664da g1 g2 d1 d2 s vdd 0
+mmosfet_1 d1 g1 s 0 n18 L=l_M22 W=w_M22 M=m_M22   $ model=n18, w=w_M22, l=l_M22, m=int(m_M22), nf=None
+mmosfet_2 d2 g2 s 0 n18 L=l_M22 W=w_M22 M=m_M22   $ model=n18, w=w_M22, l=l_M22, m=int(m_M22), nf=None
+mmosfet_3 0 0 d1 0 n18 L=9e-07 W=w_M22 M=1   $ model=n18, w=w_M22, l=9e-7, m=1, nf=None
+mmosfet_4 d1 0 0 0 n18 L=9e-07 W=w_M22 M=1   $ model=n18, w=w_M22, l=9e-7, m=1, nf=None
+.ends
+.subckt VSource_2cfdb437549897d2 a b
+.ends
+.subckt MosfetLvs_36d10d96da76f591 d g s b
+.ends
+.subckt Two_Fully_Differential_CMOS_1V_Switched_Capacitor_Amplifiers_wrapper_380db3b66fe37fb5 VCM VINP VINN VOUTP VOUTN VOUTP_CMFB VOUTN_CMFB vdd 0
+xdut VCM VINP VINN VOUTP VOUTN VOUTP_CMFB VOUTN_CMFB vdd 0 Two_Fully_Differential_CMOS_1V_Switched_Capacitor_Amplifiers_62f4bb6b0aa571e8   $ 
+.ends
+.subckt Capacitor_455ff18989871c65 a b
+.ends
+.subckt ISource_480e6a6e22b53dbf a b
+.ends
+.subckt IProbe_4a3be06f99e1d42b a b
+.ends
+.subckt Mos_4bc7b52cf156bd8e g d s vdd 0
+mmosfet_1 d g s vdd p18 L=l_M12 W=w_M12 M=m_M12   $ model=p18, w=w_M12, l=l_M12, m=int(m_M12), nf=None
+.ends
+.subckt rpposab_4f91e6dccad3ceaa n0 n1
+.ends
+.subckt MosfetLvs_53e2fd5532e64b71 d g s b
+.ends
+.subckt VCVS_54646efb10a9bd8d a b c d
+.ends
+.subckt Capacitor_5828743125551fab a b
+.ends
+.subckt Mos_5cd04b5d3e6e7274 g d s vdd 0
+mmosfet_1 d g s vdd p18 L=l_M7 W=w_M7 M=m_M7   $ model=p18, w=w_M7, l=l_M7, m=int(m_M7), nf=None
+.ends
+.subckt VSource_5ff421cce4089485 a b
+.ends
+.subckt Two_Fully_Differential_CMOS_1V_Switched_Capacitor_Amplifiers_62f4bb6b0aa571e8 VCM VINP VINN VOUTP VOUTN VOUTP_CMFB VOUTN_CMFB vdd 0
+xdifferentialpair_1 VINN VINP n9_6 n9_5 n9_0 vdd 0 DifferentialPair_f0f8441cf249a6ac   $ l=l_M2, w=w_M2, model=pch, m=int(m_M2), nf=None, mode=abba, dummy_l=None, dummy_m=0, y_spacing=1000, builtin=True, d_via=1
+xnmos_1 n9_4 VOUTP 0 vdd 0 NMOS_201010eef527cec2   $ w=w_M13, l=l_M13, m=int(m_M13), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, nf=None, obs=None, builtin=True
+xnmos_2 n9_3 VOUTN 0 vdd 0 NMOS_201010eef527cec2   $ w=w_M13, l=l_M13, m=int(m_M13), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, nf=None, obs=None, builtin=True
+ccapacitor_1 n9_2 VOUTN c_c1   $ c=1e-12, model=capacitor
+ccapacitor_2 VOUTP n9_1 c_c1   $ c=1e-12, model=capacitor
+r_rpposab_1 n9_1 n9_4 r_R2   $ model=rpposab   $ r=r_R2
+r_rpposab_2 n9_3 n9_2 r_R2   $ model=rpposab   $ r=r_R2
+ccapacitor_3 VOUTP n9_8 2e-12   $ c=2e-12, model=capacitor
+ccapacitor_4 VOUTN n9_8 2e-12   $ c=2e-12, model=capacitor
+xpmos_1 n9_7 n9_0 vdd vdd 0 PMOS_86f5e1721e50a6ec   $ w=w_M7, l=l_M7, m=int(m_M7), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, nf=None, obs=None, builtin=True
+xpmos_2 n9_7 n9_4 vdd vdd 0 PMOS_86f5e1721e50a6ec   $ w=w_M7, l=l_M7, m=int(m_M7), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, nf=None, obs=None, builtin=True
+xpmos_3 n9_7 n9_3 vdd vdd 0 PMOS_86f5e1721e50a6ec   $ w=w_M7, l=l_M7, m=int(m_M7), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, nf=None, obs=None, builtin=True
+xpmos_4 n9_8 VOUTP vdd vdd 0 PMOS_9619de8072fbe1b2   $ w=w_M12, l=l_M12, m=int(m_M12), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, nf=None, obs=None, builtin=True
+xpmos_5 n9_8 VOUTN vdd vdd 0 PMOS_9619de8072fbe1b2   $ w=w_M12, l=l_M12, m=int(m_M12), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, nf=None, obs=None, builtin=True
+xnmos_3 vdd n9_4 n9_5 vdd 0 NMOS_ab0fb751101a476a   $ w=w_M4, l=l_M4, m=int(m_M4), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, nf=None, obs=None, builtin=True
+xnmos_4 vdd n9_3 n9_6 vdd 0 NMOS_ab0fb751101a476a   $ w=w_M4, l=l_M4, m=int(m_M4), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, nf=None, obs=None, builtin=True
+xnmos_5 n9_4 n9_5 0 vdd 0 NMOS_e8c0829b37a5e5c1   $ w=w_M61, l=l_M62, m=int(m_M62), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, nf=None, obs=None, builtin=True
+xnmos_6 n9_3 n9_6 0 vdd 0 NMOS_e8c0829b37a5e5c1   $ w=w_M61, l=l_M62, m=int(m_M62), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, nf=None, obs=None, builtin=True
+xnmos_7 n9_3 n9_5 0 vdd 0 NMOS_f2c79f194969b130   $ w=w_M62, l=l_M62, m=int(m_M62), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, nf=None, obs=None, builtin=True
+xnmos_8 n9_4 n9_6 0 vdd 0 NMOS_f2c79f194969b130   $ w=w_M62, l=l_M62, m=int(m_M62), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, nf=None, obs=None, builtin=True
+xpmos_6 n9_7 n9_7 vdd vdd 0 PMOS_86f5e1721e50a6ec   $ w=w_M7, l=l_M7, m=int(m_M7), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, nf=None, obs=None, builtin=True
+xdifferentialpair_2 VCM n9_11 n9_8 n9_10 n9_12 vdd 0 DifferentialPair_285bede8993664da   $ l=l_M22, w=w_M22, model=nch, m=int(m_M22), nf=None, mode=abba, dummy_l=None, dummy_m=0, y_spacing=1000, builtin=True, d_via=1
+xpmos_7 n9_10 n9_10 vdd vdd 0 PMOS_7ac8b8a9c244c625   $ w=w_M26, l=l_M26, m=int(m_M26), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, nf=None, obs=None, builtin=True
+xpmos_8 n9_10 n9_8 vdd vdd 0 PMOS_7ac8b8a9c244c625   $ w=w_M26, l=l_M26, m=int(m_M26), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, nf=None, obs=None, builtin=True
+r_rpposab_3 VOUTN_CMFB n9_11 r_R4   $ model=rpposab   $ r=r_R2
+r_rpposab_4 VOUTP_CMFB n9_11 r_R4   $ model=rpposab   $ r=r_R2
+xnmos_9 n9_9 n9_12 0 vdd 0 NMOS_2648d14367beeb0f   $ w=w_M16, l=l_M16, m=int(m_M16), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, nf=None, obs=None, builtin=True
+xnmos_10 n9_9 n9_9 0 vdd 0 NMOS_2648d14367beeb0f   $ w=w_M16, l=l_M16, m=int(m_M16), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, nf=None, obs=None, builtin=True
+iisource_1 vdd n9_9 DC i_Ip1   $ dc=i_Ip1, ac=0, model=isource, mode=None
+iisource_2 n9_7 0 DC i_Ip   $ dc=i_Ip, ac=0, model=isource, mode=None
+.ends
+.subckt Mos_66436804fab6349c g d s vdd 0
+mmosfet_1 d g s 0 n18 L=l_M62 W=w_M61 M=m_M62   $ model=n18, w=w_M61, l=l_M62, m=int(m_M62), nf=None
+.ends
+.subckt Mos_6dfd9ed2b7078a68 g d s vdd 0
+mmosfet_1 d g s 0 n18 L=l_M16 W=w_M16 M=m_M16   $ model=n18, w=w_M16, l=l_M16, m=int(m_M16), nf=None
+.ends
+.subckt rpposab_74827dbcaf3d728e n0 n1
+.ends
+.subckt PMOS_7ac8b8a9c244c625 g d s vdd 0
+xmos g d s vdd 0 Mos_d20435b2094c751e   $ l=l_M26, w=w_M26, m=int(m_M26), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, obs=None, builtin=True, nf=None, left_dummy_gate=0, right_dummy_gate=0, connect_gate=None, confine=None
+.ends
+.subckt PMOS_86f5e1721e50a6ec g d s vdd 0
+xmos g d s vdd 0 Mos_5cd04b5d3e6e7274   $ l=l_M7, w=w_M7, m=int(m_M7), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, obs=None, builtin=True, nf=None, left_dummy_gate=0, right_dummy_gate=0, connect_gate=None, confine=None
+.ends
+.subckt Mosfet_8959872d471aaca8 d g s b
+.ends
+.subckt MosfetLvs_8acca442a97202dc d g s b
+.ends
+.subckt Mosfet_8d47b4bd30b39795 d g s b
+.ends
+.subckt Mosfet_930f00b549a33d89 d g s b
+.ends
+.subckt Mos_9516ec8b2a3afd19 g d s vdd 0
+mmosfet_1 d g s 0 n18 L=l_M62 W=w_M62 M=m_M62   $ model=n18, w=w_M62, l=l_M62, m=int(m_M62), nf=None
+.ends
+.subckt Capacitor_957ee7f24dddc7c0 a b
+.ends
+.subckt PMOS_9619de8072fbe1b2 g d s vdd 0
+xmos g d s vdd 0 Mos_4bc7b52cf156bd8e   $ l=l_M12, w=w_M12, m=int(m_M12), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=pch, obs=None, builtin=True, nf=None, left_dummy_gate=0, right_dummy_gate=0, connect_gate=None, confine=None
+.ends
+.subckt Mosfet_9afe2caac24002c4 d g s b
+.ends
+.subckt MosfetLvs_a33bd54015429807 d g s b
+.ends
+.subckt Mosfet_a91fd76766ddfa6b d g s b
+.ends
+.subckt NMOS_ab0fb751101a476a g d s vdd 0
+xmos g d s vdd 0 Mos_c8a901242b6c58b6   $ l=l_M4, w=w_M4, m=int(m_M4), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, obs=None, builtin=True, nf=None, left_dummy_gate=0, right_dummy_gate=0, connect_gate=None, confine=None
+.ends
+.subckt MosfetLvs_be92dd0a81622a27 d g s b
+.ends
+.subckt ISource_c0d66e5133458a38 a b
+.ends
+.subckt Mos_c8a901242b6c58b6 g d s vdd 0
+mmosfet_1 d g s 0 n18 L=l_M4 W=w_M4 M=m_M4   $ model=n18, w=w_M4, l=l_M4, m=int(m_M4), nf=None
+.ends
+.subckt Mos_d20435b2094c751e g d s vdd 0
+mmosfet_1 d g s vdd p18 L=l_M26 W=w_M26 M=m_M26   $ model=p18, w=w_M26, l=l_M26, m=int(m_M26), nf=None
+.ends
+.subckt Cmdmprobe1_d357ccad95258d56 In1 In2 out1 out2 vdd 0
+Eevinj In2 out2 In1 out1 -1   $ gain=-1, model=vcvs
+Viinj inout In1 DC 0   $ r=1.0, model=iprobe
+Viprb inout out1 DC 0   $ r=1.0, model=iprobe
+Ffiinj 0 out2 -1   $ gain=-1, probes=iprb iinj, coeffs=0 1 1, model=pcccs
+.ends
+.subckt Mosfet_d5353e833fae3833 d g s b
+.ends
+.subckt MosfetLvs_e60c8cd4716b73f8 d g s b
+.ends
+.subckt NMOS_e8c0829b37a5e5c1 g d s vdd 0
+xmos g d s vdd 0 Mos_66436804fab6349c   $ l=l_M62, w=w_M61, m=int(m_M62), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, obs=None, builtin=True, nf=None, left_dummy_gate=0, right_dummy_gate=0, connect_gate=None, confine=None
+.ends
+.subckt Mosfet_e990df02bad416ff d g s b
+.ends
+.subckt DifferentialPair_f0f8441cf249a6ac g1 g2 d1 d2 s vdd 0
+mmosfet_1 d1 g1 s vdd p18 L=l_M2 W=w_M2 M=m_M2   $ model=p18, w=w_M2, l=l_M2, m=int(m_M2), nf=None
+mmosfet_2 d2 g2 s vdd p18 L=l_M2 W=w_M2 M=m_M2   $ model=p18, w=w_M2, l=l_M2, m=int(m_M2), nf=None
+mmosfet_3 vdd vdd d1 vdd p18 L=9e-07 W=w_M2 M=1   $ model=p18, w=w_M2, l=9e-7, m=1, nf=None
+mmosfet_4 d1 vdd vdd vdd p18 L=9e-07 W=w_M2 M=1   $ model=p18, w=w_M2, l=9e-7, m=1, nf=None
+.ends
+.subckt MosfetLvs_f143813bd1ba9e86 d g s b
+.ends
+.subckt NMOS_f2c79f194969b130 g d s vdd 0
+xmos g d s vdd 0 Mos_9516ec8b2a3afd19   $ l=l_M62, w=w_M62, m=int(m_M62), from_virtuoso=False, drain_width=260, source_width=260, drain_aa_spacing=80, source_aa_spacing=80, drain_gate_spacing=140, source_gate_spacing=140, gate_extrude_height=220, model=nch, obs=None, builtin=True, nf=None, left_dummy_gate=0, right_dummy_gate=0, connect_gate=None, confine=None
+.ends
+.subckt MosfetLvs_f5042f4c5848430f d g s b
+.ends
+.subckt MosfetLvs_fa240405dc72351b d g s b
+.ends
+vVD v_dd vdd DC 0   $ dc=0, ac=None, mode=None, model=vsource
+vVS v_ss 0 DC 0   $ dc=0, ac=None, mode=None, model=vsource
+vVDD v_dd v_ss DC 1.8   $ dc=1.8, ac=None, mode=None, model=vsource
+rRf_p X1_outp v_inn 10000.0   $ r=1e4, model=resistor, modelstr=None
+rRf_n X1_outn v_inp 10000.0   $ r=1e4, model=resistor, modelstr=None
+rRin_p v_inn1 v_inp 10000.0   $ r=1e4, model=resistor, modelstr=None
+rRin_n v_inn1 v_inn 10000.0   $ r=1e4, model=resistor, modelstr=None
+cCload_p X1_outp v_ss 1e-12   $ c=1e-12, model=capacitor
+cCload_n X1_outn v_ss 1e-12   $ c=1e-12, model=capacitor
+vVcm v_inn1 v_ss DC 0.9   $ dc=0.9, ac=None, mode=None, model=vsource
+vVcm2 VCM v_ss DC 0.9   $ dc=0.9, ac=None, mode=None, model=vsource
+xcmdmprobe0 v_outp v_outn X1_outp X1_outn vdd 0 Cmdmprobe1_d357ccad95258d56   $ cmdm=-1
+xdut VCM v_inp v_inn v_outp v_outn v_outp v_outn vdd 0 Two_Fully_Differential_CMOS_1V_Switched_Capacitor_Amplifiers_wrapper_380db3b66fe37fb5   $ 
+.options gmin=1e-12 iabstol=1e-12 reltol=0.001 temp=27 tnom=27 vabstol=1e-06
+* saveOptions options save=allpub
+.ac dec 10 1.0 1000000000.0   $ STB→AC
+* Sweep point 0: l_origin=1.2800e-06, l_M13=1.1000e-06, w_M13=1.0000e-05, m_M13=2.0000e+00, l_M2=3.3000e-06, w_M2=1.0600e-05, m_M2=2.0000e+00, l_M4=1.0000e-06, w_M4=6.4000e-06, m_M4=2.0000e+00, l_M62=3.5000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=1.4000e-12, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=2.6000e-06, w_M12=4.0000e-06, m_M12=4.0000e+00, r_R2=1.0700e+04, r_R4=5.0000e+05, i_Ip1=5.0000e-06, i_Ip=1.8600e-05, l_M22=1.4000e-06, w_M22=1.0200e-05, m_M22=4.0000e+00, l_M26=3.7000e-06, w_M26=7.8000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 1: l_origin=1.2800e-06, l_M13=1.1000e-06, w_M13=1.0000e-05, m_M13=2.0000e+00, l_M2=3.3000e-06, w_M2=1.1000e-05, m_M2=2.0000e+00, l_M4=1.0000e-06, w_M4=5.0000e-06, m_M4=2.0000e+00, l_M62=3.5000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=8.0000e-13, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=2.4000e-06, w_M12=4.0000e-06, m_M12=1.0000e+01, r_R2=1.0700e+04, r_R4=5.0000e+05, i_Ip1=5.0000e-06, i_Ip=1.6700e-05, l_M22=1.9000e-06, w_M22=1.1400e-05, m_M22=4.0000e+00, l_M26=3.1000e-06, w_M26=7.8000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 2: l_origin=7.8000e-07, l_M13=1.2000e-06, w_M13=1.0200e-05, m_M13=2.0000e+00, l_M2=1.9000e-06, w_M2=1.0100e-05, m_M2=2.0000e+00, l_M4=1.1000e-06, w_M4=6.6000e-06, m_M4=2.0000e+00, l_M62=3.2000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=8.0000e-13, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=2.1000e-06, w_M12=4.3000e-06, m_M12=4.0000e+00, r_R2=1.5100e+04, r_R4=5.6330e+05, i_Ip1=5.0000e-06, i_Ip=1.5200e-05, l_M22=1.7000e-06, w_M22=1.0000e-05, m_M22=4.0000e+00, l_M26=2.9000e-06, w_M26=2.8000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 3: l_origin=1.2800e-06, l_M13=1.2000e-06, w_M13=1.0000e-05, m_M13=2.0000e+00, l_M2=2.2000e-06, w_M2=1.0100e-05, m_M2=2.0000e+00, l_M4=1.1000e-06, w_M4=6.4000e-06, m_M4=2.0000e+00, l_M62=3.5000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=8.0000e-13, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=2.1000e-06, w_M12=4.0000e-06, m_M12=4.0000e+00, r_R2=1.0700e+04, r_R4=5.0000e+05, i_Ip1=5.0000e-06, i_Ip=1.5300e-05, l_M22=1.7000e-06, w_M22=1.1400e-05, m_M22=2.0000e+00, l_M26=3.1000e-06, w_M26=7.8000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 4: l_origin=1.2800e-06, l_M13=1.2000e-06, w_M13=1.0600e-05, m_M13=2.0000e+00, l_M2=2.2000e-06, w_M2=1.0200e-05, m_M2=4.0000e+00, l_M4=1.1000e-06, w_M4=6.4000e-06, m_M4=2.0000e+00, l_M62=3.5000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=8.0000e-13, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=2.1000e-06, w_M12=4.0000e-06, m_M12=4.0000e+00, r_R2=2.3000e+04, r_R4=6.3240e+05, i_Ip1=5.2000e-06, i_Ip=1.0000e-05, l_M22=1.4000e-06, w_M22=1.0000e-05, m_M22=4.0000e+00, l_M26=3.1000e-06, w_M26=4.4000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 5: l_origin=1.2800e-06, l_M13=1.2000e-06, w_M13=1.0000e-05, m_M13=2.0000e+00, l_M2=2.5000e-06, w_M2=1.0300e-05, m_M2=2.0000e+00, l_M4=1.1000e-06, w_M4=5.4000e-06, m_M4=2.0000e+00, l_M62=3.5000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=9.0000e-13, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=2.0000e-06, w_M12=4.0000e-06, m_M12=4.0000e+00, r_R2=1.1500e+04, r_R4=5.0000e+05, i_Ip1=5.0000e-06, i_Ip=1.7300e-05, l_M22=1.9000e-06, w_M22=1.1000e-05, m_M22=2.0000e+00, l_M26=3.4000e-06, w_M26=9.6000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 6: l_origin=1.0800e-06, l_M13=1.3000e-06, w_M13=1.0000e-05, m_M13=2.0000e+00, l_M2=1.1000e-06, w_M2=1.0000e-05, m_M2=2.0000e+00, l_M4=1.2000e-06, w_M4=9.3000e-06, m_M4=2.0000e+00, l_M62=3.3000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=1.1000e-12, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=1.5000e-06, w_M12=4.0000e-06, m_M12=4.0000e+00, r_R2=1.6600e+04, r_R4=5.0000e+05, i_Ip1=5.1000e-06, i_Ip=1.6700e-05, l_M22=1.6000e-06, w_M22=1.0000e-05, m_M22=2.0000e+00, l_M26=2.1000e-06, w_M26=3.4000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 7: l_origin=9.8000e-07, l_M13=1.2000e-06, w_M13=1.0400e-05, m_M13=2.0000e+00, l_M2=2.2000e-06, w_M2=1.0000e-05, m_M2=2.0000e+00, l_M4=1.1000e-06, w_M4=9.0000e-06, m_M4=2.0000e+00, l_M62=3.4000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=1.2000e-12, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=2.0000e-06, w_M12=4.0000e-06, m_M12=4.0000e+00, r_R2=1.3300e+04, r_R4=5.7690e+05, i_Ip1=5.0000e-06, i_Ip=1.6700e-05, l_M22=1.5000e-06, w_M22=1.0000e-05, m_M22=2.0000e+00, l_M26=3.1000e-06, w_M26=4.1000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 8: l_origin=1.2800e-06, l_M13=1.2000e-06, w_M13=1.0600e-05, m_M13=2.0000e+00, l_M2=2.2000e-06, w_M2=1.0000e-05, m_M2=2.0000e+00, l_M4=1.1000e-06, w_M4=6.4000e-06, m_M4=2.0000e+00, l_M62=3.5000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=1.2000e-12, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=2.0000e-06, w_M12=4.0000e-06, m_M12=4.0000e+00, r_R2=1.3300e+04, r_R4=5.0000e+05, i_Ip1=5.0000e-06, i_Ip=1.3200e-05, l_M22=1.7000e-06, w_M22=1.0000e-05, m_M22=2.0000e+00, l_M26=3.1000e-06, w_M26=7.8000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 9: l_origin=1.2800e-06, l_M13=1.2000e-06, w_M13=1.0200e-05, m_M13=2.0000e+00, l_M2=2.2000e-06, w_M2=1.0000e-05, m_M2=2.0000e+00, l_M4=1.1000e-06, w_M4=6.4000e-06, m_M4=2.0000e+00, l_M62=3.5000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=1.2000e-12, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=2.0000e-06, w_M12=4.0000e-06, m_M12=4.0000e+00, r_R2=1.3300e+04, r_R4=5.0000e+05, i_Ip1=5.0000e-06, i_Ip=1.6700e-05, l_M22=1.7000e-06, w_M22=1.0000e-05, m_M22=2.0000e+00, l_M26=3.1000e-06, w_M26=7.8000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 10: l_origin=1.6800e-06, l_M13=1.2000e-06, w_M13=1.0200e-05, m_M13=2.0000e+00, l_M2=1.9000e-06, w_M2=1.0300e-05, m_M2=2.0000e+00, l_M4=1.2000e-06, w_M4=6.6000e-06, m_M4=2.0000e+00, l_M62=3.2000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=1.2000e-12, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=1.7000e-06, w_M12=4.3000e-06, m_M12=4.0000e+00, r_R2=1.5100e+04, r_R4=5.6330e+05, i_Ip1=5.0000e-06, i_Ip=1.5200e-05, l_M22=2.4000e-06, w_M22=1.0000e-05, m_M22=2.0000e+00, l_M26=2.9000e-06, w_M26=5.1000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 11: l_origin=1.2800e-06, l_M13=1.2000e-06, w_M13=1.0400e-05, m_M13=2.0000e+00, l_M2=2.2000e-06, w_M2=1.0000e-05, m_M2=2.0000e+00, l_M4=1.2000e-06, w_M4=8.0000e-06, m_M4=2.0000e+00, l_M62=3.5000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=1.2000e-12, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=2.0000e-06, w_M12=4.0000e-06, m_M12=4.0000e+00, r_R2=1.3300e+04, r_R4=5.0000e+05, i_Ip1=5.0000e-06, i_Ip=1.6700e-05, l_M22=1.9000e-06, w_M22=1.0000e-05, m_M22=2.0000e+00, l_M26=3.1000e-06, w_M26=7.8000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 12: l_origin=1.2800e-06, l_M13=1.2000e-06, w_M13=1.0200e-05, m_M13=2.0000e+00, l_M2=2.0000e-06, w_M2=1.0100e-05, m_M2=2.0000e+00, l_M4=1.2000e-06, w_M4=9.2000e-06, m_M4=2.0000e+00, l_M62=3.5000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=1.1000e-12, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=1.7000e-06, w_M12=4.8000e-06, m_M12=4.0000e+00, r_R2=1.3300e+04, r_R4=5.1520e+05, i_Ip1=5.0000e-06, i_Ip=1.5200e-05, l_M22=1.9000e-06, w_M22=1.0000e-05, m_M22=2.0000e+00, l_M26=2.7000e-06, w_M26=7.7000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 13: l_origin=1.0800e-06, l_M13=1.2000e-06, w_M13=1.0000e-05, m_M13=2.0000e+00, l_M2=2.2000e-06, w_M2=1.0000e-05, m_M2=2.0000e+00, l_M4=1.2000e-06, w_M4=6.4000e-06, m_M4=2.0000e+00, l_M62=3.4000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=1.1000e-12, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=1.7000e-06, w_M12=4.9000e-06, m_M12=4.0000e+00, r_R2=1.3300e+04, r_R4=5.0000e+05, i_Ip1=5.0000e-06, i_Ip=1.4600e-05, l_M22=1.7000e-06, w_M22=1.0000e-05, m_M22=2.0000e+00, l_M26=2.5000e-06, w_M26=3.3000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 14: l_origin=1.2800e-06, l_M13=1.2000e-06, w_M13=1.0600e-05, m_M13=2.0000e+00, l_M2=2.2000e-06, w_M2=1.0000e-05, m_M2=2.0000e+00, l_M4=1.1000e-06, w_M4=6.4000e-06, m_M4=2.0000e+00, l_M62=3.5000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=1.1000e-12, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=2.0000e-06, w_M12=4.0000e-06, m_M12=4.0000e+00, r_R2=1.3300e+04, r_R4=5.0000e+05, i_Ip1=5.0000e-06, i_Ip=1.6700e-05, l_M22=1.7000e-06, w_M22=1.0000e-05, m_M22=2.0000e+00, l_M26=3.1000e-06, w_M26=5.0000e-07, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 15: l_origin=1.2800e-06, l_M13=1.3000e-06, w_M13=1.0700e-05, m_M13=2.0000e+00, l_M2=2.2000e-06, w_M2=1.0000e-05, m_M2=2.0000e+00, l_M4=1.1000e-06, w_M4=6.4000e-06, m_M4=2.0000e+00, l_M62=3.5000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=1.1000e-12, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=1.5000e-06, w_M12=5.8000e-06, m_M12=8.0000e+00, r_R2=1.0000e+04, r_R4=5.0000e+05, i_Ip1=5.0000e-06, i_Ip=1.6700e-05, l_M22=1.7000e-06, w_M22=1.1300e-05, m_M22=2.0000e+00, l_M26=3.1000e-06, w_M26=7.7000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 16: l_origin=1.2800e-06, l_M13=1.2000e-06, w_M13=1.0000e-05, m_M13=2.0000e+00, l_M2=2.2000e-06, w_M2=1.0100e-05, m_M2=2.0000e+00, l_M4=1.1000e-06, w_M4=6.0000e-06, m_M4=2.0000e+00, l_M62=3.5000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=8.0000e-13, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=2.1000e-06, w_M12=4.0000e-06, m_M12=4.0000e+00, r_R2=1.0700e+04, r_R4=5.0000e+05, i_Ip1=5.0000e-06, i_Ip=1.6700e-05, l_M22=1.9000e-06, w_M22=1.1400e-05, m_M22=2.0000e+00, l_M26=3.1000e-06, w_M26=8.0000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 17: l_origin=1.2800e-06, l_M13=1.2000e-06, w_M13=1.0000e-05, m_M13=2.0000e+00, l_M2=2.2000e-06, w_M2=1.0000e-05, m_M2=2.0000e+00, l_M4=1.1000e-06, w_M4=5.3000e-06, m_M4=2.0000e+00, l_M62=3.5000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=9.0000e-13, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=2.1000e-06, w_M12=4.0000e-06, m_M12=4.0000e+00, r_R2=1.0700e+04, r_R4=5.0000e+05, i_Ip1=5.0000e-06, i_Ip=1.6700e-05, l_M22=1.5000e-06, w_M22=1.1400e-05, m_M22=2.0000e+00, l_M26=2.5000e-06, w_M26=7.8000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 18: l_origin=1.2800e-06, l_M13=1.0000e-06, w_M13=1.0000e-05, m_M13=2.0000e+00, l_M2=2.2000e-06, w_M2=1.0000e-05, m_M2=2.0000e+00, l_M4=1.1000e-06, w_M4=6.4000e-06, m_M4=2.0000e+00, l_M62=3.5000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=8.0000e-13, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=2.1000e-06, w_M12=4.0000e-06, m_M12=4.0000e+00, r_R2=1.0000e+04, r_R4=5.0000e+05, i_Ip1=5.0000e-06, i_Ip=1.6700e-05, l_M22=1.7000e-06, w_M22=1.2700e-05, m_M22=2.0000e+00, l_M26=3.1000e-06, w_M26=7.8000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* Sweep point 19: l_origin=1.2800e-06, l_M13=1.2000e-06, w_M13=1.0000e-05, m_M13=2.0000e+00, l_M2=2.8000e-06, w_M2=1.0100e-05, m_M2=2.0000e+00, l_M4=1.1000e-06, w_M4=6.4000e-06, m_M4=4.0000e+00, l_M62=3.5000e-06, w_M62=9.9000e-06, m_M62=1.0000e+00, w_M61=1.0000e-05, c_c1=8.0000e-13, l_M7=2.0000e-06, w_M7=6.0000e-06, m_M7=1.0000e+00, l_M12=2.8000e-06, w_M12=4.0000e-06, m_M12=4.0000e+00, r_R2=1.0700e+04, r_R4=5.0000e+05, i_Ip1=5.0000e-06, i_Ip=1.4700e-05, l_M22=1.7000e-06, w_M22=1.1400e-05, m_M22=2.0000e+00, l_M26=3.1000e-06, w_M26=7.8000e-06, m_M26=2.0000e+00, l_M16=2.0000e-06, w_M16=5.0000e-06, m_M16=1.0000e+00
+* ^^^^ ngspice: use .step param or .data for sweep
+.save all
+
+.end

@@ -1,0 +1,37 @@
+; ============================================================
+; TB7: PSRR VDD Ocean Post-Processing Script
+; ============================================================
+; Circuit: BGR + HORDER joint simulation
+; Analysis: AC PSRR at VDD
+; Temperature: 27C, Corner: TT
+; FOM: PSRR_VDD (dB) at low frequency
+; PSF data: /share/home/chentianyang/nloa/testdata_input/psf_data/tb7_psrr_vdd
+; ============================================================
+
+simulator('spectre)
+
+; Initialize all FOM variables
+psrr_vdd_val = 0.0
+
+; Open PSF results using absolute path string literal
+openResults("/share/home/chentianyang/nloa/testdata_input/psf_data/tb7_psrr_vdd")
+
+; Select AC analysis results
+selectResults("ac_psrr_vdd-ac")
+
+; Get V_CONTROL AC response (complex waveform)
+vctrl_ac_raw = getData("V_CONTROL")
+when(vctrl_ac_raw != nil
+    ; Convert to dB: 20*log10(|V_CONTROL_ac|)
+    ; Since VDD_ac magnitude = 1, this directly gives PSRR_VDD
+    vctrl_db_wf = db(vctrl_ac_raw)
+    yvec_db = drGetWaveformYVec(vctrl_db_wf)
+    psrr_vdd_val = drGetElem(yvec_db 0)
+    printf("PSRR_VDD = %.4f dB\n" psrr_vdd_val)
+)
+
+; ===== FOM Summary =====
+printf("\n===== FOM Summary =====\n")
+printf("PSRR_VDD = %.4f dB\n" psrr_vdd_val)
+
+exit

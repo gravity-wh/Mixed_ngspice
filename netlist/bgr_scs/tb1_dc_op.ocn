@@ -1,0 +1,101 @@
+; ============================================================
+; TB1: DC Operating Point - OCN Post-Processing
+; Circuit: BGR + HORDER joint simulation
+; Temperature: 27C, Corner: TT
+; FOMs: V_CONTROL_DC, VBG_DC, VCTAT_DC, PWR_DC
+; ============================================================
+
+simulator('spectre)
+
+; ---- Initialize all variables to default values ----
+v_control_val = 0.0
+vbg_val = 0.0
+vctat_val = 0.0
+pwr_val = 0.0
+i_vddb_val = 0.0
+i_vdd_val = 0.0
+i_vddb_abs = 0.0
+i_vdd_abs = 0.0
+pwr_bgr = 0.0
+pwr_horder = 0.0
+
+; ---- Open PSF results ----
+openResults("/share/home/chentianyang/nloa/testdata_input/psf_data/tb1_dc_op")
+
+; ---- Select DC analysis results ----
+selectResults("dc_op-dc")
+
+; ---- Extract signals from DC operating point ----
+
+; ---- Extract V_CONTROL (HORDER output) ----
+v_control_raw = getData("V_CONTROL")
+when(v_control_raw != nil
+    v_control_val = value(v_control_raw 0)
+    printf("V_CONTROL = %.6f V\n" v_control_val)
+)
+
+; ---- Extract VBG (BGR bandgap voltage) ----
+vbg_raw = getData("VBG")
+when(vbg_raw != nil
+    vbg_val = value(vbg_raw 0)
+    printf("VBG = %.6f V\n" vbg_val)
+)
+
+; ---- Extract VCTAT (BGR CTAT voltage, feeds HORDER.VIN) ----
+vctat_raw = getData("VCTAT")
+when(vctat_raw != nil
+    vctat_val = value(vctat_raw 0)
+    printf("VCTAT = %.6f V\n" vctat_val)
+)
+
+; ---- Extract VDDB supply current (BGR 3.3V rail) ----
+i_vddb_raw = getData("V_VDDB:p")
+when(i_vddb_raw != nil
+    i_vddb_raw_val = value(i_vddb_raw 0)
+    i_vddb_abs = abs(i_vddb_raw_val)
+    printf("I_VDDB_raw = %.6e A\n" i_vddb_raw_val)
+    printf("I_VDDB_abs = %.6e A\n" i_vddb_abs)
+    i_vddb_val = i_vddb_abs
+)
+
+; ---- Extract VDD supply current (HORDER 2V rail) ----
+i_vdd_raw = getData("V_VDD:p")
+when(i_vdd_raw != nil
+    i_vdd_raw_val = value(i_vdd_raw 0)
+    i_vdd_abs = abs(i_vdd_raw_val)
+    printf("I_VDD_raw = %.6e A\n" i_vdd_raw_val)
+    printf("I_VDD_abs = %.6e A\n" i_vdd_abs)
+    i_vdd_val = i_vdd_abs
+)
+
+; ---- Compute power components ----
+; PWR_BGR = I_VDDB * 3.3 (BGR power on 3.3V rail)
+when(i_vddb_raw != nil
+    pwr_bgr = i_vddb_val * 3.3
+    printf("PWR_BGR = %.6e W\n" pwr_bgr)
+)
+
+; PWR_HORDER = I_VDD * 2.0 (HORDER power on 2V rail)
+when(i_vdd_raw != nil
+    pwr_horder = i_vdd_val * 2.0
+    printf("PWR_HORDER = %.6e W\n" pwr_horder)
+)
+
+; ---- Calculate total power ----
+; PWR_DC = PWR_BGR + PWR_HORDER
+when(i_vddb_raw != nil && i_vdd_raw != nil
+    pwr_val = pwr_bgr + pwr_horder
+    printf("PWR_DC_total = %.6e W\n" pwr_val)
+)
+
+; ---- Verify that PWR_DC matches indicator.json format ----
+; indicator.json TB1 FOMs: ["V_CONTROL_DC", "VBG_DC", "VCTAT_DC", "PWR_DC"]
+
+; ---- FOM Summary ----
+printf("\n===== FOM Summary =====\n")
+printf("V_CONTROL_DC = %.6f V\n" v_control_val)
+printf("VBG_DC = %.6f V\n" vbg_val)
+printf("VCTAT_DC = %.6f V\n" vctat_val)
+printf("PWR_DC = %.6e W\n" pwr_val)
+
+exit

@@ -1,0 +1,527 @@
+; TB5: STB HORDER Stability Analysis
+; 12 independent STB loops covering all HORDER iprobe locations
+; Extracts PM (deg), GM (dB), and UGF (Hz) for each loop
+; BGR + HORDER joint simulation, 27C, TT corner
+; Reference: indicator.json key "TB5"
+
+simulator('spectre)
+
+; Initialize all FOM variables
+pm_cont = 0.0
+gm_cont = 0.0
+ugf_cont = 0.0
+pm_h1 = 0.0
+gm_h1 = 0.0
+ugf_h1 = 0.0
+pm_h3_amp = 0.0
+gm_h3_amp = 0.0
+ugf_h3_amp = 0.0
+pm_h4_amp1 = 0.0
+gm_h4_amp1 = 0.0
+ugf_h4_amp1 = 0.0
+pm_h5_amp1 = 0.0
+gm_h5_amp1 = 0.0
+ugf_h5_amp1 = 0.0
+pm_adder = 0.0
+gm_adder = 0.0
+ugf_adder = 0.0
+pm_h3 = 0.0
+gm_h3 = 0.0
+ugf_h3 = 0.0
+pm_h4 = 0.0
+gm_h4 = 0.0
+ugf_h4 = 0.0
+pm_h4_amp2 = 0.0
+gm_h4_amp2 = 0.0
+ugf_h4_amp2 = 0.0
+pm_h5 = 0.0
+gm_h5 = 0.0
+ugf_h5 = 0.0
+pm_h5_amp2 = 0.0
+gm_h5_amp2 = 0.0
+ugf_h5_amp2 = 0.0
+pm_center = 0.0
+gm_center = 0.0
+ugf_center = 0.0
+
+openResults("/share/home/chentianyang/nloa/testdata_input/psf_data/tb5_stb_horder")
+
+; =============================
+; Function: extract PM and GM from margin results
+; =============================
+printf("\n===== STB Loop Results =====\n")
+
+; ----- CONT Loop -----
+sr = selectResults("stb-margin.stb")
+when(sr != nil
+    pm_raw = getData("phaseMargin")
+    when(pm_raw != nil
+        pm_cont = value(pm_raw 0)
+    )
+    gm_raw = getData("gainMargin")
+    when(gm_raw != nil
+        gm_cont = value(gm_raw 0)
+    )
+)
+
+sr_ugf = selectResults("stb-stb")
+when(sr_ugf != nil
+    lg_raw = getData("loopGain")
+    when(lg_raw != nil
+        lg_mag = db20(lg_raw)
+        ugf_cross = cross(lg_mag 0 1 "falling" nil 0.0)
+        when(numberp(ugf_cross)
+            ugf_cont = ugf_cross
+        )
+        when(drIsWaveform(ugf_cross)
+            ugf_vec = drGetWaveformYVec(ugf_cross)
+            when(ugf_vec != nil
+                ugf_cont = drGetElem(ugf_vec 0)
+            )
+        )
+    )
+)
+
+printf("PM_CONT  = %.4f Deg\n" pm_cont)
+printf("GM_CONT  = %.4f dB\n" gm_cont)
+printf("UGF_CONT = %.4f Hz\n" ugf_cont)
+
+; ----- H1 Loop -----
+sr = selectResults("stb_h1-margin.stb")
+when(sr != nil
+    pm_raw = getData("phaseMargin")
+    when(pm_raw != nil
+        pm_h1 = value(pm_raw 0)
+    )
+    gm_raw = getData("gainMargin")
+    when(gm_raw != nil
+        gm_h1 = value(gm_raw 0)
+    )
+)
+
+sr_ugf = selectResults("stb_h1-stb")
+when(sr_ugf != nil
+    lg_raw = getData("loopGain")
+    when(lg_raw != nil
+        lg_mag = db20(lg_raw)
+        ugf_cross = cross(lg_mag 0 1 "falling" nil 0.0)
+        when(numberp(ugf_cross)
+            ugf_h1 = ugf_cross
+        )
+        when(drIsWaveform(ugf_cross)
+            ugf_vec = drGetWaveformYVec(ugf_cross)
+            when(ugf_vec != nil
+                ugf_h1 = drGetElem(ugf_vec 0)
+            )
+        )
+    )
+)
+
+printf("PM_H1    = %.4f Deg\n" pm_h1)
+printf("GM_H1    = %.4f dB\n" gm_h1)
+printf("UGF_H1   = %.4f Hz\n" ugf_h1)
+
+; ----- H3_AMP Loop -----
+sr = selectResults("stb_h3_amp-margin.stb")
+when(sr != nil
+    pm_raw = getData("phaseMargin")
+    when(pm_raw != nil
+        pm_h3_amp = value(pm_raw 0)
+    )
+    gm_raw = getData("gainMargin")
+    when(gm_raw != nil
+        gm_h3_amp = value(gm_raw 0)
+    )
+)
+
+sr_ugf = selectResults("stb_h3_amp-stb")
+when(sr_ugf != nil
+    lg_raw = getData("loopGain")
+    when(lg_raw != nil
+        lg_mag = db20(lg_raw)
+        ugf_cross = cross(lg_mag 0 1 "falling" nil 0.0)
+        when(numberp(ugf_cross)
+            ugf_h3_amp = ugf_cross
+        )
+        when(drIsWaveform(ugf_cross)
+            ugf_vec = drGetWaveformYVec(ugf_cross)
+            when(ugf_vec != nil
+                ugf_h3_amp = drGetElem(ugf_vec 0)
+            )
+        )
+    )
+)
+
+printf("PM_H3_AMP  = %.4f Deg\n" pm_h3_amp)
+printf("GM_H3_AMP  = %.4f dB\n" gm_h3_amp)
+printf("UGF_H3_AMP = %.4f Hz\n" ugf_h3_amp)
+
+; ----- H4_AMP1 Loop -----
+sr = selectResults("stb_h4_amp1-margin.stb")
+when(sr != nil
+    pm_raw = getData("phaseMargin")
+    when(pm_raw != nil
+        pm_h4_amp1 = value(pm_raw 0)
+    )
+    gm_raw = getData("gainMargin")
+    when(gm_raw != nil
+        gm_h4_amp1 = value(gm_raw 0)
+    )
+)
+
+sr_ugf = selectResults("stb_h4_amp1-stb")
+when(sr_ugf != nil
+    lg_raw = getData("loopGain")
+    when(lg_raw != nil
+        lg_mag = db20(lg_raw)
+        ugf_cross = cross(lg_mag 0 1 "falling" nil 0.0)
+        when(numberp(ugf_cross)
+            ugf_h4_amp1 = ugf_cross
+        )
+        when(drIsWaveform(ugf_cross)
+            ugf_vec = drGetWaveformYVec(ugf_cross)
+            when(ugf_vec != nil
+                ugf_h4_amp1 = drGetElem(ugf_vec 0)
+            )
+        )
+    )
+)
+
+printf("PM_H4_AMP1  = %.4f Deg\n" pm_h4_amp1)
+printf("GM_H4_AMP1  = %.4f dB\n" gm_h4_amp1)
+printf("UGF_H4_AMP1 = %.4f Hz\n" ugf_h4_amp1)
+
+; ----- H5_AMP1 Loop -----
+sr = selectResults("stb_h5_amp1-margin.stb")
+when(sr != nil
+    pm_raw = getData("phaseMargin")
+    when(pm_raw != nil
+        pm_h5_amp1 = value(pm_raw 0)
+    )
+    gm_raw = getData("gainMargin")
+    when(gm_raw != nil
+        gm_h5_amp1 = value(gm_raw 0)
+    )
+)
+
+sr_ugf = selectResults("stb_h5_amp1-stb")
+when(sr_ugf != nil
+    lg_raw = getData("loopGain")
+    when(lg_raw != nil
+        lg_mag = db20(lg_raw)
+        ugf_cross = cross(lg_mag 0 1 "falling" nil 0.0)
+        when(numberp(ugf_cross)
+            ugf_h5_amp1 = ugf_cross
+        )
+        when(drIsWaveform(ugf_cross)
+            ugf_vec = drGetWaveformYVec(ugf_cross)
+            when(ugf_vec != nil
+                ugf_h5_amp1 = drGetElem(ugf_vec 0)
+            )
+        )
+    )
+)
+
+printf("PM_H5_AMP1  = %.4f Deg\n" pm_h5_amp1)
+printf("GM_H5_AMP1  = %.4f dB\n" gm_h5_amp1)
+printf("UGF_H5_AMP1 = %.4f Hz\n" ugf_h5_amp1)
+
+; ----- ADDER Loop -----
+sr = selectResults("stb_adder-margin.stb")
+when(sr != nil
+    pm_raw = getData("phaseMargin")
+    when(pm_raw != nil
+        pm_adder = value(pm_raw 0)
+    )
+    gm_raw = getData("gainMargin")
+    when(gm_raw != nil
+        gm_adder = value(gm_raw 0)
+    )
+)
+
+sr_ugf = selectResults("stb_adder-stb")
+when(sr_ugf != nil
+    lg_raw = getData("loopGain")
+    when(lg_raw != nil
+        lg_mag = db20(lg_raw)
+        ugf_cross = cross(lg_mag 0 1 "falling" nil 0.0)
+        when(numberp(ugf_cross)
+            ugf_adder = ugf_cross
+        )
+        when(drIsWaveform(ugf_cross)
+            ugf_vec = drGetWaveformYVec(ugf_cross)
+            when(ugf_vec != nil
+                ugf_adder = drGetElem(ugf_vec 0)
+            )
+        )
+    )
+)
+
+printf("PM_ADDER  = %.4f Deg\n" pm_adder)
+printf("GM_ADDER  = %.4f dB\n" gm_adder)
+printf("UGF_ADDER = %.4f Hz\n" ugf_adder)
+
+; ----- H3 Loop -----
+sr = selectResults("stb_h3-margin.stb")
+when(sr != nil
+    pm_raw = getData("phaseMargin")
+    when(pm_raw != nil
+        pm_h3 = value(pm_raw 0)
+    )
+    gm_raw = getData("gainMargin")
+    when(gm_raw != nil
+        gm_h3 = value(gm_raw 0)
+    )
+)
+
+sr_ugf = selectResults("stb_h3-stb")
+when(sr_ugf != nil
+    lg_raw = getData("loopGain")
+    when(lg_raw != nil
+        lg_mag = db20(lg_raw)
+        ugf_cross = cross(lg_mag 0 1 "falling" nil 0.0)
+        when(numberp(ugf_cross)
+            ugf_h3 = ugf_cross
+        )
+        when(drIsWaveform(ugf_cross)
+            ugf_vec = drGetWaveformYVec(ugf_cross)
+            when(ugf_vec != nil
+                ugf_h3 = drGetElem(ugf_vec 0)
+            )
+        )
+    )
+)
+
+printf("PM_H3    = %.4f Deg\n" pm_h3)
+printf("GM_H3    = %.4f dB\n" gm_h3)
+printf("UGF_H3   = %.4f Hz\n" ugf_h3)
+
+; ----- H4 Loop -----
+sr = selectResults("stb_h4-margin.stb")
+when(sr != nil
+    pm_raw = getData("phaseMargin")
+    when(pm_raw != nil
+        pm_h4 = value(pm_raw 0)
+    )
+    gm_raw = getData("gainMargin")
+    when(gm_raw != nil
+        gm_h4 = value(gm_raw 0)
+    )
+)
+
+sr_ugf = selectResults("stb_h4-stb")
+when(sr_ugf != nil
+    lg_raw = getData("loopGain")
+    when(lg_raw != nil
+        lg_mag = db20(lg_raw)
+        ugf_cross = cross(lg_mag 0 1 "falling" nil 0.0)
+        when(numberp(ugf_cross)
+            ugf_h4 = ugf_cross
+        )
+        when(drIsWaveform(ugf_cross)
+            ugf_vec = drGetWaveformYVec(ugf_cross)
+            when(ugf_vec != nil
+                ugf_h4 = drGetElem(ugf_vec 0)
+            )
+        )
+    )
+)
+
+printf("PM_H4    = %.4f Deg\n" pm_h4)
+printf("GM_H4    = %.4f dB\n" gm_h4)
+printf("UGF_H4   = %.4f Hz\n" ugf_h4)
+
+; ----- H4_AMP2 Loop -----
+sr = selectResults("stb_h4_amp2-margin.stb")
+when(sr != nil
+    pm_raw = getData("phaseMargin")
+    when(pm_raw != nil
+        pm_h4_amp2 = value(pm_raw 0)
+    )
+    gm_raw = getData("gainMargin")
+    when(gm_raw != nil
+        gm_h4_amp2 = value(gm_raw 0)
+    )
+)
+
+sr_ugf = selectResults("stb_h4_amp2-stb")
+when(sr_ugf != nil
+    lg_raw = getData("loopGain")
+    when(lg_raw != nil
+        lg_mag = db20(lg_raw)
+        ugf_cross = cross(lg_mag 0 1 "falling" nil 0.0)
+        when(numberp(ugf_cross)
+            ugf_h4_amp2 = ugf_cross
+        )
+        when(drIsWaveform(ugf_cross)
+            ugf_vec = drGetWaveformYVec(ugf_cross)
+            when(ugf_vec != nil
+                ugf_h4_amp2 = drGetElem(ugf_vec 0)
+            )
+        )
+    )
+)
+
+printf("PM_H4_AMP2  = %.4f Deg\n" pm_h4_amp2)
+printf("GM_H4_AMP2  = %.4f dB\n" gm_h4_amp2)
+printf("UGF_H4_AMP2 = %.4f Hz\n" ugf_h4_amp2)
+
+; ----- H5 Loop -----
+sr = selectResults("stb_h5-margin.stb")
+when(sr != nil
+    pm_raw = getData("phaseMargin")
+    when(pm_raw != nil
+        pm_h5 = value(pm_raw 0)
+    )
+    gm_raw = getData("gainMargin")
+    when(gm_raw != nil
+        gm_h5 = value(gm_raw 0)
+    )
+)
+
+sr_ugf = selectResults("stb_h5-stb")
+when(sr_ugf != nil
+    lg_raw = getData("loopGain")
+    when(lg_raw != nil
+        lg_mag = db20(lg_raw)
+        ugf_cross = cross(lg_mag 0 1 "falling" nil 0.0)
+        when(numberp(ugf_cross)
+            ugf_h5 = ugf_cross
+        )
+        when(drIsWaveform(ugf_cross)
+            ugf_vec = drGetWaveformYVec(ugf_cross)
+            when(ugf_vec != nil
+                ugf_h5 = drGetElem(ugf_vec 0)
+            )
+        )
+    )
+)
+
+printf("PM_H5    = %.4f Deg\n" pm_h5)
+printf("GM_H5    = %.4f dB\n" gm_h5)
+printf("UGF_H5   = %.4f Hz\n" ugf_h5)
+
+; ----- H5_AMP2 Loop -----
+sr = selectResults("stb_h5_amp2-margin.stb")
+when(sr != nil
+    pm_raw = getData("phaseMargin")
+    when(pm_raw != nil
+        pm_h5_amp2 = value(pm_raw 0)
+    )
+    gm_raw = getData("gainMargin")
+    when(gm_raw != nil
+        gm_h5_amp2 = value(gm_raw 0)
+    )
+)
+
+sr_ugf = selectResults("stb_h5_amp2-stb")
+when(sr_ugf != nil
+    lg_raw = getData("loopGain")
+    when(lg_raw != nil
+        lg_mag = db20(lg_raw)
+        ugf_cross = cross(lg_mag 0 1 "falling" nil 0.0)
+        when(numberp(ugf_cross)
+            ugf_h5_amp2 = ugf_cross
+        )
+        when(drIsWaveform(ugf_cross)
+            ugf_vec = drGetWaveformYVec(ugf_cross)
+            when(ugf_vec != nil
+                ugf_h5_amp2 = drGetElem(ugf_vec 0)
+            )
+        )
+    )
+)
+
+printf("PM_H5_AMP2  = %.4f Deg\n" pm_h5_amp2)
+printf("GM_H5_AMP2  = %.4f dB\n" gm_h5_amp2)
+printf("UGF_H5_AMP2 = %.4f Hz\n" ugf_h5_amp2)
+
+; ----- CENTER Loop -----
+sr = selectResults("stb_center-margin.stb")
+when(sr != nil
+    pm_raw = getData("phaseMargin")
+    when(pm_raw != nil
+        pm_center = value(pm_raw 0)
+    )
+    gm_raw = getData("gainMargin")
+    when(gm_raw != nil
+        gm_center = value(gm_raw 0)
+    )
+)
+
+sr_ugf = selectResults("stb_center-stb")
+when(sr_ugf != nil
+    lg_raw = getData("loopGain")
+    when(lg_raw != nil
+        lg_mag = db20(lg_raw)
+        ugf_cross = cross(lg_mag 0 1 "falling" nil 0.0)
+        when(numberp(ugf_cross)
+            ugf_center = ugf_cross
+        )
+        when(drIsWaveform(ugf_cross)
+            ugf_vec = drGetWaveformYVec(ugf_cross)
+            when(ugf_vec != nil
+                ugf_center = drGetElem(ugf_vec 0)
+            )
+        )
+    )
+)
+
+printf("PM_CENTER  = %.4f Deg\n" pm_center)
+printf("GM_CENTER  = %.4f dB\n" gm_center)
+printf("UGF_CENTER = %.4f Hz\n" ugf_center)
+
+; =============================
+; FOM Summary
+; =============================
+printf("\n===== FOM Summary =====\n")
+
+printf("PM_CONT = %.4f Deg\n" pm_cont)
+printf("GM_CONT = %.4f dB\n" gm_cont)
+printf("UGF_CONT = %.4f Hz\n" ugf_cont)
+
+printf("PM_H1 = %.4f Deg\n" pm_h1)
+printf("GM_H1 = %.4f dB\n" gm_h1)
+printf("UGF_H1 = %.4f Hz\n" ugf_h1)
+
+printf("PM_H3_AMP = %.4f Deg\n" pm_h3_amp)
+printf("GM_H3_AMP = %.4f dB\n" gm_h3_amp)
+printf("UGF_H3_AMP = %.4f Hz\n" ugf_h3_amp)
+
+printf("PM_H4_AMP1 = %.4f Deg\n" pm_h4_amp1)
+printf("GM_H4_AMP1 = %.4f dB\n" gm_h4_amp1)
+printf("UGF_H4_AMP1 = %.4f Hz\n" ugf_h4_amp1)
+
+printf("PM_H5_AMP1 = %.4f Deg\n" pm_h5_amp1)
+printf("GM_H5_AMP1 = %.4f dB\n" gm_h5_amp1)
+printf("UGF_H5_AMP1 = %.4f Hz\n" ugf_h5_amp1)
+
+printf("PM_ADDER = %.4f Deg\n" pm_adder)
+printf("GM_ADDER = %.4f dB\n" gm_adder)
+printf("UGF_ADDER = %.4f Hz\n" ugf_adder)
+
+printf("PM_H3 = %.4f Deg\n" pm_h3)
+printf("GM_H3 = %.4f dB\n" gm_h3)
+printf("UGF_H3 = %.4f Hz\n" ugf_h3)
+
+printf("PM_H4 = %.4f Deg\n" pm_h4)
+printf("GM_H4 = %.4f dB\n" gm_h4)
+printf("UGF_H4 = %.4f Hz\n" ugf_h4)
+
+printf("PM_H4_AMP2 = %.4f Deg\n" pm_h4_amp2)
+printf("GM_H4_AMP2 = %.4f dB\n" gm_h4_amp2)
+printf("UGF_H4_AMP2 = %.4f Hz\n" ugf_h4_amp2)
+
+printf("PM_H5 = %.4f Deg\n" pm_h5)
+printf("GM_H5 = %.4f dB\n" gm_h5)
+printf("UGF_H5 = %.4f Hz\n" ugf_h5)
+
+printf("PM_H5_AMP2 = %.4f Deg\n" pm_h5_amp2)
+printf("GM_H5_AMP2 = %.4f dB\n" gm_h5_amp2)
+printf("UGF_H5_AMP2 = %.4f Hz\n" ugf_h5_amp2)
+
+printf("PM_CENTER = %.4f Deg\n" pm_center)
+printf("GM_CENTER = %.4f dB\n" gm_center)
+printf("UGF_CENTER = %.4f Hz\n" ugf_center)
+
+exit

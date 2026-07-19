@@ -1,0 +1,93 @@
+// TB2: Temperature Sweep + PPM Fitting
+// BGR + HORDER joint simulation
+// Temperature: -55 to 125 C, step 1 C
+// Corner: TT
+
+parameters vdd_val=2.0 vddb_val=3.3
+
+// PDK includes (from horder.scs - horder.scs not included to avoid subckt duplication with dut.scs)
+include "/share/project/ianalog/process/SMIC/smic18mserf_1833_1P6M_5Ia_1TMa2_MIM20_TYP1_oa_cds_2022_01_20_v1.20_rev0_0/models/spectre/ms018_enhanced_v1p2_rev0_spe.lib" section=tt
+include "/share/project/ianalog/process/SMIC/smic18mserf_1833_1P6M_5Ia_1TMa2_MIM20_TYP1_oa_cds_2022_01_20_v1.20_rev0_0/models/spectre/ms018_enhanced_v1p2_rev0_spe.lib" section=res_tt
+include "/share/project/ianalog/process/SMIC/smic18mserf_1833_1P6M_5Ia_1TMa2_MIM20_TYP1_oa_cds_2022_01_20_v1.20_rev0_0/models/spectre/ms018_enhanced_v1p2_rev0_spe.lib" section=mim_tt
+include "/share/project/ianalog/process/SMIC/smic18mserf_1833_1P6M_5Ia_1TMa2_MIM20_TYP1_oa_cds_2022_01_20_v1.20_rev0_0/models/spectre/ms018_enhanced_v1p2_rev0_spe.lib" section=bjt_tt
+include "/share/project/ianalog/process/SMIC/smic18mserf_1833_1P6M_5Ia_1TMa2_MIM20_TYP1_oa_cds_2022_01_20_v1.20_rev0_0/models/spectre/ms018_enhanced_v1p2_rev0_spe.lib" section=dio_tt
+include "/share/project/ianalog/process/SMIC/smic18mserf_1833_1P6M_5Ia_1TMa2_MIM20_TYP1_oa_cds_2022_01_20_v1.20_rev0_0/models/spectre/ms018_enhanced_v1p2_rev0_spe.lib" section=var_tt
+
+// Subckt definitions (dut.scs includes all HORDER subckts; horder.scs NOT included to avoid duplication)
+include "./bgr.scs"
+include "./dut.scs"
+
+// BGR instance
+xBGR (DEC_D0 DEC_D1 DEC_D2 GND OEN PIB VBG VDDB VR0 VR1 VCTAT VREF) BANDGAP_7070_MK3
+
+// HORDER wrapper instance (BGR.VCTAT → HORDER.VIN)
+xdut (IBN_3U_CENTER VINP_CENTER V_CONTROL CTRL_H4 CTRL_H5 IBN_1U_H3 IBN_1U_H4 IBN_1U_H5 IBN_6U_CONT IBN_6U_H1 IBN_6U_H3 IBN_6U_H4 IBN_6U_H5 IBN_6U_VOL3 IBN_6U_VOL41 IBN_6U_VOL42 IBN_6U_VOL51 IBN_6U_VOL52 IBP_3U_ADDER NCTRL_H4 NCTRL_H5 VDD VH1 VH2 VH3 VCTAT VL1 VL2 VL3 VM VOUT_ADDER VOUT_CONT VOUT_H1 VOUT_H3 VOUT_H4 VOUT_H5 VSS STB1_CONT STB2_CONT STB1_H1 STB2_H1 STB1_H3_AMP STB2_H3_AMP STB1_H4_AMP1 STB2_H4_AMP1 STB1_H5_AMP1 STB2_H5_AMP1 STB1_ADDER STB2_ADDER STB1_H3 STB2_H3 STB1_H4 STB2_H4 STB1_H4_AMP2 STB2_H4_AMP2 STB1_H5 STB2_H5 STB1_H5_AMP2 STB2_H5_AMP2 STB1_CENTER STB2_CENTER VDD VSS) NewGenerator_20260610_175018_wrapper_9f8ecae021113917
+
+// Connect BGR VCTAT to HORDER VIN
+V_VIN_connect (VIN VCTAT) vsource dc=0
+
+// BGR power supplies
+V_VDDB (VDDB 0) vsource dc=3.3
+V_GND (GND 0) vsource dc=0
+V_OEN (OEN 0) vsource dc=3.3
+V_VREF (VREF 0) vsource dc=1
+V_DEC0 (DEC_D0 0) vsource dc=0
+V_DEC1 (DEC_D1 0) vsource dc=0
+V_DEC2 (DEC_D2 0) vsource dc=0
+
+// HORDER power supplies
+V_VDD (VDD 0) vsource dc=2.0
+V_VSS (VSS 0) vsource dc=0
+
+// HORDER signal inputs
+V_VINP_CENTER (VINP_CENTER 0) vsource dc=1.28
+V_VM (VM 0) vsource dc=1.3
+V_VH1 (VH1 0) vsource dc=1.7
+V_VH2 (VH2 0) vsource dc=1.8
+V_VH3 (VH3 0) vsource dc=1.9
+V_VL1 (VL1 0) vsource dc=0.9
+V_VL2 (VL2 0) vsource dc=0.8
+V_VL3 (VL3 0) vsource dc=0.7
+V_CTRL_H4 (CTRL_H4 0) vsource dc=0
+V_NCTRL_H4 (NCTRL_H4 0) vsource dc=2
+V_CTRL_H5 (CTRL_H5 0) vsource dc=0
+V_NCTRL_H5 (NCTRL_H5 0) vsource dc=2
+
+// Bias currents: IBN_* = VDD to port (current flows into VDD)
+I_IBN_1U_H3 (VDD IBN_1U_H3) isource dc=1u
+I_IBN_1U_H4 (VDD IBN_1U_H4) isource dc=1u
+I_IBN_1U_H5 (VDD IBN_1U_H5) isource dc=1u
+I_IBN_6U_H1 (VDD IBN_6U_H1) isource dc=6u
+I_IBN_6U_H3 (VDD IBN_6U_H3) isource dc=6u
+I_IBN_6U_H4 (VDD IBN_6U_H4) isource dc=6u
+I_IBN_6U_H5 (VDD IBN_6U_H5) isource dc=6u
+I_IBN_6U_CONT (VDD IBN_6U_CONT) isource dc=6u
+I_IBN_6U_VOL3 (VDD IBN_6U_VOL3) isource dc=6u
+I_IBN_6U_VOL41 (VDD IBN_6U_VOL41) isource dc=6u
+I_IBN_6U_VOL42 (VDD IBN_6U_VOL42) isource dc=6u
+I_IBN_6U_VOL51 (VDD IBN_6U_VOL51) isource dc=6u
+I_IBN_6U_VOL52 (VDD IBN_6U_VOL52) isource dc=6u
+
+// Bias currents: IBP_3U_ADDER = port to VSS (current flows from port to ground)
+I_IBP_3U_ADDER (IBP_3U_ADDER 0) isource dc=3u
+I_IBN_3U_CENTER (IBN_3U_CENTER 0) isource dc=3u
+
+// STB probe iprobes: short STB1_x to STB2_x to close feedback loops
+iIPRB_CONT    (STB1_CONT    STB2_CONT)    iprobe
+iIPRB_H1      (STB1_H1      STB2_H1)      iprobe
+iIPRB_H3_AMP  (STB1_H3_AMP  STB2_H3_AMP)  iprobe
+iIPRB_H4_AMP1 (STB1_H4_AMP1 STB2_H4_AMP1) iprobe
+iIPRB_H5_AMP1 (STB1_H5_AMP1 STB2_H5_AMP1) iprobe
+iIPRB_ADDER   (STB1_ADDER   STB2_ADDER)   iprobe
+iIPRB_H3      (STB1_H3      STB2_H3)      iprobe
+iIPRB_H4      (STB1_H4      STB2_H4)      iprobe
+iIPRB_H4_AMP2 (STB1_H4_AMP2 STB2_H4_AMP2) iprobe
+iIPRB_H5      (STB1_H5      STB2_H5)      iprobe
+iIPRB_H5_AMP2 (STB1_H5_AMP2 STB2_H5_AMP2) iprobe
+iIPRB_CENTER  (STB1_CENTER  STB2_CENTER)  iprobe
+
+// Save signals for post-processing
+save V_CONTROL VBG VCTAT
+
+// DC temperature sweep
+dc_op dc param=temp start=-55 stop=125 step=1

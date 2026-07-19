@@ -1,0 +1,75 @@
+;============================================================
+; TB4: STB BGR Stability Analysis - Ocean Post-Processing
+; Probe: BGR internal IPRB0 (xBGR.IPRB0)
+; Temperature: 27C, Corner: TT
+; Analysis: stb_bgr (1 mHz to 1 GHz)
+;
+; FOMs: PM_BGR, GM_BGR, UGF_BGR
+;
+; For indicator.json alignment:
+;   TB4: ["PM_BGR", "GM_BGR", "UGF_BGR"]
+;
+; Margin stb signals: phaseMargin, gainMargin,
+;   gainMarginFreq, phaseMarginFreq, stb_state
+;
+; Note: phaseMargin and phaseMarginFreq are scalar values
+;       gainMargin may be -nan if no gain margin exists
+;============================================================
+
+simulator('spectre)
+
+; Initialize all output variables
+pm_bgr = 0.0
+gm_bgr = 0.0
+ugf_bgr = 0.0
+
+; Open PSF results - absolute path, string literal
+openResults("/share/home/chentianyang/nloa/testdata_input/psf_data/tb4_stb_bgr")
+
+;------------------------------------------
+; Extract Phase Margin from margin.stb
+; phaseMargin is a scalar value (degrees)
+;------------------------------------------
+selectResults("stb_bgr-margin.stb")
+pm_raw = getData("phaseMargin")
+when(numberp(pm_raw)
+    pm_bgr = pm_raw
+    printf("PM_BGR = %.6f deg\n" pm_bgr)
+)
+
+;------------------------------------------
+; Extract Gain Margin from margin.stb
+; gainMargin may be -nan (no gain margin exists:
+;   phase does not cross 0 deg before gain drops below 0 dB)
+; In SKILL, -nan is still numberp=true, so we check valid range
+;------------------------------------------
+selectResults("stb_bgr-margin.stb")
+gm_raw = getData("gainMargin")
+if(numberp(gm_raw) && gm_raw > -1e6 && gm_raw < 1e6 then
+    gm_bgr = gm_raw
+    printf("GM_BGR = %.6f dB\n" gm_bgr)
+else
+    gm_bgr = 0.0
+    printf("GM_BGR = 0.000000 dB\n")
+)
+
+;------------------------------------------
+; Extract Unity Gain Frequency from margin.stb
+; phaseMarginFreq is the frequency where gain = 0 dB (UGF)
+;------------------------------------------
+selectResults("stb_bgr-margin.stb")
+ugf_raw = getData("phaseMarginFreq")
+when(numberp(ugf_raw)
+    ugf_bgr = ugf_raw
+    printf("UGF_BGR = %.6f Hz\n" ugf_bgr)
+)
+
+;------------------------------------------
+; FOM Summary (aligned with indicator.json TB4 keys)
+;------------------------------------------
+printf("\n===== FOM Summary =====\n")
+printf("PM_BGR = %.6f deg\n" pm_bgr)
+printf("GM_BGR = %.6f dB\n" gm_bgr)
+printf("UGF_BGR = %.6f Hz\n" ugf_bgr)
+
+exit

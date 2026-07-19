@@ -1,0 +1,8 @@
+{
+    "TB_ID": "TB3",
+    "FOM": {
+        "STARTUP_TIME": {"value": 22.06, "unit": "us"},
+        "OVERSHOOT": {"value": 64.743, "unit": "%"},
+        "V_CONTROL_FINAL": {"value": 0.943, "unit": "V"}
+    }
+}

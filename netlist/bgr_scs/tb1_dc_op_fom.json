@@ -1,0 +1,9 @@
+{
+    "TB_ID": "TB1",
+    "FOM": {
+        "V_CONTROL_DC": {"value": 1.999549, "unit": "V"},
+        "VBG_DC": {"value": 1.231907, "unit": "V"},
+        "VCTAT_DC": {"value": 1.263451, "unit": "V"},
+        "PWR_DC": {"value": 0.008715091, "unit": "W"}
+    }
+}

@@ -1,0 +1,58 @@
+; ============================================================
+; TB8: Output Noise Analysis - OCN Post-Processing
+; Circuit: BGR + HORDER joint simulation
+; Temperature: 27C, Corner: TT
+; FOMs: NOISE_1HZ, NOISE_1KHZ, NOISE_1MHZ
+; ============================================================
+
+simulator('spectre)
+
+; ---- Initialize all variables to default values ----
+noise_1hz_db = 0.0
+noise_1khz_db = 0.0
+noise_1mhz_db = 0.0
+
+; ---- Open PSF results ----
+openResults("/share/home/chentianyang/nloa/testdata_input/psf_data/tb8_noise")
+
+; ---- Select noise analysis results ----
+selectResults("noise-noise")
+
+; ---- Get output noise density (V/rtHz) ----
+onoise_raw = getData("out")
+when(onoise_raw != nil
+    printf("Output noise data loaded successfully.\n")
+
+    freq_xvec = drGetWaveformXVec(onoise_raw)
+    npts = drVectorLength(freq_xvec)
+    freq_first = drGetElem(freq_xvec 0)
+    freq_last = drGetElem(freq_xvec sub1(npts))
+    printf("Number of frequency points = %d\n" npts)
+    printf("Frequency range: %.4f Hz to %.4e Hz\n" freq_first freq_last)
+
+    ; ---- Extract spot noise at 1 Hz ----
+    v2_1hz = value(onoise_raw 1.0)
+    printf("Noise density at 1Hz (V/rtHz) = %.6e\n" v2_1hz)
+    noise_1hz_db = 20.0 * log10(v2_1hz)
+    printf("NOISE_1HZ_raw = %.6f dBV/rtHz\n" noise_1hz_db)
+
+    ; ---- Extract spot noise at 1 KHz ----
+    v2_1khz = value(onoise_raw 1000.0)
+    printf("Noise density at 1KHz (V/rtHz) = %.6e\n" v2_1khz)
+    noise_1khz_db = 20.0 * log10(v2_1khz)
+    printf("NOISE_1KHZ_raw = %.6f dBV/rtHz\n" noise_1khz_db)
+
+    ; ---- Extract spot noise at 1 MHz ----
+    v2_1mhz = value(onoise_raw 1000000.0)
+    printf("Noise density at 1MHz (V/rtHz) = %.6e\n" v2_1mhz)
+    noise_1mhz_db = 20.0 * log10(v2_1mhz)
+    printf("NOISE_1MHZ_raw = %.6f dBV/rtHz\n" noise_1mhz_db)
+)
+
+; ---- FOM Summary ----
+printf("\n===== FOM Summary =====\n")
+printf("NOISE_1HZ = %.6f dBV/rtHz\n" noise_1hz_db)
+printf("NOISE_1KHZ = %.6f dBV/rtHz\n" noise_1khz_db)
+printf("NOISE_1MHZ = %.6f dBV/rtHz\n" noise_1mhz_db)
+
+exit

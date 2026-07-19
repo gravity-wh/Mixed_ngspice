@@ -1,0 +1,97 @@
+; ============================================================
+; TB3: Transient Startup - OCN Post-Processing
+; Circuit: BGR + HORDER joint simulation
+; Temperature: 27C, Corner: TT
+; FOMs: STARTUP_TIME, OVERSHOOT, V_CONTROL_FINAL
+; ============================================================
+
+simulator('spectre)
+
+; ---- Initialize all variables to default values ----
+vctrl_final = 0.0
+vctrl_max = 0.0
+overshoot_pct = 0.0
+startup_time_val = 0.0
+
+; ---- Open PSF results ----
+openResults("/share/home/chentianyang/nloa/testdata_input/psf_data/tb3_startup")
+
+; ---- Select transient analysis results ----
+selectResults("tran_startup-tran")
+
+; ---- Extract V_CONTROL waveform from transient simulation ----
+vctrl_wf = getData("V_CONTROL")
+when(vctrl_wf != nil
+    ; ---- V_CONTROL_FINAL: value at end of simulation (t=100us) ----
+    vctrl_final = value(vctrl_wf 100e-6)
+    printf("V_CONTROL_FINAL_RAW = %.6f V\n" vctrl_final)
+
+    ; ---- V_CONTROL max: peak value during startup ----
+    vctrl_max = ymax(vctrl_wf)
+    printf("V_CONTROL_MAX_RAW = %.6f V\n" vctrl_max)
+
+    ; ---- OVERSHOOT: (Vmax - Vfinal) / Vfinal * 100% ----
+    when(vctrl_final != 0.0
+        overshoot_pct = (vctrl_max - vctrl_final) / vctrl_final * 100.0
+        printf("OVERSHOOT_RAW = %.3f %%\n" overshoot_pct)
+    )
+
+    ; ---- STARTUP_TIME: time to settle within +/- 1% of V_CONTROL_FINAL ----
+    when(vctrl_final != 0.0
+        ; Compute absolute percentage error waveform
+        err_wf = abs((vctrl_wf - vctrl_final) / vctrl_final)
+
+        ; Check error at end of simulation
+        err_at_end = value(err_wf 100e-6)
+        printf("ERR_AT_100US_RAW = %.6f\n" err_at_end)
+
+        if(err_at_end < 0.01 then
+            ; Signal is settled at end - find last crossing of 1% threshold
+            cross_wf = cross(err_wf 0.01 50 "either" "time" nil)
+            if(cross_wf != nil then
+                if(numberp(cross_wf) then
+                    startup_time_val = cross_wf
+                else
+                    ; waveform: get last crossing time
+                    cross_yvec = drGetWaveformYVec(cross_wf)
+                    when(cross_yvec != nil
+                        last_idx = drVectorLength(cross_yvec) - 1
+                        when(last_idx >= 0
+                            startup_time_val = drGetElem(cross_yvec last_idx)
+                        )
+                    )
+                )
+                printf("STARTUP_TIME_RAW = %.6e s\n" startup_time_val)
+            else
+                ; No crossings at all - always within 1%
+                startup_time_val = 10e-6
+                printf("STARTUP_TIME_RAW (no cross) = %.6e s\n" startup_time_val)
+            )
+        else
+            ; Not settled at end of simulation
+            startup_time_val = 100e-6
+            printf("STARTUP_TIME_RAW (not settled) = %.6e s\n" startup_time_val)
+        )
+    )
+)
+
+; ---- Extract VDD for reference ----
+vdd_wf = getData("VDD")
+when(vdd_wf != nil
+    vdd_final = value(vdd_wf 100e-6)
+    printf("VDD_FINAL_RAW = %.6f V\n" vdd_final)
+)
+
+; ---- Convert startup time to microseconds for display ----
+startup_time_us = startup_time_val * 1e6
+
+; ============================================
+; ---- FOM Summary ----
+; indicator.json TB3 FOMs: ["STARTUP_TIME", "OVERSHOOT", "V_CONTROL_FINAL"]
+; ============================================
+printf("\n===== FOM Summary =====\n")
+printf("STARTUP_TIME = %.3f us\n" startup_time_us)
+printf("OVERSHOOT = %.3f %%\n" overshoot_pct)
+printf("V_CONTROL_FINAL = %.6f V\n" vctrl_final)
+
+exit

@@ -1,0 +1,42 @@
+; ============================================================
+; TB6: PSRR VDDB - BGR 3.3V Power Supply Rejection Ratio
+; Analysis: AC sweep 1mHz to 1GHz
+; Measurement: V_CONTROL AC response
+; FOM: PSRR_VDDB (dB)
+; Temperature: 27C, Corner: TT
+; ============================================================
+
+simulator('spectre)
+
+; ---------- Variable Initialization ----------
+psrr_vddb = -300.0
+
+; ---------- Open PSF Results ----------
+openResults("/share/home/chentianyang/nloa/testdata_input/psf_data/tb6_psrr_vddb")
+
+; ---------- AC Analysis: PSRR from VDDB ----------
+selectResults("ac_psrr_vddb-ac")
+vctrl_raw = getData("V_CONTROL")
+
+when(vctrl_raw != nil
+    yvec = drGetWaveformYVec(vctrl_raw)
+    when(yvec != nil
+        ; Extract PSRR at 1 Hz (standard low-frequency PSRR measurement)
+        vctrl_cplx = value(vctrl_raw 1.0)
+        when(vctrl_cplx != nil
+            vctrl_real = real(vctrl_cplx)
+            vctrl_imag = imag(vctrl_cplx)
+            vctrl_mag = sqrt(vctrl_real * vctrl_real + vctrl_imag * vctrl_imag)
+            printf("V_CONTROL_mag_at_1Hz = %.6e V/V\n" vctrl_mag)
+            when(vctrl_mag > 1e-30
+                psrr_vddb = 20.0 * log10(vctrl_mag)
+            )
+        )
+    )
+)
+
+; ---------- FOM Summary ----------
+printf("\n===== FOM Summary =====\n")
+printf("PSRR_VDDB = %.4f dB\n" psrr_vddb)
+
+exit

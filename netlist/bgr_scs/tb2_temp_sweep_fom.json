@@ -1,0 +1,9 @@
+{
+  "TB_ID": "TB2",
+  "FOM": {
+    "PPM": {"value": 2.157, "unit": null},
+    "V_CONTROL_RANGE": {"value": 0.856, "unit": "V"},
+    "VBG_TC": {"value": 5.429, "unit": "ppm/C"},
+    "VCTAT_TC": {"value": 3923.152, "unit": "ppm/C"}
+  }
+}

@@ -1,0 +1,136 @@
+// TB5: STB HORDER Stability Analysis
+// 12 independent STB loops covering all HORDER iprobe locations
+// BGR + HORDER joint simulation
+// Temperature: 27C, Corner: TT
+
+include "/share/project/ianalog/process/SMIC/smic18mserf_1833_1P6M_5Ia_1TMa2_MIM20_TYP1_oa_cds_2022_01_20_v1.20_rev0_0/models/spectre/ms018_enhanced_v1p2_rev0_spe.lib" section=tt
+include "/share/project/ianalog/process/SMIC/smic18mserf_1833_1P6M_5Ia_1TMa2_MIM20_TYP1_oa_cds_2022_01_20_v1.20_rev0_0/models/spectre/ms018_enhanced_v1p2_rev0_spe.lib" section=res_tt
+include "/share/project/ianalog/process/SMIC/smic18mserf_1833_1P6M_5Ia_1TMa2_MIM20_TYP1_oa_cds_2022_01_20_v1.20_rev0_0/models/spectre/ms018_enhanced_v1p2_rev0_spe.lib" section=mim_tt
+include "/share/project/ianalog/process/SMIC/smic18mserf_1833_1P6M_5Ia_1TMa2_MIM20_TYP1_oa_cds_2022_01_20_v1.20_rev0_0/models/spectre/ms018_enhanced_v1p2_rev0_spe.lib" section=bjt_tt
+include "/share/project/ianalog/process/SMIC/smic18mserf_1833_1P6M_5Ia_1TMa2_MIM20_TYP1_oa_cds_2022_01_20_v1.20_rev0_0/models/spectre/ms018_enhanced_v1p2_rev0_spe.lib" section=dio_tt
+include "/share/project/ianalog/process/SMIC/smic18mserf_1833_1P6M_5Ia_1TMa2_MIM20_TYP1_oa_cds_2022_01_20_v1.20_rev0_0/models/spectre/ms018_enhanced_v1p2_rev0_spe.lib" section=var_tt
+
+include "./dut.scs"
+include "./bgr.scs"
+
+parameters vdd_val=2 vddb_val=3.3
+
+// BGR instance
+// Port order: DEC_D0 DEC_D1 DEC_D2 GND OEN PIB VBG VDDB VR0 VR1 VCTAT VREF
+// BGR.VCTAT connects to HORDER.VIN via shared net VIN
+xBGR (DEC_D0 DEC_D1 DEC_D2 GND OEN PIB VBG VDDB VR0 VR1 VIN VREF) BANDGAP_7070_MK3
+
+// BGR supply and control
+V_VDDB (VDDB 0) vsource dc=3.3
+V_GND (GND 0) vsource dc=0
+V_OEN (OEN 0) vsource dc=3.3
+V_VREF (VREF 0) vsource dc=1
+V_DEC0 (DEC_D0 0) vsource dc=0
+V_DEC1 (DEC_D1 0) vsource dc=0
+V_DEC2 (DEC_D2 0) vsource dc=0
+
+// HORDER wrapper instance
+// Port order from NewGenerator_20260610_175018_wrapper_9f8ecae021113917:
+// IBN_3U_CENTER VINP_CENTER V_CONTROL CTRL_H4 CTRL_H5
+// IBN_1U_H3 IBN_1U_H4 IBN_1U_H5
+// IBN_6U_CONT IBN_6U_H1 IBN_6U_H3 IBN_6U_H4 IBN_6U_H5 IBN_6U_VOL3 IBN_6U_VOL41 IBN_6U_VOL42 IBN_6U_VOL51 IBN_6U_VOL52
+// IBP_3U_ADDER NCTRL_H4 NCTRL_H5
+// VDD VH1 VH2 VH3 VIN VL1 VL2 VL3 VM
+// VOUT_ADDER VOUT_CONT VOUT_H1 VOUT_H3 VOUT_H4 VOUT_H5 VSS
+// STB1_CONT STB2_CONT STB1_H1 STB2_H1 STB1_H3_AMP STB2_H3_AMP STB1_H4_AMP1 STB2_H4_AMP1 STB1_H5_AMP1 STB2_H5_AMP1
+// STB1_ADDER STB2_ADDER STB1_H3 STB2_H3 STB1_H4 STB2_H4 STB1_H4_AMP2 STB2_H4_AMP2 STB1_H5 STB2_H5 STB1_H5_AMP2 STB2_H5_AMP2 STB1_CENTER STB2_CENTER
+// _vdd_ _vss_
+xdut (IBN_3U_CENTER VINP_CENTER V_CONTROL CTRL_H4 CTRL_H5 \
+    IBN_1U_H3 IBN_1U_H4 IBN_1U_H5 \
+    IBN_6U_CONT IBN_6U_H1 IBN_6U_H3 IBN_6U_H4 IBN_6U_H5 IBN_6U_VOL3 IBN_6U_VOL41 IBN_6U_VOL42 IBN_6U_VOL51 IBN_6U_VOL52 \
+    IBP_3U_ADDER NCTRL_H4 NCTRL_H5 \
+    VDD VH1 VH2 VH3 VIN VL1 VL2 VL3 VM \
+    VOUT_ADDER VOUT_CONT VOUT_H1 VOUT_H3 VOUT_H4 VOUT_H5 VSS \
+    STB1_CONT STB2_CONT STB1_H1 STB2_H1 STB1_H3_AMP STB2_H3_AMP STB1_H4_AMP1 STB2_H4_AMP1 STB1_H5_AMP1 STB2_H5_AMP1 \
+    STB1_ADDER STB2_ADDER STB1_H3 STB2_H3 STB1_H4 STB2_H4 STB1_H4_AMP2 STB2_H4_AMP2 STB1_H5 STB2_H5 STB1_H5_AMP2 STB2_H5_AMP2 STB1_CENTER STB2_CENTER \
+    VDD VSS) NewGenerator_20260610_175018_wrapper_9f8ecae021113917
+
+// HORDER supply
+V_VDD (VDD 0) vsource dc=2
+V_VSS (VSS 0) vsource dc=0
+
+// HORDER analog inputs
+V_VINP_CENTER (VINP_CENTER 0) vsource dc=1.28
+V_VM (VM 0) vsource dc=1.3
+V_VH1 (VH1 0) vsource dc=1.7
+V_VH2 (VH2 0) vsource dc=1.8
+V_VH3 (VH3 0) vsource dc=1.9
+V_VL1 (VL1 0) vsource dc=0.9
+V_VL2 (VL2 0) vsource dc=0.8
+V_VL3 (VL3 0) vsource dc=0.7
+
+// HORDER digital control
+V_CTRL_H4 (CTRL_H4 0) vsource dc=0
+V_NCTRL_H4 (NCTRL_H4 0) vsource dc=2
+V_CTRL_H5 (CTRL_H5 0) vsource dc=0
+V_NCTRL_H5 (NCTRL_H5 0) vsource dc=2
+
+// HORDER bias currents
+// IBN_1U (VDD -> port): 1uA current sources
+I_IBN_1U_H3 (VDD IBN_1U_H3) isource dc=1u
+I_IBN_1U_H4 (VDD IBN_1U_H4) isource dc=1u
+I_IBN_1U_H5 (VDD IBN_1U_H5) isource dc=1u
+
+// IBN_6U (VDD -> port): 6uA current sources
+I_IBN_6U_CONT (VDD IBN_6U_CONT) isource dc=6u
+I_IBN_6U_H1 (VDD IBN_6U_H1) isource dc=6u
+I_IBN_6U_H3 (VDD IBN_6U_H3) isource dc=6u
+I_IBN_6U_H4 (VDD IBN_6U_H4) isource dc=6u
+I_IBN_6U_H5 (VDD IBN_6U_H5) isource dc=6u
+I_IBN_6U_VOL3 (VDD IBN_6U_VOL3) isource dc=6u
+I_IBN_6U_VOL41 (VDD IBN_6U_VOL41) isource dc=6u
+I_IBN_6U_VOL42 (VDD IBN_6U_VOL42) isource dc=6u
+I_IBN_6U_VOL51 (VDD IBN_6U_VOL51) isource dc=6u
+I_IBN_6U_VOL52 (VDD IBN_6U_VOL52) isource dc=6u
+
+// IBP_3U_ADDER and IBN_3U_CENTER (port -> VSS): current sinks
+I_IBP_3U_ADDER (IBP_3U_ADDER 0) isource dc=3u
+I_IBN_3U_CENTER (IBN_3U_CENTER 0) isource dc=3u
+
+// =============================
+// IPROBE instances at TB top level
+// (one per STB loop, connecting the wrapper's STB1/STB2 port pairs)
+// =============================
+iIPRB_CONT (STB1_CONT STB2_CONT) iprobe
+iIPRB_H1 (STB1_H1 STB2_H1) iprobe
+iIPRB_H3_AMP (STB1_H3_AMP STB2_H3_AMP) iprobe
+iIPRB_H4_AMP1 (STB1_H4_AMP1 STB2_H4_AMP1) iprobe
+iIPRB_H5_AMP1 (STB1_H5_AMP1 STB2_H5_AMP1) iprobe
+iIPRB_ADDER (STB1_ADDER STB2_ADDER) iprobe
+iIPRB_H3 (STB1_H3 STB2_H3) iprobe
+iIPRB_H4 (STB1_H4 STB2_H4) iprobe
+iIPRB_H4_AMP2 (STB1_H4_AMP2 STB2_H4_AMP2) iprobe
+iIPRB_H5 (STB1_H5 STB2_H5) iprobe
+iIPRB_H5_AMP2 (STB1_H5_AMP2 STB2_H5_AMP2) iprobe
+iIPRB_CENTER (STB1_CENTER STB2_CENTER) iprobe
+
+// =============================
+// 12 Independent STB Analyses
+// Frequency: 1mHz to 1GHz
+// =============================
+stb stb start=1e-3 stop=1e9 probe=iIPRB_CONT
+stb_h1 stb start=1e-3 stop=1e9 probe=iIPRB_H1
+stb_h3_amp stb start=1e-3 stop=1e9 probe=iIPRB_H3_AMP
+stb_h4_amp1 stb start=1e-3 stop=1e9 probe=iIPRB_H4_AMP1
+stb_h5_amp1 stb start=1e-3 stop=1e9 probe=iIPRB_H5_AMP1
+stb_adder stb start=1e-3 stop=1e9 probe=iIPRB_ADDER
+stb_h3 stb start=1e-3 stop=1e9 probe=iIPRB_H3
+stb_h4 stb start=1e-3 stop=1e9 probe=iIPRB_H4
+stb_h4_amp2 stb start=1e-3 stop=1e9 probe=iIPRB_H4_AMP2
+stb_h5 stb start=1e-3 stop=1e9 probe=iIPRB_H5
+stb_h5_amp2 stb start=1e-3 stop=1e9 probe=iIPRB_H5_AMP2
+stb_center stb start=1e-3 stop=1e9 probe=iIPRB_CENTER
+
+// =============================
+// Simulation options
+// =============================
+simulatorOptions options checklimitdest=psf cols=80 digits=5 gmin=1e-12 iabstol=1e-12 maxnotes=5 maxwarns=5 pivrel=0.001 reltol=0.001 rforce=1 scale=1.0 scalem=1.0 temp=27 tnom=27 useterms=name vabstol=1e-06
+
+// Save key signals for debugging
+save V_CONTROL VBG V_VDD:p V_VDDB:p
+saveOptions options save=allpub

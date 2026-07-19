@@ -1,0 +1,458 @@
+
+// Library name: SMIC180RF_EDA_7070
+// Cell name: INV_P6_P6_LP3
+// View name: schematic
+subckt INV_P6_P6_LP3 A GS VS YN
+    M0 (YN A VS VS) p33_ckt mr=(1) w=(600n) l=300n nf=1 as=288f ad=288f \
+        ps=2.16u pd=2.16u nrs=450m nrd=450m sa=480n sb=480n sd=0 sca=0 \
+        scb=0 scc=0 mismod=1
+    M1 (YN A GS GS) n33_ckt mr=(1) w=(600n) l=350n nf=1 as=288f ad=288f \
+        ps=2.16u pd=2.16u nrs=450m nrd=450m sa=480n sb=480n sd=0 sca=0 \
+        scb=0 scc=0 mismod=1
+ends INV_P6_P6_LP3
+// End of subcircuit definition.
+
+// Library name: SMIC180RF_EDA_7070
+// Cell name: NOR3_33_P6_P6_LP3
+// View name: schematic
+subckt NOR3_33_P6_P6_LP3 A B C GS VS YN
+    M6 (M0_S A VS VS) p33_ckt mr=(1) w=(600n) l=300n nf=1 as=288f ad=288f \
+        ps=2.16u pd=2.16u nrs=450m nrd=450m sa=480n sb=480n sd=0 sca=0 \
+        scb=0 scc=0 mismod=1
+    M0 (M0_D B M0_S VS) p33_ckt mr=(1) w=(600n) l=300n nf=1 as=288f \
+        ad=288f ps=2.16u pd=2.16u nrs=450m nrd=450m sa=480n sb=480n sd=0 \
+        sca=0 scb=0 scc=0 mismod=1
+    M1 (YN C M0_D VS) p33_ckt mr=(1) w=(600n) l=300n nf=1 as=288f ad=288f \
+        ps=2.16u pd=2.16u nrs=450m nrd=450m sa=480n sb=480n sd=0 sca=0 \
+        scb=0 scc=0 mismod=1
+    M7 (YN A GS GS) n33_ckt mr=(1) w=(600n) l=350n nf=1 as=288f ad=288f \
+        ps=2.16u pd=2.16u nrs=450m nrd=450m sa=480n sb=480n sd=0 sca=0 \
+        scb=0 scc=0 mismod=1
+    M2 (YN B GS GS) n33_ckt mr=(1) w=(600n) l=350n nf=1 as=288f ad=288f \
+        ps=2.16u pd=2.16u nrs=450m nrd=450m sa=480n sb=480n sd=0 sca=0 \
+        scb=0 scc=0 mismod=1
+    M3 (YN C GS GS) n33_ckt mr=(1) w=(600n) l=350n nf=1 as=288f ad=288f \
+        ps=2.16u pd=2.16u nrs=450m nrd=450m sa=480n sb=480n sd=0 sca=0 \
+        scb=0 scc=0 mismod=1
+ends NOR3_33_P6_P6_LP3
+// End of subcircuit definition.
+
+// Library name: SMIC180RF_EDA_7070
+// Cell name: BANDGAP_RES_TRIM_7070
+// View name: schematic
+subckt BANDGAP_RES_TRIM_7070 DEC_D0 DEC_D1 DEC_D2 GND IBIAS VDDB
+    I19 (DEC_D0 GND VDDB I3748_YN) INV_P6_P6_LP3
+    I15 (DEC_D2 GND VDDB I00390_YN) INV_P6_P6_LP3
+    I16 (I00390_YN GND VDDB I3736_YN) INV_P6_P6_LP3
+    I18 (DEC_D1 GND VDDB I3737_YN) INV_P6_P6_LP3
+    I20 (I3748_YN GND VDDB I3746_YN) INV_P6_P6_LP3
+    I17 (I3737_YN GND VDDB I3738_YN) INV_P6_P6_LP3
+    M3 (net12 I3743_YN GND GND) n33_ckt mr=(10) w=(25u) l=550n nf=1 as=12p \
+        ad=12p ps=50.96u pd=50.96u nrs=10.8m nrd=10.8m sa=480n sb=480n \
+        sd=0 sca=0 scb=0 scc=0 mismod=1
+    M7 (net6 I00392_YN GND GND) n33_ckt mr=(10) w=(25u) l=550n nf=1 as=12p \
+        ad=12p ps=50.96u pd=50.96u nrs=10.8m nrd=10.8m sa=480n sb=480n \
+        sd=0 sca=0 scb=0 scc=0 mismod=1
+    M0 (net9 I3744_YN GND GND) n33_ckt mr=(10) w=(25u) l=550n nf=1 as=12p \
+        ad=12p ps=50.96u pd=50.96u nrs=10.8m nrd=10.8m sa=480n sb=480n \
+        sd=0 sca=0 scb=0 scc=0 mismod=1
+    M5 (net2 I3739_YN GND GND) n33_ckt mr=(10) w=(25u) l=550n nf=1 as=12p \
+        ad=12p ps=50.96u pd=50.96u nrs=10.8m nrd=10.8m sa=480n sb=480n \
+        sd=0 sca=0 scb=0 scc=0 mismod=1
+    M1 (net10 I3742_YN GND GND) n33_ckt mr=(10) w=(25u) l=550n nf=1 as=12p \
+        ad=12p ps=50.96u pd=50.96u nrs=10.8m nrd=10.8m sa=480n sb=480n \
+        sd=0 sca=0 scb=0 scc=0 mismod=1
+    M4 (net1 I3740_YN GND GND) n33_ckt mr=(10) w=(25u) l=550n nf=1 as=12p \
+        ad=12p ps=50.96u pd=50.96u nrs=10.8m nrd=10.8m sa=480n sb=480n \
+        sd=0 sca=0 scb=0 scc=0 mismod=1
+    M2 (net13 I3741_YN GND GND) n33_ckt mr=(10) w=(25u) l=550n nf=1 as=12p \
+        ad=12p ps=50.96u pd=50.96u nrs=10.8m nrd=10.8m sa=480n sb=480n \
+        sd=0 sca=0 scb=0 scc=0 mismod=1
+    M6 (net4 I00393_YN GND GND) n33_ckt mr=(10) w=(25u) l=550n nf=1 as=12p \
+        ad=12p ps=50.96u pd=50.96u nrs=10.8m nrd=10.8m sa=480n sb=480n \
+        sd=0 sca=0 scb=0 scc=0 mismod=1
+    I28 (I3746_YN I3738_YN I3736_YN GND VDDB I00392_YN) NOR3_33_P6_P6_LP3
+    I27 (I3748_YN I3738_YN I3736_YN GND VDDB I00393_YN) NOR3_33_P6_P6_LP3
+    I26 (I3746_YN I3737_YN I3736_YN GND VDDB I3739_YN) NOR3_33_P6_P6_LP3
+    I21 (I3748_YN I3737_YN I00390_YN GND VDDB I3744_YN) NOR3_33_P6_P6_LP3
+    I22 (I3746_YN I3737_YN I00390_YN GND VDDB I3742_YN) NOR3_33_P6_P6_LP3
+    I25 (I3748_YN I3737_YN I3736_YN GND VDDB I3740_YN) NOR3_33_P6_P6_LP3
+    I24 (I3746_YN I3738_YN I00390_YN GND VDDB I3743_YN) NOR3_33_P6_P6_LP3
+    I23 (I3748_YN I3738_YN I00390_YN GND VDDB I3741_YN) NOR3_33_P6_P6_LP3
+R8 (IBIAS net9) rpposab_ckt l=5.025u w=1u mr=1*6 mismod_res=1
+
+R14 (IBIAS net4) rpposab_ckt l=5.94u w=1u mr=1*10 mismod_res=1
+
+R15 (IBIAS net6) rpposab_ckt l=5.79u w=1u mr=1*8 mismod_res=1
+
+R13 (IBIAS net2) rpposab_ckt l=5.485u w=1u mr=1*12 mismod_res=1
+
+R12 (IBIAS net1) rpposab_ckt l=5.94u w=1u mr=1*18 mismod_res=1
+
+R11 (IBIAS net12) rpposab_ckt l=7.77u w=1u mr=1*6 mismod_res=1
+
+R9 (IBIAS net10) rpposab_ckt l=5.94u w=1u mr=1*6 mismod_res=1
+
+R10 (IBIAS net13) rpposab_ckt l=6.855u w=1u mr=1*6 mismod_res=1
+
+ends BANDGAP_RES_TRIM_7070
+// End of subcircuit definition.
+
+// Library name: smic18mmrf
+// Cell name: rhrpo
+// View name: schematic
+subckt rhrpo_pcell_0 MINUS PLUS
+parameters segL=10u segW=2u
+    R89 (n89 MINUS) rhrpo m=1 l=segL w=segW
+    R88 (n88 n89) rhrpo m=1 l=segL w=segW
+    R87 (n87 n88) rhrpo m=1 l=segL w=segW
+    R86 (n86 n87) rhrpo m=1 l=segL w=segW
+    R85 (n85 n86) rhrpo m=1 l=segL w=segW
+    R84 (n84 n85) rhrpo m=1 l=segL w=segW
+    R83 (n83 n84) rhrpo m=1 l=segL w=segW
+    R82 (n82 n83) rhrpo m=1 l=segL w=segW
+    R81 (n81 n82) rhrpo m=1 l=segL w=segW
+    R80 (n80 n81) rhrpo m=1 l=segL w=segW
+    R79 (n79 n80) rhrpo m=1 l=segL w=segW
+    R78 (n78 n79) rhrpo m=1 l=segL w=segW
+    R77 (n77 n78) rhrpo m=1 l=segL w=segW
+    R76 (n76 n77) rhrpo m=1 l=segL w=segW
+    R75 (n75 n76) rhrpo m=1 l=segL w=segW
+    R74 (n74 n75) rhrpo m=1 l=segL w=segW
+    R73 (n73 n74) rhrpo m=1 l=segL w=segW
+    R72 (n72 n73) rhrpo m=1 l=segL w=segW
+    R71 (n71 n72) rhrpo m=1 l=segL w=segW
+    R70 (n70 n71) rhrpo m=1 l=segL w=segW
+    R69 (n69 n70) rhrpo m=1 l=segL w=segW
+    R68 (n68 n69) rhrpo m=1 l=segL w=segW
+    R67 (n67 n68) rhrpo m=1 l=segL w=segW
+    R66 (n66 n67) rhrpo m=1 l=segL w=segW
+    R65 (n65 n66) rhrpo m=1 l=segL w=segW
+    R64 (n64 n65) rhrpo m=1 l=segL w=segW
+    R63 (n63 n64) rhrpo m=1 l=segL w=segW
+    R62 (n62 n63) rhrpo m=1 l=segL w=segW
+    R61 (n61 n62) rhrpo m=1 l=segL w=segW
+    R60 (n60 n61) rhrpo m=1 l=segL w=segW
+    R59 (n59 n60) rhrpo m=1 l=segL w=segW
+    R58 (n58 n59) rhrpo m=1 l=segL w=segW
+    R57 (n57 n58) rhrpo m=1 l=segL w=segW
+    R56 (n56 n57) rhrpo m=1 l=segL w=segW
+    R55 (n55 n56) rhrpo m=1 l=segL w=segW
+    R54 (n54 n55) rhrpo m=1 l=segL w=segW
+    R53 (n53 n54) rhrpo m=1 l=segL w=segW
+    R52 (n52 n53) rhrpo m=1 l=segL w=segW
+    R51 (n51 n52) rhrpo m=1 l=segL w=segW
+    R50 (n50 n51) rhrpo m=1 l=segL w=segW
+    R49 (n49 n50) rhrpo m=1 l=segL w=segW
+    R48 (n48 n49) rhrpo m=1 l=segL w=segW
+    R47 (n47 n48) rhrpo m=1 l=segL w=segW
+    R46 (n46 n47) rhrpo m=1 l=segL w=segW
+    R45 (n45 n46) rhrpo m=1 l=segL w=segW
+    R44 (n44 n45) rhrpo m=1 l=segL w=segW
+    R43 (n43 n44) rhrpo m=1 l=segL w=segW
+    R42 (n42 n43) rhrpo m=1 l=segL w=segW
+    R41 (n41 n42) rhrpo m=1 l=segL w=segW
+    R40 (n40 n41) rhrpo m=1 l=segL w=segW
+    R39 (n39 n40) rhrpo m=1 l=segL w=segW
+    R38 (n38 n39) rhrpo m=1 l=segL w=segW
+    R37 (n37 n38) rhrpo m=1 l=segL w=segW
+    R36 (n36 n37) rhrpo m=1 l=segL w=segW
+    R35 (n35 n36) rhrpo m=1 l=segL w=segW
+    R34 (n34 n35) rhrpo m=1 l=segL w=segW
+    R33 (n33 n34) rhrpo m=1 l=segL w=segW
+    R32 (n32 n33) rhrpo m=1 l=segL w=segW
+    R31 (n31 n32) rhrpo m=1 l=segL w=segW
+    R30 (n30 n31) rhrpo m=1 l=segL w=segW
+    R29 (n29 n30) rhrpo m=1 l=segL w=segW
+    R28 (n28 n29) rhrpo m=1 l=segL w=segW
+    R27 (n27 n28) rhrpo m=1 l=segL w=segW
+    R26 (n26 n27) rhrpo m=1 l=segL w=segW
+    R25 (n25 n26) rhrpo m=1 l=segL w=segW
+    R24 (n24 n25) rhrpo m=1 l=segL w=segW
+    R23 (n23 n24) rhrpo m=1 l=segL w=segW
+    R22 (n22 n23) rhrpo m=1 l=segL w=segW
+    R21 (n21 n22) rhrpo m=1 l=segL w=segW
+    R20 (n20 n21) rhrpo m=1 l=segL w=segW
+    R19 (n19 n20) rhrpo m=1 l=segL w=segW
+    R18 (n18 n19) rhrpo m=1 l=segL w=segW
+    R17 (n17 n18) rhrpo m=1 l=segL w=segW
+    R16 (n16 n17) rhrpo m=1 l=segL w=segW
+    R15 (n15 n16) rhrpo m=1 l=segL w=segW
+    R14 (n14 n15) rhrpo m=1 l=segL w=segW
+    R13 (n13 n14) rhrpo m=1 l=segL w=segW
+    R12 (n12 n13) rhrpo m=1 l=segL w=segW
+    R11 (n11 n12) rhrpo m=1 l=segL w=segW
+    R10 (n10 n11) rhrpo m=1 l=segL w=segW
+    R9 (n9 n10) rhrpo m=1 l=segL w=segW
+    R8 (n8 n9) rhrpo m=1 l=segL w=segW
+    R7 (n7 n8) rhrpo m=1 l=segL w=segW
+    R6 (n6 n7) rhrpo m=1 l=segL w=segW
+    R5 (n5 n6) rhrpo m=1 l=segL w=segW
+    R4 (n4 n5) rhrpo m=1 l=segL w=segW
+    R3 (n3 n4) rhrpo m=1 l=segL w=segW
+    R2 (n2 n3) rhrpo m=1 l=segL w=segW
+    R1 (n1 n2) rhrpo m=1 l=segL w=segW
+    R0 (PLUS n1) rhrpo m=1 l=segL w=segW
+ends rhrpo_pcell_0
+// End of subcircuit definition.
+
+// Library name: smic18mmrf
+// Cell name: rhrpo
+// View name: schematic
+subckt rhrpo_pcell_1 MINUS PLUS
+parameters segL=10u segW=2u
+    R6 (n6 MINUS) rhrpo m=1 l=segL w=segW
+    R5 (n5 n6) rhrpo m=1 l=segL w=segW
+    R4 (n4 n5) rhrpo m=1 l=segL w=segW
+    R3 (n3 n4) rhrpo m=1 l=segL w=segW
+    R2 (n2 n3) rhrpo m=1 l=segL w=segW
+    R1 (n1 n2) rhrpo m=1 l=segL w=segW
+    R0 (PLUS n1) rhrpo m=1 l=segL w=segW
+ends rhrpo_pcell_1
+// End of subcircuit definition.
+
+// Library name: SMIC180_7070_caot
+// Cell name: BANDGAP_7070_MK3
+// View name: schematic
+subckt BANDGAP_7070_MK3 DEC_D0 DEC_D1 DEC_D2 GND OEN PIB VBG VDDB VR0 VR1 \
+        VCTAT VREF
+    I4 (DEC_D0 DEC_D1 DEC_D2 GND net105 VDDB) BANDGAP_RES_TRIM_7070
+    M59 (net8 NVB GND GND) n33_ckt mr=(16) w=(10.1u) l=4u nf=1 as=4.848p \
+        ad=4.848p ps=21.16u pd=21.16u nrs=26.7327m nrd=26.7327m sa=480n \
+        sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M54 (VCTAT net4 net8 GND) n33_ckt mr=(1) w=(8u) l=1u nf=8 as=2.58p \
+        ad=2.16p ps=15.16u pd=12.32u nrs=33.75m nrd=33.75m sa=480n sb=480n \
+        sd=540n sca=0 scb=0 scc=0 mismod=1
+    M48 (net5 VCTAT1 net8 GND) n33_ckt mr=(1) w=(8u) l=1u nf=8 as=2.58p \
+        ad=2.16p ps=15.16u pd=12.32u nrs=33.75m nrd=33.75m sa=480n sb=480n \
+        sd=540n sca=0 scb=0 scc=0 mismod=1
+    M15 (net032 OE GND GND) n33_ckt mr=(1) w=(1.1u) l=450n nf=1 as=528f \
+        ad=528f ps=3.16u pd=3.16u nrs=245.455m nrd=245.455m sa=480n \
+        sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M25 (net9 OE GND GND) n33_ckt mr=(1) w=(1.1u) l=450n nf=1 as=528f \
+        ad=528f ps=3.16u pd=3.16u nrs=245.455m nrd=245.455m sa=480n \
+        sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M14 (VBP VBP GND GND) n33_ckt mr=(1) w=(10.1u) l=800n nf=1 as=4.848p \
+        ad=4.848p ps=21.16u pd=21.16u nrs=26.7327m nrd=26.7327m sa=480n \
+        sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M28 (net18 NVB GND GND) n33_ckt mr=(2) w=(10.1u) l=4u nf=1 as=4.848p \
+        ad=4.848p ps=21.16u pd=21.16u nrs=26.7327m nrd=26.7327m sa=480n \
+        sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M29 (VBG OE GND GND) n33_ckt mr=(2) w=(5.1u) l=450n nf=1 as=2.448p \
+        ad=2.448p ps=11.16u pd=11.16u nrs=52.9412m nrd=52.9412m sa=480n \
+        sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M2 (net011 OE GND GND) n33_ckt mr=(1) w=(1.1u) l=450n nf=1 as=528f \
+        ad=528f ps=3.16u pd=3.16u nrs=245.455m nrd=245.455m sa=480n \
+        sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M1 (net011 net012 GND GND) n33_ckt mr=(1) w=(10u) l=1u nf=1 as=4.8p \
+        ad=4.8p ps=20.96u pd=20.96u nrs=27m nrd=27m sa=480n sb=480n sd=0 \
+        sca=0 scb=0 scc=0 mismod=1
+    M8 (NVB NVB GND GND) n33_ckt mr=(1) w=(10.1u) l=4u nf=1 as=4.848p \
+        ad=4.848p ps=21.16u pd=21.16u nrs=26.7327m nrd=26.7327m sa=480n \
+        sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M9 (NVB OE GND GND) n33_ckt mr=(1) w=(1.1u) l=450n nf=1 as=528f \
+        ad=528f ps=3.16u pd=3.16u nrs=245.455m nrd=245.455m sa=480n \
+        sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M62 (VCTAT net5 VDDB VDDB) p33_ckt mr=(2) w=(16u) l=1u nf=8 as=5.16p \
+        ad=4.32p ps=25.16u pd=20.32u nrs=16.875m nrd=16.875m sa=480n \
+        sb=480n sd=540n sca=0 scb=0 scc=0 mismod=1
+    M63 (net5 net5 VDDB VDDB) p33_ckt mr=(2) w=(16u) l=1u nf=8 as=5.16p \
+        ad=4.32p ps=25.16u pd=20.32u nrs=16.875m nrd=16.875m sa=480n \
+        sb=480n sd=540n sca=0 scb=0 scc=0 mismod=1
+    M18 (VBP1 EN VDDB VDDB) p33_ckt mr=(1) w=(1.1u) l=450n nf=1 as=528f \
+        ad=528f ps=3.16u pd=3.16u nrs=245.455m nrd=245.455m sa=480n \
+        sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M19 (net085 VBP1 VDDB VDDB) p33_ckt mr=(60) w=(10u) l=10u nf=1 as=4.8p \
+        ad=4.8p ps=20.96u pd=20.96u nrs=27m nrd=27m sa=480n sb=480n sd=0 \
+        sca=0 scb=0 scc=0 mismod=1
+    M20 (net086 VBP1 VDDB VDDB) p33_ckt mr=(20) w=(10u) l=10u nf=1 as=4.8p \
+        ad=4.8p ps=20.96u pd=20.96u nrs=27m nrd=27m sa=480n sb=480n sd=0 \
+        sca=0 scb=0 scc=0 mismod=1
+    M11 (net032 PVB VDDB VDDB) p33_ckt mr=(1) w=(10.1u) l=950n nf=1 \
+        as=4.848p ad=4.848p ps=21.16u pd=21.16u nrs=26.7327m nrd=26.7327m \
+        sa=480n sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M12 (net17 net17 net16 net16) p33_ckt mr=(2) w=(10.1u) l=450n nf=1 \
+        as=4.848p ad=4.848p ps=21.16u pd=21.16u nrs=26.7327m nrd=26.7327m \
+        sa=480n sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M27 (net14 OE VDDB VDDB) p33_ckt mr=(8) w=(20.1u) l=450n nf=1 \
+        as=9.648p ad=9.648p ps=41.16u pd=41.16u nrs=13.4328m nrd=13.4328m \
+        sa=480n sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M21 (VBP1 VBP net086 VDDB) p33_ckt mr=(4) w=(10u) l=300n nf=1 as=4.8p \
+        ad=4.8p ps=20.96u pd=20.96u nrs=27m nrd=27m sa=480n sb=480n sd=0 \
+        sca=0 scb=0 scc=0 mismod=1
+    M22 (net9 VBP net085 VDDB) p33_ckt mr=(12) w=(10u) l=300n nf=1 as=4.8p \
+        ad=4.8p ps=20.96u pd=20.96u nrs=27m nrd=27m sa=480n sb=480n sd=0 \
+        sca=0 scb=0 scc=0 mismod=1
+    M13 (VBP VBP net17 net17) p33_ckt mr=(1) w=(10.1u) l=800n nf=1 \
+        as=4.848p ad=4.848p ps=21.16u pd=21.16u nrs=26.7327m nrd=26.7327m \
+        sa=480n sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M51 (net1 VBP1 VDDB VDDB) p33_ckt mr=(40) w=(10u) l=10u nf=1 as=4.8p \
+        ad=4.8p ps=20.96u pd=20.96u nrs=27m nrd=27m sa=480n sb=480n sd=0 \
+        sca=0 scb=0 scc=0 mismod=1
+    M50 (net6 VBP net1 VDDB) p33_ckt mr=(8) w=(10u) l=300n nf=1 as=4.8p \
+        ad=4.8p ps=20.96u pd=20.96u nrs=27m nrd=27m sa=480n sb=480n sd=0 \
+        sca=0 scb=0 scc=0 mismod=1
+    M5 (PVB EN VDDB VDDB) p33_ckt mr=(1) w=(1.1u) l=450n nf=1 as=528f \
+        ad=528f ps=3.16u pd=3.16u nrs=245.455m nrd=245.455m sa=480n \
+        sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M6 (NVB PVB VDDB VDDB) p33_ckt mr=(2) w=(10.1u) l=950n nf=1 as=4.848p \
+        ad=4.848p ps=21.16u pd=21.16u nrs=26.7327m nrd=26.7327m sa=480n \
+        sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M4 (PVB PVB VDDB VDDB) p33_ckt mr=(8) w=(10.1u) l=950n nf=1 as=4.848p \
+        ad=4.848p ps=21.16u pd=21.16u nrs=26.7327m nrd=26.7327m sa=480n \
+        sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M7 (PIB PVB VDDB VDDB) p33_ckt mr=(8) w=(10.1u) l=950n nf=1 as=4.848p \
+        ad=4.848p ps=21.16u pd=21.16u nrs=26.7327m nrd=26.7327m sa=480n \
+        sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    M0 (M1381_S OE VDDB VDDB) p33_ckt mr=(2) w=(10.1u) l=450n nf=1 \
+        as=4.848p ad=4.848p ps=21.16u pd=21.16u nrs=26.7327m nrd=26.7327m \
+        sa=480n sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+    C2 (net032 GND) mim2_ckt wr=16.5u lr=15.1u mr=2 mismod_mim=1
+    C3 (GND GND) mim2_ckt wr=19.1u lr=15.8u mr=4 mismod_mim=1
+    C4 (net098 GND) mim2_ckt wr=19.1u lr=11.1u mr=4 mismod_mim=1
+    C0 (NVB GND) mim2_ckt wr=10.3u lr=10.7u mr=7 mismod_mim=1
+    C5 (VBG GND) mim2_ckt wr=10.3u lr=10.9u mr=7 mismod_mim=1
+    M3 (PVB net011 net012 net012) n33_dnw_4t_ckt mr=(1) w=(10.1u) l=1u \
+        nf=1 as=4.848p ad=4.848p ps=21.16u pd=21.16u nrs=26.7327m \
+        nrd=26.7327m sa=480n sb=480n sd=0 sca=0 scb=0 scc=0 mismod=1
+R4 (VDDB net033) rpposab_ckt l=6.5u w=1u mr=1 mismod_res=1
+
+R14 (VBG VM) rpposab_ckt l=13.715u w=1u mr=1 mismod_res=1
+
+R15 (VM VP) rpposab_ckt l=8.225u w=1u mr=1*2 mismod_res=1
+
+R16 (VP net98) rpposab_ckt l=6.4u w=1u mr=1*4 mismod_res=1
+
+    I3 (OE GND VDDB EN) INV_P6_P6_LP3
+    I2 (OEN GND VDDB OE) INV_P6_P6_LP3
+    R18 (net7 net2) rhrpo_pcell_0 m=1 segL=1.94u segW=2u
+    R6 (net11 net10) rhrpo_pcell_1 m=1 segL=1.94u segW=2u
+    IPRB0 (net18 VBG) iprobe
+    Q7 (net3 net3 GND GND) npn33a25_mis_ckt m=1 mismod_bjt=1
+    Q1 (net090 VP net095 GND) npn33a25_mis_ckt m=16 mismod_bjt=1
+    Q2 (net088 VM net095 GND) npn33a25_mis_ckt m=1 mismod_bjt=1
+    Q3 (net98 net98 net105 GND) npn33a25_mis_ckt m=2 mismod_bjt=1
+    Q5 (VCTAT1 net6 net3 GND) npn33a25_mis_ckt m=1 mismod_bjt=1
+R26 (net4 R26_1__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 mismod_res=1
+R26_2__res_gen (R26_1__inter_gen R26_2__inter_gen) rhrpo_ckt l=9.6u w=1u \
+        mr=1 mismod_res=1
+R26_3__res_gen (R26_2__inter_gen R26_3__inter_gen) rhrpo_ckt l=9.6u w=1u \
+        mr=1 mismod_res=1
+R26_4__res_gen (R26_3__inter_gen R26_4__inter_gen) rhrpo_ckt l=9.6u w=1u \
+        mr=1 mismod_res=1
+R26_5__res_gen (R26_4__inter_gen R26_5__inter_gen) rhrpo_ckt l=9.6u w=1u \
+        mr=1 mismod_res=1
+R26_6__res_gen (R26_5__inter_gen R26_6__inter_gen) rhrpo_ckt l=9.6u w=1u \
+        mr=1 mismod_res=1
+R26_7__res_gen (R26_6__inter_gen R26_7__inter_gen) rhrpo_ckt l=9.6u w=1u \
+        mr=1 mismod_res=1
+R26_8__res_gen (R26_7__inter_gen R26_8__inter_gen) rhrpo_ckt l=9.6u w=1u \
+        mr=1 mismod_res=1
+R26_9__res_gen (R26_8__inter_gen R26_9__inter_gen) rhrpo_ckt l=9.6u w=1u \
+        mr=1 mismod_res=1
+R26_10__res_gen (R26_9__inter_gen VREF) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+
+R25 (VCTAT R25_1__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 mismod_res=1
+R25_2__res_gen (R25_1__inter_gen R25_2__inter_gen) rhrpo_ckt l=9.6u w=1u \
+        mr=1 mismod_res=1
+R25_3__res_gen (R25_2__inter_gen net4) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+
+R3 (net032 R3_1__inter_gen) rhrpo_ckt l=14.7u w=2u mr=1 mismod_res=1
+R3_2__res_gen (R3_1__inter_gen net16) rhrpo_ckt l=14.7u w=2u mr=1 \
+        mismod_res=1
+
+R7 (net9 net098) rhrpo_ckt l=17.5u w=1u mr=1 mismod_res=1
+
+R5 (net095 GND) rhrpo_ckt l=11u w=2u mr=1*2 mismod_res=1
+
+R8 (VBG R8_1__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 mismod_res=1
+R8_2__res_gen (R8_1__inter_gen R8_2__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+R8_3__res_gen (R8_2__inter_gen R8_3__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+R8_4__res_gen (R8_3__inter_gen R8_4__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+R8_5__res_gen (R8_4__inter_gen R8_5__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+R8_6__res_gen (R8_5__inter_gen R8_6__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+R8_7__res_gen (R8_6__inter_gen R8_7__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+R8_8__res_gen (R8_7__inter_gen R8_8__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+R8_9__res_gen (R8_8__inter_gen VR0) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+
+R11 (net103 R11_1__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 mismod_res=1
+R11_2__res_gen (R11_1__inter_gen VR1) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+
+R10 (net102 net103) rhrpo_ckt l=9.6u w=1u mr=2 mismod_res=1
+
+R9 (VR0 R9_1__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 mismod_res=1
+R9_2__res_gen (R9_1__inter_gen R9_2__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+R9_3__res_gen (R9_2__inter_gen R9_3__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+R9_4__res_gen (R9_3__inter_gen R9_4__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+R9_5__res_gen (R9_4__inter_gen R9_5__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+R9_6__res_gen (R9_5__inter_gen R9_6__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+R9_7__res_gen (R9_6__inter_gen net102) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+
+R13 (VR1 R13_1__inter_gen) rhrpo_ckt l=9.6u w=1u mr=1 mismod_res=1
+R13_2__res_gen (R13_1__inter_gen R13_2__inter_gen) rhrpo_ckt l=9.6u w=1u \
+        mr=1 mismod_res=1
+R13_3__res_gen (R13_2__inter_gen R13_3__inter_gen) rhrpo_ckt l=9.6u w=1u \
+        mr=1 mismod_res=1
+R13_4__res_gen (R13_3__inter_gen R13_4__inter_gen) rhrpo_ckt l=9.6u w=1u \
+        mr=1 mismod_res=1
+R13_5__res_gen (R13_4__inter_gen net104) rhrpo_ckt l=9.6u w=1u mr=1 \
+        mismod_res=1
+
+R12 (net104 GND) rhrpo_ckt l=9.6u w=1u mr=2 mismod_res=1
+
+R17 (net6 VCTAT1) rhrpo_ckt l=9.6u w=1u mr=1 mismod_res=1
+
+R0 (M1381_S R0_1__inter_gen) rhrpo_ckt l=37u w=1u mr=1 mismod_res=1
+R0_2__res_gen (R0_1__inter_gen R0_2__inter_gen) rhrpo_ckt l=37u w=1u mr=1 \
+        mismod_res=1
+R0_3__res_gen (R0_2__inter_gen R0_3__inter_gen) rhrpo_ckt l=37u w=1u mr=1 \
+        mismod_res=1
+R0_4__res_gen (R0_3__inter_gen net011) rhrpo_ckt l=37u w=1u mr=1 \
+        mismod_res=1
+
+R2 (GND GND) rhrpo_ckt l=25u w=2u mr=4 mismod_res=1
+
+R1 (net012 R1_1__inter_gen) rhrpo_ckt l=25u w=2u mr=1 mismod_res=1
+R1_2__res_gen (R1_1__inter_gen R1_2__inter_gen) rhrpo_ckt l=25u w=2u mr=1 \
+        mismod_res=1
+R1_3__res_gen (R1_2__inter_gen R1_3__inter_gen) rhrpo_ckt l=25u w=2u mr=1 \
+        mismod_res=1
+R1_4__res_gen (R1_3__inter_gen R1_4__inter_gen) rhrpo_ckt l=25u w=2u mr=1 \
+        mismod_res=1
+R1_5__res_gen (R1_4__inter_gen R1_5__inter_gen) rhrpo_ckt l=25u w=2u mr=1 \
+        mismod_res=1
+R1_6__res_gen (R1_5__inter_gen R1_6__inter_gen) rhrpo_ckt l=25u w=2u mr=1 \
+        mismod_res=1
+R1_7__res_gen (R1_6__inter_gen R1_7__inter_gen) rhrpo_ckt l=25u w=2u mr=1 \
+        mismod_res=1
+R1_8__res_gen (R1_7__inter_gen GND) rhrpo_ckt l=25u w=2u mr=1 mismod_res=1
+
+    M23 (net9 VDDB net088 GND) nnt33_ckt mr=(6) w=(20u) l=1.8u nf=1 \
+        as=9.6p ad=9.6p ps=40.96u pd=40.96u nrs=13.5m nrd=13.5m sa=480n \
+        sb=480n sd=0 mismod=1
+    M26 (net14 net9 net18 GND) nnt33_ckt mr=(8) w=(20u) l=1.8u nf=1 \
+        as=9.6p ad=9.6p ps=40.96u pd=40.96u nrs=13.5m nrd=13.5m sa=480n \
+        sb=480n sd=0 mismod=1
+    M24 (VBP1 VDDB net090 GND) nnt33_ckt mr=(6) w=(20u) l=1.8u nf=1 \
+        as=9.6p ad=9.6p ps=40.96u pd=40.96u nrs=13.5m nrd=13.5m sa=480n \
+        sb=480n sd=0 mismod=1
+ends BANDGAP_7070_MK3
+// End of subcircuit definition.
+
