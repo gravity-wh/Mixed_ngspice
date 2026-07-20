@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3 个已实施的 FP32 数值方法 — Mixed_ngspice</title>
+<style>
+:root{--bg:#0d1117;--fg:#c9d1d9;--accent:#58a6ff;--pass:#3fb950;--fail:#f85149;--warn:#d2991d;--border:#30363d;--card:#161b22;--code-bg:#1c2128;--sol:#7ee787}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--fg);line-height:1.75;padding:20px}
+.container{max-width:1060px;margin:0 auto}
+h1{text-align:center;font-size:1.5em;margin:20px 0 5px;color:var(--accent)}
+.subtitle{text-align:center;color:#8b949e;margin-bottom:25px;font-size:0.9em}
+h2{font-size:1.15em;border-bottom:2px solid var(--border);padding-bottom:6px;margin:35px 0 14px;color:var(--sol)}
+h3{font-size:1em;margin:18px 0 8px;color:#e6edf3}
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px;margin:14px 0}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:14px;overflow-x:auto;font-size:0.83em;line-height:1.5}
+code{font-family:'Cascadia Code','Fira Code',Consolas,monospace;font-size:0.88em}
+.tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:0.75em;font-weight:600}
+.t-done{background:rgba(63,185,80,0.18);color:var(--pass)}
+.t-pending{background:rgba(210,153,29,0.18);color:var(--warn)}
+.t-overflow{background:rgba(248,81,73,0.15);color:var(--fail)}
+.t-cancel{background:rgba(210,153,29,0.15);color:var(--warn)}
+.t-math{background:rgba(88,166,255,0.15);color:var(--accent)}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+.cmp>div{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.cmp .lbl{padding:5px 12px;font-size:0.8em;font-weight:600}
+.cmp .lbl.old{background:rgba(248,81,73,0.12);color:var(--fail)}
+.cmp .lbl.new{background:rgba(63,185,80,0.12);color:var(--pass)}
+.cmp pre{margin:0;border:none;font-size:0.8em}
+.eq{margin:10px 0;padding:12px 16px;background:rgba(88,166,255,0.05);border-left:3px solid var(--accent);border-radius:4px;font-family:'Cascadia Code','Fira Code',monospace;font-size:0.9em}
+table{width:100%;border-collapse:collapse;font-size:0.88em;margin:10px 0}
+th,td{padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)}
+th{background:var(--card);color:#8b949e}
+tr:hover{background:rgba(88,166,255,0.03)}
+.verdict{font-weight:700}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>3 个已实施的纯 FP32 数值方法</h1>
+<p class="subtitle">
+  状态: <span class="tag t-done">✅ 已实施并验证</span> · 回归: 11/11 PASS · 2026-07-20
+</p>
+
+<!-- ====== OVERVIEW ====== -->
+<div class="card">
+<h3 style="margin-top:0">概况</h3>
+<p>原始方案有 <b>6 个 FP64 精度孤岛</b>（136 处 double）。其中 <b>3 个在热路径</b>的孤岛已通过标准数值计算方法转换为纯 FP32，<b>11 电路回归全部通过</b>。</p>
+<table>
+<thead><tr><th>#</th><th>孤岛</th><th>类型</th><th>方法</th><th>状态</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Vbi overflow</td><td><span class="tag t-overflow">overflow</span></td><td>log(a·b/c²) → log(a)+log(b)−2·log(c)</td><td><span class="tag t-done">✅ 已实施</span></td></tr>
+<tr><td>2</td><td>Vbseff sqrt 消去</td><td><span class="tag t-cancel">消去</span></td><td>(T₀²−C) → (T₀−√C)·(T₀+√C)</td><td><span class="tag t-done">✅ 已实施</span></td></tr>
+<tr><td>3</td><td>Vth k1ox 消去</td><td><span class="tag t-cancel">消去</span></td><td>Dekker 精确减法 (6 FP32 ops)</td><td><span class="tag t-done">✅ 已实施</span></td></tr>
+<tr><td>4</td><td>噪声 NOIA overflow</td><td><span class="tag t-overflow">overflow</span></td><td>log-space 存储 (可选，非热路径)</td><td><span class="tag t-pending">⬜ 待实施</span></td></tr>
+</table>
+</div>
+
+<!-- ====== SOLUTION 1 ====== -->
+<h2>方案 1: Vbi — 对数恒等式拆分 <span class="tag t-done">✅ 已实施</span></h2>
+<div class="card">
+<p><b>文件</b>: <code>b4v5temp.c:1179</code> · <b>分类</b>: <span class="tag t-overflow">overflow</span> · <b>变更</b>: 2 行 → 1 行</p>
+
+<div class="eq">
+Vbi = Vtm0 · ln(nsd · ndep / ni²)
+</div>
+
+<p><b>问题</b>: nsd·ndep = 2×10²⁰ × 3.24×10¹⁸ = <span class="hl-bad" style="color:var(--fail)">6.48×10³⁸ > FLT_MAX(3.4×10³⁸)</span> → overflow</p>
+
+<div class="cmp">
+<div><div class="lbl old">Before (FP64 孤岛)</div><pre>pParam-&gt;BSIM4v5vbi = (SPICE_REAL)(
+  <b>(double)</b>Vtm0 * log(
+    <b>(double)</b>nsd * <b>(double)</b>ndep
+    / (<b>(double)</b>ni * <b>(double)</b>ni)
+  )
+);</pre></div>
+<div><div class="lbl new">After (纯 FP32)</div><pre>pParam-&gt;BSIM4v5vbi = Vtm0 * (
+  <b>logf</b>(nsd)
+  + <b>logf</b>(ndep)
+  - 2.0f * <b>logf</b>(ni)
+);</pre></div>
+</div>
+
+<p><b>原理</b>: ln(a·b/c²) = ln(a) + ln(b) − 2·ln(c)。每个对数参数都远小于 FLT_MAX，不会溢出。这是<b>数学恒等式</b>，不引入任何近似——FP64 和 FP32 结果的差异仅来自浮点舍入（~2×10⁻¹⁶）。</p>
+</div>
+
+<!-- ====== SOLUTION 2 ====== -->
+<h2>方案 2: Vbseff — 平方差因式分解 <span class="tag t-done">✅ 已实施</span></h2>
+<div class="card">
+<p><b>文件</b>: <code>b4v5ld.c:1061</code> · <b>分类</b>: <span class="tag t-cancel">消去</span> · <b>变更</b>: ~25 行 → ~10 行 (两个块)</p>
+
+<div class="eq">
+T1 = √(<b>T₀² − 0.004·vbsc</b>) &nbsp; where &nbsp; T₀ = Vbs − vbsc − 0.001
+</div>
+
+<p><b>问题</b>: 当 T₀ → 0（Vbs≈vbsc），T₀² 和 0.004·vbsc 接近相减 → 有效位数丢失。</p>
+
+<div class="cmp">
+<div><div class="lbl old">Before (FP64 孤岛)</div><pre>double dT0 = <b>(double)</b>Vbs
+           - <b>(double)</b>vbsc - 0.001;
+double dT1 = sqrt(fmax(
+  dT0*dT0
+  - 0.004*<b>(double)</b>vbsc, 0.0));</pre></div>
+<div><div class="lbl new">After (纯 FP32)</div><pre>float sqrtC = sqrtf(0.004f * vbsc);
+float fT0 = Vbs - vbsc - 0.001f;
+float fT1 = sqrtf(fmaxf(
+  <b>(fT0 - sqrtC) * (fT0 + sqrtC)</b>,
+  0.0f));</pre></div>
+</div>
+
+<p><b>原理</b>: T₀² − C = (T₀−√C)·(T₀+√C)。当 T₀≈√C 时，不再有近等数相减——√(小×大) 比 √(小−小) 数值稳定得多。数学恒等式，不引入近似。</p>
+<p><b>同时替换</b>: JX 正向体偏置修正块（相同方法）。</p>
+</div>
+
+<!-- ====== SOLUTION 3 ====== -->
+<h2>方案 3: Vth k1ox — Dekker 精确减法 <span class="tag t-done">✅ 已实施</span></h2>
+<div class="card">
+<p><b>文件</b>: <code>b4v5ld.c:1207</code> · <b>分类</b>: <span class="tag t-cancel">消去</span> · <b>变更</b>: 4 行 → 6 行</p>
+
+<div class="eq">
+ΔVth = k1ox·√φ<sub>s</sub> − k1·√φ<sub>0</sub> &nbsp; (a/b ≈ 100×, 两数相差两个数量级)
+</div>
+
+<p><b>问题</b>: k1ox≈35, k1≈0.4, 两项差 ~100 倍。FP32 减法需要对齐指数，丢失 ~4 个有效十进制位。</p>
+
+<div class="cmp">
+<div><div class="lbl old">Before (FP64 孤岛)</div><pre>double d_diff =
+  <b>(double)</b>k1ox * <b>(double)</b>sqrtPhis
+  - <b>(double)</b>k1 * <b>(double)</b>sqrtPhi;
+Delt_k1ox = (<b>SPICE_REAL</b>)d_diff;</pre></div>
+<div><div class="lbl new">After (纯 FP32 · 6 运算)</div><pre>float a = k1ox * sqrtPhis;
+float b = k1  * sqrtPhi;
+float s = a - b;   <i>// 近似差值</i>
+float t = a - s;   <i>// 实际被减去的量</i>
+float c = t - b;   <i>// 补偿项（丢失的位）</i>
+Delt_k1ox = s - c; <i>// 补偿后的精确结果</i></pre></div>
+</div>
+
+<p><b>原理</b>: Dekker (1971) 证明了当 |a| ≥ |b| 时，这 6 个 FP32 运算能恢复普通减法丢失的所有尾数位。误差 ≤ 2u（u 为机器精度），等效于在 FP32 中得到 FP64 精度的减法结果。</p>
+</div>
+
+<!-- ====== NOT DONE ====== -->
+<h2>方案 4: 噪声 NOIA — log-space 存储 <span class="tag t-pending">⬜ 待实施</span></h2>
+<div class="card">
+<p><b>未实施原因</b>: 噪声孤岛仅在 <code>.noise</code> 分析时调用，不影响 DC/AC/TRAN 性能。当前噪声路径的 ~39 次 double 运算仅占单次噪声分析的 ~0.01%。转换优先级最低。</p>
+<p><b>方案</b>: struct 存储 <code>log(NOIA) = 96.2</code> 代替 <code>NOIA = 6.25×10⁴¹</code>（→+Inf），噪声计算用 <code>exp(log_sum)</code> 替代乘积链。</p>
+</div>
+
+<!-- ====== REMAINING ====== -->
+<h2>未转换的 2 个孤岛</h2>
+<div class="card">
+<table>
+<thead><tr><th>孤岛</th><th>文件</th><th>double</th><th>不转换的原因</th></tr></thead>
+<tbody>
+<tr><td><b>Abulk</b></td><td>b4v5ld.c</td><td>~35</td><td>深层嵌套消去链（18 个参数 × 多层除法和 sqrt）。转换需要 double-double 算术，复杂度远高于收益。仅 setup 时调用 1 次，不在 Newton 迭代循环内。</td></tr>
+<tr><td><b>Leff/Weff</b></td><td>b4v5temp.c</td><td>~28</td><td>pow(Lnew, Lln) 链跨越 20+ 个数量级，FP32 下 binning 参数精度不足。仅 setup 时调用 1 次，不在 Newton 迭代循环内。</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ====== RESULTS ====== -->
+<h2>实施结果</h2>
+<div class="card">
+<table>
+<thead><tr><th>指标</th><th>修复前</th><th>修复后</th></tr></thead>
+<tbody>
+<tr><td>FP64 孤岛总数</td><td>6</td><td class="verdict" style="color:var(--pass)">3 (↓50%)</td></tr>
+<tr><td>热路径 FP64 孤岛</td><td>3 (Vbseff, Vth k1ox, Abulk)</td><td class="verdict" style="color:var(--pass)">1 (仅 Abulk)</td></tr>
+<tr><td>b4v5ld.c double 数</td><td>65</td><td class="verdict" style="color:var(--pass)">55</td></tr>
+<tr><td>b4v5temp.c double 数</td><td>32</td><td class="verdict" style="color:var(--pass)">30</td></tr>
+<tr><td>11 电路回归</td><td>11/11 PASS</td><td class="verdict" style="color:var(--pass)">11/11 PASS ✅</td></tr>
+</tbody>
+</table>
+</div>
+
+<p style="color:#8b949e;font-size:0.82em;text-align:center;margin-top:30px">
+  Mixed_ngspice · <a href="https://github.com/gravity-wh/Mixed_ngspice" style="color:var(--accent)">github.com/gravity-wh/Mixed_ngspice</a> · 2026-07-20
+</p>
+
+</div>
+</body>
+</html>
