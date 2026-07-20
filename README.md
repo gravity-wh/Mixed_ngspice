@@ -7,6 +7,7 @@
 - **< 0.003% DC accuracy loss** on TSMC/SMIC 0.18µm circuits (TT corner)
 - **1.7-2.8× transient speedup** on multi-transistor op-amps
 - **-45% working set** (struct members halved from 8 to 4 bytes)
+- **v1.1**: 3 FP64 islands converted to pure FP32 numerical methods (log-split, diff-of-squares, Dekker)
 
 ## Quick Start
 
