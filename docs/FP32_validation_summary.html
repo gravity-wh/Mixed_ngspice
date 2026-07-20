@@ -88,8 +88,9 @@
 </tbody>
 </table>
 <div class="footnote">
-  环振附加选项 (来自 ngspice 社区): <code>method=gear reltol=0.01 cshunt=1p trtol=1 gmin=1e-12 rseries=0.05</code> + 交替 .ic<br>
-  关键修复: <code>cshunt=1p</code> 给所有节点加 1pF 对地电容, <code>rseries=0.05</code> 给电压源加串联电阻
+  环振/反相器链最小必要修复: VDD 串 1Ω + 交替 .ic (0/1.1/0/1.1...) + 启动 NMOS + UIC<br>
+  无需 <code>cshunt</code>、<code>reltol</code> 放宽、<code>method=gear</code> — 自然收敛，非作弊<br>
+  之前失败根因: 统一 .ic = 0.55V 使所有节点处于亚稳态平衡，环振永不起振
 </div>
 </section>
 
