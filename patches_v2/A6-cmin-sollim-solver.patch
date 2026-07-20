@@ -1,0 +1,1684 @@
+--- /tmp/ngspice_patches/step0/src/include/ngspice/cktdefs.h	2026-07-20 15:00:12.110063277 +0800
++++ /mnt/e/MyResearch/Ngspice/ngspice-46_mixed/src/include/ngspice/cktdefs.h	2026-07-19 18:44:25.498811200 +0800
+@@ -48,9 +48,9 @@
+ #define NODE_CURRENT SP_CURRENT
+ 
+     int number;                 /* Number of the node */
+-    double ic;                  /* Value of the initial condition */
+-    double nodeset;             /* Value of the .nodeset option */
+-    double *ptr;                /* ??? */
++    SPICE_REAL ic;                  /* Value of the initial condition */
++    SPICE_REAL nodeset;             /* Value of the .nodeset option */
++    SPICE_REAL *ptr;                /* ??? */
+     CKTnode *next;              /* pointer to the next node */
+     unsigned int icGiven:1;     /* FLAG ic given */
+     unsigned int nsGiven:1;     /* FLAG nodeset given */
+@@ -81,7 +81,7 @@
+ 
+ 
+     STATistics *CKTstat;        /* The STATistics structure */
+-    double *CKTstates[8];       /* Used as memory of past steps ??? */
++    SPICE_REAL *CKTstates[8];       /* Used as memory of past steps ??? */
+ 
+     /* Some shortcut for CKTstates */
+ #define CKTstate0 CKTstates[0]
+@@ -92,21 +92,21 @@
+ #define CKTstate5 CKTstates[5]
+ #define CKTstate6 CKTstates[6]
+ #define CKTstate7 CKTstates[7]
+-    double CKTtime;             /* Current transient simulation time */
+-    double CKTdelta;            /* next time step in transient simulation */
+-    double CKTdeltaOld[7];      /* Memory for the 7 most recent CKTdelta */
+-    double CKTtemp;             /* Actual temperature of CKT, initialzed to 300.15 K in cktinit.c*/
+-    double CKTnomTemp;          /* Reference temperature 300.15 K set in cktinit.c */
+-    double CKTvt;               /* Thernmal voltage at CKTtemp */
+-    double CKTag[7];            /* the gear variable coefficient matrix */
++    SPICE_REAL CKTtime;             /* Current transient simulation time */
++    SPICE_REAL CKTdelta;            /* next time step in transient simulation */
++    SPICE_REAL CKTdeltaOld[7];      /* Memory for the 7 most recent CKTdelta */
++    SPICE_REAL CKTtemp;             /* Actual temperature of CKT, initialzed to 300.15 K in cktinit.c*/
++    SPICE_REAL CKTnomTemp;          /* Reference temperature 300.15 K set in cktinit.c */
++    SPICE_REAL CKTvt;               /* Thernmal voltage at CKTtemp */
++    SPICE_REAL CKTag[7];            /* the gear variable coefficient matrix */
+ #ifdef PREDICTOR
+-    double CKTagp[7];           /* the gear predictor variable
++    SPICE_REAL CKTagp[7];           /* the gear predictor variable
+                                    coefficient matrix */
+ #endif /*PREDICTOR*/
+     int CKTorder;               /* the integration method order */
+     int CKTmaxOrder;            /* maximum integration method order */
+     int CKTintegrateMethod;     /* the integration method to be used */
+-    double CKTxmu;              /* for trapezoidal method */
++    SPICE_REAL CKTxmu;              /* for trapezoidal method */
+     int CKTindverbosity;        /* control check of inductive couplings */
+ 
+ /* known integration methods */
+@@ -115,22 +115,22 @@
+ 
+     SMPmatrix *CKTmatrix;       /* pointer to sparse matrix */
+     int CKTniState;             /* internal state */
+-    double *CKTrhs;             /* current rhs value - being loaded */
+-    double *CKTrhsOld;          /* previous rhs value for convergence
++    SPICE_REAL *CKTrhs;             /* current rhs value - being loaded */
++    SPICE_REAL *CKTrhsOld;          /* previous rhs value for convergence
+                                    testing */
+-    double *CKTrhsSpare;        /* spare rhs value for reordering */
+-    double *CKTirhs;            /* current rhs value - being loaded
++    SPICE_REAL *CKTrhsSpare;        /* spare rhs value for reordering */
++    SPICE_REAL *CKTirhs;            /* current rhs value - being loaded
+                                    (imag) */
+-    double *CKTirhsOld;         /* previous rhs value (imaginary)*/
+-    double *CKTirhsSpare;       /* spare rhs value (imaginary)*/
+-    double *CKTpred;            /* predicted solution vector */
++    SPICE_REAL *CKTirhsOld;         /* previous rhs value (imaginary)*/
++    SPICE_REAL *CKTirhsSpare;       /* spare rhs value (imaginary)*/
++    SPICE_REAL *CKTpred;            /* predicted solution vector */
+ #ifdef PREDICTOR
+-    double *CKTsols[8];         /* previous 8 solutions */
++    SPICE_REAL *CKTsols[8];         /* previous 8 solutions */
+ #endif /* PREDICTOR */
+ 
+-    double *CKTrhsOp;           /* opearating point values */
+-    double *CKTsenRhs;          /* current sensitivity rhs values */
+-    double *CKTseniRhs;         /* current sensitivity rhs values
++    SPICE_REAL *CKTrhsOp;           /* opearating point values */
++    SPICE_REAL *CKTsenRhs;          /* current sensitivity rhs values */
++    SPICE_REAL *CKTseniRhs;         /* current sensitivity rhs values
+                                    (imag)*/
+ 
+ 
+@@ -207,41 +207,44 @@
+     /* (itl4) */
+     int CKTbreakSize;           /* number of breakpoints in table *CKTbreaks */
+     int CKTbreak;               /* if 1, a breakpoint may be set (only used in isrcacct.c) */
+-    double CKTsaveDelta;        /* previous delta, before breakpoints set a new delta */
+-    double CKTminBreak;         /* minimum time difference between breakpoints */
+-    double *CKTbreaks;          /* List of breakpoints as an array of doubles */
+-    double CKTabstol;           /* --- */
+-    double CKTpivotAbsTol;      /* --- */
+-    double CKTpivotRelTol;      /* --- */
+-    double CKTreltol;           /* --- */
+-    double CKTchgtol;           /* --- */
+-    double CKTvoltTol;          /* --- */
+-    double CKTlteReltol;        /* relative error in voltage based truncation error estimation */
+-    double CKTlteAbstol;        /* absolute error in voltage based truncation error estimation */
+-    double CKTlteTrtol;         /* scaling time step in voltage based truncation error estimation */
++    SPICE_REAL CKTsaveDelta;        /* previous delta, before breakpoints set a new delta */
++    SPICE_REAL CKTminBreak;         /* minimum time difference between breakpoints */
++    SPICE_REAL *CKTbreaks;          /* List of breakpoints as an array of doubles */
++    SPICE_REAL CKTabstol;           /* --- */
++    SPICE_REAL CKTpivotAbsTol;      /* --- */
++    SPICE_REAL CKTpivotRelTol;      /* --- */
++    SPICE_REAL CKTreltol;           /* --- */
++    SPICE_REAL CKTchgtol;           /* --- */
++    SPICE_REAL CKTvoltTol;          /* --- */
++    SPICE_REAL CKTlteReltol;        /* relative error in voltage based truncation error estimation */
++    SPICE_REAL CKTlteAbstol;        /* absolute error in voltage based truncation error estimation */
++    SPICE_REAL CKTlteTrtol;         /* scaling time step in voltage based truncation error estimation */
+     int CKTnewtrunc;            /* enable lte (local truncation error) based on voltages */
+-    double CKTgmin;             /* .options GMIN */
+-    double CKTgshunt;           /* .options RSHUNT */
+-    double CKTcshunt;           /* .options CSHUNT */
+-    double CKTdelmin;           /* minimum time step for tran analysis */
+-    double CKTtrtol;            /* .options TRTOL */
+-    double CKTfinalTime;        /* TSTOP */
+-    double CKTstep;             /* TSTEP */
+-    double CKTmaxStep;          /* TMAX */
+-    double CKTinitTime;         /* TSTART */
+-    double CKTomega;            /* actual angular frequency for ac analysis */
+-    double CKTsrcFact;          /* source stepping scaling factor */
+-    double CKTdiagGmin;         /* actual value during gmin stepping */
++    SPICE_REAL CKTgmin;             /* .options GMIN */
++    SPICE_REAL CKTgshunt;           /* .options RSHUNT */
++    SPICE_REAL CKTcshunt;           /* .options CSHUNT */
++    SPICE_REAL CKTdelmin;           /* minimum time step for tran analysis */
++    SPICE_REAL CKTtrtol;            /* .options TRTOL */
++    SPICE_REAL CKTfinalTime;        /* TSTOP */
++    SPICE_REAL CKTstep;             /* TSTEP */
++    SPICE_REAL CKTmaxStep;          /* TMAX */
++    SPICE_REAL CKTinitTime;         /* TSTART */
++    SPICE_REAL CKTomega;            /* actual angular frequency for ac analysis */
++    SPICE_REAL CKTsrcFact;          /* source stepping scaling factor */
++    SPICE_REAL CKTdiagGmin;         /* actual value during gmin stepping */
+     int CKTnumSrcSteps;         /* .options SRCSTEPS */
+     int CKTnumGminSteps;        /* .options GMINSTEPS */
+-    double CKTgminFactor;       /* gmin stepping scaling factor */
++    SPICE_REAL CKTgminFactor;       /* gmin stepping scaling factor */
++    SPICE_REAL CKTcmin;             /* Cmin stepping: initial shunt capacitance */
++    int CKTnumCminSteps;        /* .options CMINSTEPS */
++    SPICE_REAL CKTcminFactor;       /* Cmin stepping scaling factor */
+     int CKTnoncon;              /* used by devices (and few other places)
+                                    to announce non-convergence */
+-    double CKTdefaultMosM;      /* Default MOS multiplier parameter m */
+-    double CKTdefaultMosL;      /* Default Channel Lenght of MOS devices */
+-    double CKTdefaultMosW;      /* Default Channel Width of MOS devics */
+-    double CKTdefaultMosAD;     /* Default Drain Area of MOS */
+-    double CKTdefaultMosAS;     /* Default Source Area of MOS */
++    SPICE_REAL CKTdefaultMosM;      /* Default MOS multiplier parameter m */
++    SPICE_REAL CKTdefaultMosL;      /* Default Channel Lenght of MOS devices */
++    SPICE_REAL CKTdefaultMosW;      /* Default Channel Width of MOS devics */
++    SPICE_REAL CKTdefaultMosAD;     /* Default Drain Area of MOS */
++    SPICE_REAL CKTdefaultMosAS;     /* Default Source Area of MOS */
+     unsigned int CKThadNodeset:1; /* flag to show that nodes have been set up */
+     unsigned int CKTfixLimit:1; /* flag to indicate that the limiting
+                                    of MOSFETs should be done as in
+@@ -256,9 +259,9 @@
+     JOB *CKTcurJob;             /* Next analysis to be performed ??? */
+ 
+     SENstruct *CKTsenInfo;      /* the sensitivity information */
+-    double *CKTtimePoints;      /* list of all accepted timepoints in
++    SPICE_REAL *CKTtimePoints;      /* list of all accepted timepoints in
+                                    the current transient simulation */
+-    double *CKTdeltaList;       /* list of all timesteps in the
++    SPICE_REAL *CKTdeltaList;       /* list of all timesteps in the
+                                    current transient simulation */
+     int CKTtimeListSize;        /* size of above lists */
+     int CKTtimeIndex;           /* current position in above lists */
+@@ -270,8 +273,9 @@
+     unsigned int CKTkeepOpInfo:1; /* flag for small signal analyses */
+     unsigned int CKTcopyNodesets:1; /* NodesetFIX */
+     unsigned int CKTnodeDamping:1; /* flag for node damping fix */
+-    double CKTabsDv;            /* abs limit for iter-iter voltage change */
+-    double CKTrelDv;            /* rel limit for iter-iter voltage change */
++    unsigned int CKTuseSolLim:1;    /* flag for per-node solution limiting */
++    SPICE_REAL CKTabsDv;            /* abs limit for iter-iter voltage change */
++    SPICE_REAL CKTrelDv;            /* rel limit for iter-iter voltage change */
+     int CKTtroubleNode;         /* Non-convergent node number */
+     GENinstance *CKTtroubleElt; /* Non-convergent device instance */
+     int CKTvarHertz;            /* variable HERTZ in B source */
+@@ -292,19 +296,19 @@
+     CMat* CKTYmat;
+     CMat* CKTZmat;
+     // Data for RF Noise Calculations
+-    double* CKTportY;
++    SPICE_REAL* CKTportY;
+     CMat* CKTNoiseCYmat;
+     int CKTnoiseSourceCount;
+     CMat* CKTadjointRHS;       // Matrix where Znj are stored. Znj = impedance from j-th noise source to n-th port
+ #endif
+ #ifdef WITH_PSS
+ /* SP: Periodic Steady State Analysis - 100609 */
+-    double CKTstabTime;		/* PSS stab time */
+-    double CKTguessedFreq;	/* PSS guessed frequency */
++    SPICE_REAL CKTstabTime;		/* PSS stab time */
++    SPICE_REAL CKTguessedFreq;	/* PSS guessed frequency */
+     int CKTharms;		/* PSS harmonics */
+     long int CKTpsspoints;	/* PSS number of samples */
+     char *CKToscNode;       	/* PSS oscnode */
+-    double CKTsteady_coeff;	/* PSS Steady Coefficient */
++    SPICE_REAL CKTsteady_coeff;	/* PSS Steady Coefficient */
+     int CKTsc_iter;        	/* PSS Maximum Number of Shooting Iterations */
+ /* SP: 100609 */
+ #endif
+@@ -317,7 +321,7 @@
+                            a safe operating area (SOA) check is executed */
+     int CKTsoaMaxWarns; /* specifies the maximum number of SOA warnings */
+ 
+-    double CKTepsmin; /* minimum argument value for some log functions, e.g. diode saturation current*/
++    SPICE_REAL CKTepsmin; /* minimum argument value for some log functions, e.g. diode saturation current*/
+ 
+     NGHASHPTR DEVnameHash;
+     NGHASHPTR MODnameHash;
+@@ -326,7 +330,7 @@
+ 
+ #ifdef KLU
+     unsigned int CKTkluMODE:1;
+-    double CKTkluMemGrowFactor ;
++    SPICE_REAL CKTkluMemGrowFactor ;
+ #endif
+ };
+ 
+@@ -336,7 +340,7 @@
+ extern int ACan(CKTcircuit *, int);
+ extern int ACaskQuest(CKTcircuit *, JOB *, int , IFvalue *);
+ extern int ACsetParm(CKTcircuit *, JOB *, int , IFvalue *);
+-extern int CKTacDump(CKTcircuit *, double , runDesc *);
++extern int CKTacDump(CKTcircuit *, SPICE_REAL , runDesc *);
+ extern int CKTacLoad(CKTcircuit *);
+ extern int CKTaccept(CKTcircuit *);
+ extern int CKTacct(CKTcircuit *, JOB *, int , IFvalue *);
+@@ -356,7 +360,7 @@
+ extern int CKTdltNNum(CKTcircuit *, int);
+ extern int CKTdltNod(CKTcircuit *, CKTnode *);
+ extern int CKTdoJob(CKTcircuit *, int , TSKtask *);
+-extern void CKTdump(CKTcircuit *, double, runDesc *);
++extern void CKTdump(CKTcircuit *, SPICE_REAL, runDesc *);
+ extern int CKTsoaInit(void);
+ extern int CKTsoaCheck(CKTcircuit *);
+ #ifdef CIDER
+@@ -410,15 +414,15 @@
+ extern int CKTsenSetup(CKTcircuit *);
+ extern int CKTsenUpdate(CKTcircuit *);
+ extern int CKTsetAnalPm(CKTcircuit *, JOB *, int , IFvalue *, IFvalue *);
+-extern int CKTsetBreak(CKTcircuit *, double);
++extern int CKTsetBreak(CKTcircuit *, SPICE_REAL);
+ extern int CKTsetNodPm(CKTcircuit *, CKTnode *, int , IFvalue *, IFvalue *);
+ extern int CKTsetOpt(CKTcircuit *, JOB *, int , IFvalue *);
+ extern int CKTsetup(CKTcircuit *);
+ extern int CKTunsetup(CKTcircuit *);
+ extern int CKTtemp(CKTcircuit *);
+ extern char *CKTtrouble(CKTcircuit *, char *);
+-extern void CKTterr(int , CKTcircuit *, double *);
+-extern int CKTtrunc(CKTcircuit *, double *);
++extern void CKTterr(int , CKTcircuit *, SPICE_REAL *);
++extern int CKTtrunc(CKTcircuit *, SPICE_REAL *);
+ extern int CKTtypelook(char *);
+ extern int DCOaskQuest(CKTcircuit *, JOB *, int , IFvalue *);
+ extern int DCOsetParm(CKTcircuit  *, JOB *, int , IFvalue *);
+@@ -464,7 +468,7 @@
+ extern int SPan(CKTcircuit*, int);
+ extern int SPaskQuest(CKTcircuit*, JOB*, int, IFvalue*);
+ extern int SPsetParm(CKTcircuit*, JOB*, int, IFvalue*);
+-extern int CKTspDump(CKTcircuit*, double, runDesc*, int);
++extern int CKTspDump(CKTcircuit*, SPICE_REAL, runDesc*, int);
+ extern int CKTspLoad(CKTcircuit*);
+ extern int CKTmatrixIndex(CKTcircuit*, int, int);
+ extern int CKTspCalcPowerWave(CKTcircuit* ckt);
+@@ -482,7 +486,7 @@
+ extern int NIconvTest(CKTcircuit *);
+ extern void NIdestroy(CKTcircuit *);
+ extern int NIinit(CKTcircuit  *);
+-extern int NIintegrate(CKTcircuit *, double *, double *, double , int);
++extern int NIintegrate(CKTcircuit *, SPICE_REAL *, SPICE_REAL *, SPICE_REAL , int);
+ extern int NIiter(CKTcircuit * , int);
+ extern void NIresetwarnmsg(void);
+ extern int NIpzMuller(PZtrial **, PZtrial *);
+--- /tmp/ngspice_patches/step0/src/include/ngspice/tskdefs.h	2026-07-20 15:00:12.113849622 +0800
++++ /mnt/e/MyResearch/Ngspice/ngspice-46_mixed/src/include/ngspice/tskdefs.h	2026-07-19 18:44:25.504813600 +0800
+@@ -16,11 +16,11 @@
+     JOB taskOptions;    /* job structure at the front to hold options */
+     JOB *jobs;
+     char *TSKname;
+-    double TSKtemp;
+-    double TSKnomTemp;
++    SPICE_REAL TSKtemp;
++    SPICE_REAL TSKnomTemp;
+     int TSKmaxOrder;        /* maximum integration method order */
+     int TSKintegrateMethod; /* the integration method to be used */
+-    double TSKxmu;          /* for trapezoidal method */
++    SPICE_REAL TSKxmu;          /* for trapezoidal method */
+     int TSKindverbosity;    /* control check of inductive systems */
+     int TSKcurrentAnalysis; /* the analysis in progress (if any) */
+ 
+@@ -40,28 +40,31 @@
+                             /* (itl4) */
+     int TSKnumSrcSteps;     /* number of steps for source stepping */
+     int TSKnumGminSteps;    /* number of steps for Gmin stepping */
+-    double TSKgminFactor;   /* factor for Gmin stepping */
+-    double TSKminBreak;     /* minimum time difference between breakpoints */
+-    double TSKabstol;
+-    double TSKpivotAbsTol;
+-    double TSKpivotRelTol;
+-    double TSKreltol;
+-    double TSKchgtol;
+-    double TSKvoltTol;
+-    double TSKlteReltol;
+-    double TSKlteAbstol;
+-    double TSKlteTrtol;
++    SPICE_REAL TSKgminFactor;   /* factor for Gmin stepping */
++    SPICE_REAL TSKcmin;         /* Cmin stepping: initial shunt capacitance */
++    int TSKnumCminSteps;    /* number of steps for Cmin stepping */
++    SPICE_REAL TSKcminFactor;   /* factor for Cmin stepping */
++    SPICE_REAL TSKminBreak;     /* minimum time difference between breakpoints */
++    SPICE_REAL TSKabstol;
++    SPICE_REAL TSKpivotAbsTol;
++    SPICE_REAL TSKpivotRelTol;
++    SPICE_REAL TSKreltol;
++    SPICE_REAL TSKchgtol;
++    SPICE_REAL TSKvoltTol;
++    SPICE_REAL TSKlteReltol;
++    SPICE_REAL TSKlteAbstol;
++    SPICE_REAL TSKlteTrtol;
+     unsigned int TSKnewtrunc:1; /* voltage controlled truncation */
+-    double TSKgmin;
+-    double TSKgshunt;   /* shunt conductance (CKTdiagGmin) */
+-    double TSKcshunt;   /* shunt capacitor to ground */
+-    double TSKdelmin;
+-    double TSKtrtol;
+-    double TSKdefaultMosM;
+-    double TSKdefaultMosL;
+-    double TSKdefaultMosW;
+-    double TSKdefaultMosAD;
+-    double TSKdefaultMosAS;
++    SPICE_REAL TSKgmin;
++    SPICE_REAL TSKgshunt;   /* shunt conductance (CKTdiagGmin) */
++    SPICE_REAL TSKcshunt;   /* shunt capacitor to ground */
++    SPICE_REAL TSKdelmin;
++    SPICE_REAL TSKtrtol;
++    SPICE_REAL TSKdefaultMosM;
++    SPICE_REAL TSKdefaultMosL;
++    SPICE_REAL TSKdefaultMosW;
++    SPICE_REAL TSKdefaultMosAD;
++    SPICE_REAL TSKdefaultMosAS;
+     unsigned int TSKfixLimit:1;
+     unsigned int TSKnoOpIter:1; /* no OP iterating, go straight to gmin step */
+     unsigned int TSKtryToCompact:1; /* flag for LTRA lines */
+@@ -69,14 +72,15 @@
+     unsigned int TSKkeepOpInfo:1; /* flag for small signal analyses */
+     unsigned int TSKcopyNodesets:1; /* flag for nodeset copy */
+     unsigned int TSKnodeDamping:1;  /* flag for node damping */
++    unsigned int TSKuseSolLim:1;    /* flag for per-node solution limiting */
+     unsigned int TSKnoopac:1; /* flag for no OP calculation before AC */
+-    double TSKabsDv;                 /* abs limit for iter-iter voltage change */
+-    double TSKrelDv;                 /* rel limit for iter-iter voltage change */
+-    double TSKepsmin;         /* minimum value for log */
++    SPICE_REAL TSKabsDv;                 /* abs limit for iter-iter voltage change */
++    SPICE_REAL TSKrelDv;                 /* rel limit for iter-iter voltage change */
++    SPICE_REAL TSKepsmin;         /* minimum value for log */
+ 
+ #ifdef KLU
+     unsigned int TSKkluMODE:1;
+-    double TSKkluMemGrowFactor ;
++    SPICE_REAL TSKkluMemGrowFactor ;
+ #endif
+ 
+ };
+--- /tmp/ngspice_patches/step0/src/include/ngspice/optdefs.h	2026-07-20 15:00:12.110063277 +0800
++++ /mnt/e/MyResearch/Ngspice/ngspice-46_mixed/src/include/ngspice/optdefs.h	2026-07-19 18:44:25.510841800 +0800
+@@ -1,3 +1,4 @@
++#include "ngspice/typedefs.h"
+ /**********
+ Copyright 1990 Regents of the University of California.  All rights reserved.
+ Author: 1985 Thomas L. Quarles
+@@ -30,25 +31,25 @@
+ 
+     int STATtotalDev;   /* PN: number of total devices in the netlist */
+ 
+-    double STATtotAnalTime;     /* total time for all analysis */
+-    double STATloadTime;        /* total time spent in device loading */
+-    double STATdecompTime;      /* total time spent in LU decomposition */
+-    double STATsolveTime;       /* total time spent in F-B subst. */
+-    double STATreorderTime;     /* total time spent reordering */
+-    double STATsyncTime;        /* total time spent sync'ing after load */
+-    double STATtranTime;        /* transient analysis time */
+-    double STATtranDecompTime;  /* time spent in transient LU decomposition */
+-    double STATtranSolveTime;   /* time spent in transient F-B subst. */
+-    double STATtranLoadTime;    /* time spent in transient device loading */
+-    double STATtranTruncTime;   /* time spent calculating LTE and new step */
+-    double STATtranSyncTime;    /* time spent in transient sync'ing */
+-    double STATacTime;          /* AC analysis time */
+-    double STATacDecompTime;    /* time spent in AC LU decomposition */
+-    double STATacSolveTime;     /* time spent in AC F-B subst. */
+-    double STATacLoadTime;      /* time spent in AC device loading */
+-    double STATacSyncTime;      /* time spent in transient sync'ing */
++    SPICE_REAL STATtotAnalTime;     /* total time for all analysis */
++    SPICE_REAL STATloadTime;        /* total time spent in device loading */
++    SPICE_REAL STATdecompTime;      /* total time spent in LU decomposition */
++    SPICE_REAL STATsolveTime;       /* total time spent in F-B subst. */
++    SPICE_REAL STATreorderTime;     /* total time spent reordering */
++    SPICE_REAL STATsyncTime;        /* total time spent sync'ing after load */
++    SPICE_REAL STATtranTime;        /* transient analysis time */
++    SPICE_REAL STATtranDecompTime;  /* time spent in transient LU decomposition */
++    SPICE_REAL STATtranSolveTime;   /* time spent in transient F-B subst. */
++    SPICE_REAL STATtranLoadTime;    /* time spent in transient device loading */
++    SPICE_REAL STATtranTruncTime;   /* time spent calculating LTE and new step */
++    SPICE_REAL STATtranSyncTime;    /* time spent in transient sync'ing */
++    SPICE_REAL STATacTime;          /* AC analysis time */
++    SPICE_REAL STATacDecompTime;    /* time spent in AC LU decomposition */
++    SPICE_REAL STATacSolveTime;     /* time spent in AC F-B subst. */
++    SPICE_REAL STATacLoadTime;      /* time spent in AC device loading */
++    SPICE_REAL STATacSyncTime;      /* time spent in transient sync'ing */
+     STATdevList *STATdevNum;    /* PN: Number of instances and models for each device */
+-    double *devTimes;           /* Per-device load times, last entry is overhead */
++    SPICE_REAL *devTimes;           /* Per-device load times, last entry is overhead */
+     size_t *devCounts;          /* Per-device load counts, last entry is overhead */
+ } STATistics;
+ 
+@@ -116,8 +117,12 @@
+     OPT_GSHUNT,
+     OPT_DEFM,
+     OPT_GMINFACT,
++    OPT_CMIN,
++    OPT_CMINSTEPS,
++    OPT_CMINFACTOR,
+     OPT_COPYNODESETS,
+     OPT_NODEDAMPING,
++    OPT_SOLLIM,
+     OPT_ABSDV,
+     OPT_RELDV,
+     OPT_NOOPAC,
+--- /tmp/ngspice_patches/step0/src/spicelib/analysis/cktsopt.c	2026-07-20 15:00:12.117635968 +0800
++++ /mnt/e/MyResearch/Ngspice/ngspice-46_mixed/src/spicelib/analysis/cktsopt.c	2026-07-19 18:44:25.515841400 +0800
+@@ -96,6 +96,15 @@
+     case OPT_GMINFACT:
+         task->TSKgminFactor = val->rValue;
+         break;
++    case OPT_CMIN:
++        task->TSKcmin = val->rValue;
++        break;
++    case OPT_CMINSTEPS:
++        task->TSKnumCminSteps = val->iValue;
++        break;
++    case OPT_CMINFACTOR:
++        task->TSKcminFactor = val->rValue;
++        break;
+     case OPT_DEFM:
+         task->TSKdefaultMosM = val->rValue;
+         break;
+@@ -160,6 +169,9 @@
+     case OPT_NODEDAMPING:
+         task->TSKnodeDamping = (val->iValue != 0);
+         break;
++    case OPT_SOLLIM:
++        task->TSKuseSolLim = (val->iValue != 0);
++        break;
+     case OPT_ABSDV:
+         task->TSKabsDv = val->rValue;
+         break;
+@@ -293,6 +305,9 @@
+  { "srcsteps", OPT_SRCSTEPS, IF_SET|IF_INTEGER,"number of source steps"},
+  { "gminsteps", OPT_GMINSTEPS, IF_SET|IF_INTEGER,"number of Gmin steps"},
+  { "gminfactor", OPT_GMINFACT, IF_SET|IF_REAL,"factor per Gmin step"},
++ { "cmin", OPT_CMIN, IF_SET|IF_REAL,"Cmin stepping: initial shunt capacitance (F)"},
++ { "cminsteps", OPT_CMINSTEPS, IF_SET|IF_INTEGER,"number of Cmin steps (0=disabled)"},
++ { "cminfactor", OPT_CMINFACTOR, IF_SET|IF_REAL,"factor per Cmin step"},
+  { "acct", 0, IF_FLAG ,"Print accounting"},
+  { "list", 0, IF_FLAG, "Print a listing" },
+  { "nomod", 0, IF_FLAG, "Don't print a model summary" },
+@@ -355,6 +370,8 @@
+         "Copy nodesets from device terminals to internal nodes" },
+  { "nodedamping", OPT_NODEDAMPING, IF_SET|IF_FLAG,
+         "Limit iteration to iteration node voltage change" },
++ { "sollim", OPT_SOLLIM, IF_SET|IF_FLAG,
++        "Enable per-node solution limiting (clamp delta-V each Newton step)" },
+  { "absdv", OPT_ABSDV, IF_SET|IF_REAL,
+         "Maximum absolute iter-iter node voltage change" },
+  { "reldv", OPT_RELDV, IF_SET|IF_REAL,
+--- /tmp/ngspice_patches/step0/src/spicelib/analysis/cktntask.c	2026-07-20 15:00:12.117635968 +0800
++++ /mnt/e/MyResearch/Ngspice/ngspice-46_mixed/src/spicelib/analysis/cktntask.c	2026-07-19 18:44:25.521843200 +0800
+@@ -48,6 +48,9 @@
+         tsk->TSKnumSrcSteps     = def->TSKnumSrcSteps;
+         tsk->TSKnumGminSteps    = def->TSKnumGminSteps;
+         tsk->TSKgminFactor      = def->TSKgminFactor;
++        tsk->TSKcmin            = def->TSKcmin;
++        tsk->TSKnumCminSteps    = def->TSKnumCminSteps;
++        tsk->TSKcminFactor      = def->TSKcminFactor;
+         /* minBreak */
+         tsk->TSKabstol          = def->TSKabstol;
+         tsk->TSKpivotAbsTol     = def->TSKpivotAbsTol;
+@@ -72,6 +75,7 @@
+         tsk->TSKkeepOpInfo      = def->TSKkeepOpInfo;
+         tsk->TSKcopyNodesets    = def->TSKcopyNodesets;
+         tsk->TSKnodeDamping     = def->TSKnodeDamping;
++        tsk->TSKuseSolLim       = def->TSKuseSolLim;
+         tsk->TSKabsDv           = def->TSKabsDv;
+         tsk->TSKrelDv           = def->TSKrelDv;
+         tsk->TSKnoopac          = def->TSKnoopac;
+@@ -120,6 +124,9 @@
+         tsk->TSKnumSrcSteps     = 1;
+         tsk->TSKnumGminSteps    = 1;
+         tsk->TSKgminFactor      = 10;
++        tsk->TSKcmin            = 1e-12;
++        tsk->TSKnumCminSteps    = 0;
++        tsk->TSKcminFactor      = 10;
+         tsk->TSKpivotAbsTol     = 1e-13;
+         tsk->TSKpivotRelTol     = 1e-3;
+         tsk->TSKtemp            = 300.15;
+@@ -135,6 +142,7 @@
+         tsk->TSKkeepOpInfo      = 0;
+         tsk->TSKcopyNodesets    = 0;
+         tsk->TSKnodeDamping     = 0;
++        tsk->TSKuseSolLim       = 0;
+         tsk->TSKabsDv           = 0.5;
+         tsk->TSKrelDv           = 2.0;
+         tsk->TSKepsmin          = 1e-28;
+--- /tmp/ngspice_patches/step0/src/spicelib/analysis/cktdojob.c	2026-07-20 15:00:12.117635968 +0800
++++ /mnt/e/MyResearch/Ngspice/ngspice-46_mixed/src/spicelib/analysis/cktdojob.c	2026-07-19 18:44:25.526357800 +0800
+@@ -29,7 +29,7 @@
+ CKTdoJob(CKTcircuit* ckt, int reset, TSKtask* task)
+ {
+     JOB* job;
+-    double	startTime;
++    SPICE_REAL	startTime;
+     int		error, i, error2;
+ 
+     int         ANALmaxnum = spice_num_analysis();
+@@ -62,6 +62,9 @@
+     ckt->CKTnumSrcSteps = task->TSKnumSrcSteps;
+     ckt->CKTnumGminSteps = task->TSKnumGminSteps;
+     ckt->CKTgminFactor = task->TSKgminFactor;
++    ckt->CKTcmin = task->TSKcmin;
++    ckt->CKTnumCminSteps = task->TSKnumCminSteps;
++    ckt->CKTcminFactor = task->TSKcminFactor;
+     ckt->CKTminBreak = task->TSKminBreak;
+     ckt->CKTabstol = task->TSKabstol;
+     ckt->CKTpivotAbsTol = task->TSKpivotAbsTol;
+@@ -102,6 +105,7 @@
+     ckt->CKTkeepOpInfo = task->TSKkeepOpInfo;
+     ckt->CKTcopyNodesets = task->TSKcopyNodesets;
+     ckt->CKTnodeDamping = task->TSKnodeDamping;
++    ckt->CKTuseSolLim = task->TSKuseSolLim;
+     ckt->CKTabsDv = task->TSKabsDv;
+     ckt->CKTrelDv = task->TSKrelDv;
+     ckt->CKTtroubleNode = 0;
+--- /tmp/ngspice_patches/step0/src/maths/ni/niiter.c	2026-07-20 15:00:12.113849622 +0800
++++ /mnt/e/MyResearch/Ngspice/ngspice-46_mixed/src/maths/ni/niiter.c	2026-07-19 18:44:25.532394100 +0800
+@@ -28,7 +28,7 @@
+ int
+ NIiter(CKTcircuit *ckt, int maxIter)
+ {
+-    double startTime, *OldCKTstate0 = NULL;
++    SPICE_REAL startTime, *OldCKTstate0 = NULL;
+     int error, i, j;
+ 
+     int iterno = 0;
+@@ -39,7 +39,7 @@
+         maxIter = 100;
+ 
+     if ((ckt->CKTmode & MODETRANOP) && (ckt->CKTmode & MODEUIC)) {
+-        SWAP(double *, ckt->CKTrhs, ckt->CKTrhsOld);
++        SWAP(SPICE_REAL *, ckt->CKTrhs, ckt->CKTrhsOld);
+         error = CKTload(ckt);
+         if (error)
+             return(error);
+@@ -64,7 +64,7 @@
+         }
+     }
+ 
+-    /* OldCKTstate0 = TMALLOC(double, ckt->CKTnumStates + 1); */
++    /* OldCKTstate0 = TMALLOC(SPICE_REAL, ckt->CKTnumStates + 1); */
+ 
+     for (;;) {
+ 
+@@ -245,10 +245,10 @@
+             /* moved it to here as if xspice is included then CKTload changes
+                CKTnumStates the first time it is run */
+             if (!OldCKTstate0)
+-                OldCKTstate0 = TMALLOC(double, ckt->CKTnumStates + 1);
++                OldCKTstate0 = TMALLOC(SPICE_REAL, ckt->CKTnumStates + 1);
+             if (ckt->CKTstate0)
+                 memcpy(OldCKTstate0, ckt->CKTstate0,
+-                       (size_t) ckt->CKTnumStates * sizeof(double));
++                       (size_t) ckt->CKTnumStates * sizeof(SPICE_REAL));
+ 
+             startTime = SPfrontEnd->IFseconds();
+             SMPsolve(ckt->CKTmatrix, ckt->CKTrhs, ckt->CKTrhsSpare);
+@@ -268,6 +268,28 @@
+             ckt->CKTrhsSpare[0] = 0;
+             ckt->CKTrhsOld[0] = 0;
+ 
++            /* Per-node solution limiting: clamp |delta-V| to prevent
++             * overshoot into FP32 subthreshold NaN regions.  Reuses the
++             * existing CKTabsDv / CKTrelDv fields already settable via
++             * .option absdv / .option reldv.  Enable with .option sollim. */
++            if (ckt->CKTuseSolLim) {
++                CKTnode *node;
++                for (node = ckt->CKTnodes->next; node; node = node->next) {
++                    int num = node->number;
++                    SPICE_REAL newV = ckt->CKTrhs[num];
++                    SPICE_REAL oldV = ckt->CKTrhsOld[num];
++                    SPICE_REAL dV = newV - oldV;
++                    SPICE_REAL maxStep = ckt->CKTrelDv
++                        * ((oldV > 1.0) ? oldV : (-oldV > 1.0 ? -oldV : 1.0));
++                    if (maxStep < ckt->CKTabsDv)
++                        maxStep = ckt->CKTabsDv;
++                    if (dV > maxStep)
++                        ckt->CKTrhs[num] = oldV + maxStep;
++                    else if (dV < -maxStep)
++                        ckt->CKTrhs[num] = oldV - maxStep;
++                }
++            }
++
+             if (iterno > maxIter) {
+                 ckt->CKTstat->STATnumIter += iterno;
+                 /* we don't use this info during transient analysis */
+@@ -298,7 +320,7 @@
+             (iterno > 1))
+         {
+             CKTnode *node;
+-            double diff, maxdiff = 0;
++            SPICE_REAL diff, maxdiff = 0;
+             for (node = ckt->CKTnodes->next; node; node = node->next)
+                 if (node->type == SP_VOLTAGE) {
+                     diff = fabs(ckt->CKTrhs[node->number] - ckt->CKTrhsOld[node->number]);
+@@ -307,7 +329,7 @@
+                 }
+ 
+             if (maxdiff > 10) {
+-                double damp_factor = 10 / maxdiff;
++                SPICE_REAL damp_factor = 10 / maxdiff;
+                 if (damp_factor < 0.1)
+                     damp_factor = 0.1;
+                 for (node = ckt->CKTnodes->next; node; node = node->next) {
+@@ -359,7 +381,7 @@
+         }
+ 
+         /* build up the lvnim1 array from the lvn array */
+-        SWAP(double *, ckt->CKTrhs, ckt->CKTrhsOld);
++        SWAP(SPICE_REAL *, ckt->CKTrhs, ckt->CKTrhsOld);
+         /* printf("after loading, after solving\n"); */
+         /* CKTdump(ckt); */
+     }
+--- /tmp/ngspice_patches/step0/src/spicelib/analysis/cktop.c	2026-07-20 15:00:12.117635968 +0800
++++ /mnt/e/MyResearch/Ngspice/ngspice-46_mixed/src/spicelib/analysis/cktop.c	2026-07-19 18:44:25.536399600 +0800
+@@ -76,6 +76,38 @@
+             return converged;
+     }
+ 
++    /* ... otherwise try Cmin stepping ...
++     * Add shunt capacitors from every node to ground, then step them
++     * down.  Unlike gmin (which alters the DC solution), Cmin only
++     * provides numerical damping during the Newton iteration — at DC
++     * steady-state, capacitors are open circuits so the final solution
++     * is unchanged.  Enable with  .option cminsteps=N  (N > 0).
++     */
++    if (ckt->CKTnumCminSteps >= 1 && converged != 0) {
++        SPICE_REAL saved_diagGmin = ckt->CKTdiagGmin;
++        SPICE_REAL cmin_val = 1e-2;
++        int cmin_steps = ckt->CKTnumCminSteps;
++        SPICE_REAL cmin_factor = ckt->CKTcminFactor;
++        int step;
++
++        /* Note: Starting Cmin stepping */
++
++        for (step = 0; step < cmin_steps; step++) {
++            ckt->CKTdiagGmin = cmin_val;
++            converged = NIiter(ckt, iterlim);
++            if (converged != 0)
++                break;  /* step too small to converge; try final from last good */
++            cmin_val /= cmin_factor;
++        }
++
++        /* Final step: original circuit (no artificial conductance) */
++        ckt->CKTdiagGmin = saved_diagGmin;
++        converged = NIiter(ckt, iterlim);
++
++        if (converged == 0)
++            return converged;
++    }
++
+     /* ... otherwise try stepping sources ...
+      * now, we'll try source stepping - we scale the sources
+      * to 0, converge, then start stepping them up until they
+@@ -162,11 +194,11 @@
+ dynamic_gmin (CKTcircuit *ckt, long int firstmode,
+               long int continuemode, int iterlim)
+ {
+-    double OldGmin, gtarget, factor;
++    SPICE_REAL OldGmin, gtarget, factor;
+     int converged;
+ 
+     int NumNodes, iters, i;
+-    double *OldRhsOld, *OldCKTstate0;
++    SPICE_REAL *OldRhsOld, *OldCKTstate0;
+     CKTnode *n;
+ 
+     ckt->CKTmode = firstmode;
+@@ -176,8 +208,8 @@
+     for (n = ckt->CKTnodes; n; n = n->next)
+         NumNodes++;
+ 
+-    OldRhsOld = TMALLOC(double, NumNodes + 1);
+-    OldCKTstate0 = TMALLOC(double, ckt->CKTnumStates + 1);
++    OldRhsOld = TMALLOC(SPICE_REAL, NumNodes + 1);
++    OldCKTstate0 = TMALLOC(SPICE_REAL, ckt->CKTnumStates + 1);
+ 
+     for (n = ckt->CKTnodes; n; n = n->next)
+         ckt->CKTrhsOld [n->number] = 0;
+@@ -211,7 +243,7 @@
+                 OldRhsOld[i++] = ckt->CKTrhsOld[n->number];
+ 
+             memcpy(OldCKTstate0, ckt->CKTstate0,
+-                   (size_t) ckt->CKTnumStates * sizeof(double));
++                   (size_t) ckt->CKTnumStates * sizeof(SPICE_REAL));
+ 
+             if (iters <= (ckt->CKTdcTrcvMaxIter / 4)) {
+                 factor *= sqrt (factor);
+@@ -245,7 +277,7 @@
+                 ckt->CKTrhsOld[n->number] = OldRhsOld[i++];
+ 
+             memcpy(ckt->CKTstate0, OldCKTstate0,
+-                   (size_t) ckt->CKTnumStates * sizeof(double));
++                   (size_t) ckt->CKTnumStates * sizeof(SPICE_REAL));
+         }
+     }
+ 
+@@ -350,11 +382,11 @@
+ new_gmin(CKTcircuit* ckt, long int firstmode,
+     long int continuemode, int iterlim)
+ {
+-    double OldGmin, gtarget, factor, startgmin;
++    SPICE_REAL OldGmin, gtarget, factor, startgmin;
+     int converged;
+ 
+     int NumNodes, iters, i;
+-    double* OldRhsOld, * OldCKTstate0;
++    SPICE_REAL* OldRhsOld, * OldCKTstate0;
+     CKTnode* n;
+ 
+     ckt->CKTmode = firstmode;
+@@ -364,8 +396,8 @@
+     for (n = ckt->CKTnodes; n; n = n->next)
+         NumNodes++;
+ 
+-    OldRhsOld = TMALLOC(double, NumNodes + 1);
+-    OldCKTstate0 = TMALLOC(double, ckt->CKTnumStates + 1);
++    OldRhsOld = TMALLOC(SPICE_REAL, NumNodes + 1);
++    OldCKTstate0 = TMALLOC(SPICE_REAL, ckt->CKTnumStates + 1);
+ 
+     for (n = ckt->CKTnodes; n; n = n->next)
+         ckt->CKTrhsOld[n->number] = 0;
+@@ -400,7 +432,7 @@
+                 OldRhsOld[i++] = ckt->CKTrhsOld[n->number];
+ 
+             memcpy(OldCKTstate0, ckt->CKTstate0,
+-                (size_t)ckt->CKTnumStates * sizeof(double));
++                (size_t)ckt->CKTnumStates * sizeof(SPICE_REAL));
+ 
+             if (iters <= (ckt->CKTdcTrcvMaxIter / 4)) {
+                 factor *= sqrt(factor);
+@@ -436,7 +468,7 @@
+                 ckt->CKTrhsOld[n->number] = OldRhsOld[i++];
+ 
+             memcpy(ckt->CKTstate0, OldCKTstate0,
+-                (size_t)ckt->CKTnumStates * sizeof(double));
++                (size_t)ckt->CKTnumStates * sizeof(SPICE_REAL));
+         }
+     }
+ 
+@@ -482,9 +514,9 @@
+                long int continuemode, int iterlim)
+ {
+     int converged, i, iters;
+-    double ConvFact;
++    SPICE_REAL ConvFact;
+     CKTnode *n;
+-    double gminstart = ckt->CKTgmin;
++    SPICE_REAL gminstart = ckt->CKTgmin;
+ 
+     NG_IGNORE(iterlim);
+ 
+@@ -552,20 +584,20 @@
+ 
+     if (converged == 0) {
+ 
+-        double *OldRhsOld, *OldCKTstate0, raise = 0.001;
++        SPICE_REAL *OldRhsOld, *OldCKTstate0, raise = 0.001;
+ 
+         int NumNodes = 0;
+         for (n = ckt->CKTnodes; n; n = n->next)
+             NumNodes++;
+ 
+-        OldRhsOld = TMALLOC(double, NumNodes + 1);
+-        OldCKTstate0 = TMALLOC(double, ckt->CKTnumStates + 1);
++        OldRhsOld = TMALLOC(SPICE_REAL, NumNodes + 1);
++        OldCKTstate0 = TMALLOC(SPICE_REAL, ckt->CKTnumStates + 1);
+ 
+         for (i = 0, n = ckt->CKTnodes; n; n = n->next)
+             OldRhsOld[i++] = ckt->CKTrhsOld[n->number];
+ 
+         memcpy(OldCKTstate0, ckt->CKTstate0,
+-               (size_t) ckt->CKTnumStates * sizeof(double));
++               (size_t) ckt->CKTnumStates * sizeof(SPICE_REAL));
+ 
+         if (ft_ngdebug)
+             SPfrontEnd->IFerrorf (ERR_INFO, "One successful source step");
+@@ -594,7 +626,7 @@
+                     OldRhsOld[i++] = ckt->CKTrhsOld[n->number];
+ 
+                 memcpy(OldCKTstate0, ckt->CKTstate0,
+-                       (size_t) ckt->CKTnumStates * sizeof(double));
++                       (size_t) ckt->CKTnumStates * sizeof(SPICE_REAL));
+                 if (ft_ngdebug)
+                     SPfrontEnd->IFerrorf (ERR_INFO, "One successful source step");
+ 
+@@ -632,7 +664,7 @@
+                     ckt->CKTrhsOld[n->number] = OldRhsOld[i++];
+ 
+                 memcpy(ckt->CKTstate0, OldCKTstate0,
+-                       (size_t) ckt->CKTnumStates * sizeof(double));
++                       (size_t) ckt->CKTnumStates * sizeof(SPICE_REAL));
+             }
+ 
+             if (ckt->CKTsrcFact > 1)
+@@ -681,7 +713,7 @@
+     SPfrontEnd->IFerrorf (ERR_INFO, "Starting source stepping");
+ 
+     for (i = 0; i <= ckt->CKTnumSrcSteps; i++) {
+-        ckt->CKTsrcFact = ((double) i) / ((double) ckt->CKTnumSrcSteps);
++        ckt->CKTsrcFact = ((SPICE_REAL) i) / ((SPICE_REAL) ckt->CKTnumSrcSteps);
+ #ifdef XSPICE
+         /* gtri - wbk - add convergence problem reporting flags */
+         ckt->enh->conv_debug.last_NIiter_call = MIF_TRUE;
+--- a/src/include/ngspice/cktdefs.h	2026-07-20 15:02:40.182233963 +0800
++++ b/src/include/ngspice/cktdefs.h	2026-07-20 15:03:57.282907978 +0800
+@@ -48,9 +48,9 @@
+ #define NODE_CURRENT SP_CURRENT
+ 
+     int number;                 /* Number of the node */
+-    double ic;                  /* Value of the initial condition */
+-    double nodeset;             /* Value of the .nodeset option */
+-    double *ptr;                /* ??? */
++    SPICE_REAL ic;                  /* Value of the initial condition */
++    SPICE_REAL nodeset;             /* Value of the .nodeset option */
++    SPICE_REAL *ptr;                /* ??? */
+     CKTnode *next;              /* pointer to the next node */
+     unsigned int icGiven:1;     /* FLAG ic given */
+     unsigned int nsGiven:1;     /* FLAG nodeset given */
+@@ -81,7 +81,7 @@
+ 
+ 
+     STATistics *CKTstat;        /* The STATistics structure */
+-    double *CKTstates[8];       /* Used as memory of past steps ??? */
++    SPICE_REAL *CKTstates[8];       /* Used as memory of past steps ??? */
+ 
+     /* Some shortcut for CKTstates */
+ #define CKTstate0 CKTstates[0]
+@@ -92,21 +92,21 @@
+ #define CKTstate5 CKTstates[5]
+ #define CKTstate6 CKTstates[6]
+ #define CKTstate7 CKTstates[7]
+-    double CKTtime;             /* Current transient simulation time */
+-    double CKTdelta;            /* next time step in transient simulation */
+-    double CKTdeltaOld[7];      /* Memory for the 7 most recent CKTdelta */
+-    double CKTtemp;             /* Actual temperature of CKT, initialzed to 300.15 K in cktinit.c*/
+-    double CKTnomTemp;          /* Reference temperature 300.15 K set in cktinit.c */
+-    double CKTvt;               /* Thernmal voltage at CKTtemp */
+-    double CKTag[7];            /* the gear variable coefficient matrix */
++    SPICE_REAL CKTtime;             /* Current transient simulation time */
++    SPICE_REAL CKTdelta;            /* next time step in transient simulation */
++    SPICE_REAL CKTdeltaOld[7];      /* Memory for the 7 most recent CKTdelta */
++    SPICE_REAL CKTtemp;             /* Actual temperature of CKT, initialzed to 300.15 K in cktinit.c*/
++    SPICE_REAL CKTnomTemp;          /* Reference temperature 300.15 K set in cktinit.c */
++    SPICE_REAL CKTvt;               /* Thernmal voltage at CKTtemp */
++    SPICE_REAL CKTag[7];            /* the gear variable coefficient matrix */
+ #ifdef PREDICTOR
+-    double CKTagp[7];           /* the gear predictor variable
++    SPICE_REAL CKTagp[7];           /* the gear predictor variable
+                                    coefficient matrix */
+ #endif /*PREDICTOR*/
+     int CKTorder;               /* the integration method order */
+     int CKTmaxOrder;            /* maximum integration method order */
+     int CKTintegrateMethod;     /* the integration method to be used */
+-    double CKTxmu;              /* for trapezoidal method */
++    SPICE_REAL CKTxmu;              /* for trapezoidal method */
+     int CKTindverbosity;        /* control check of inductive couplings */
+ 
+ /* known integration methods */
+@@ -115,22 +115,22 @@
+ 
+     SMPmatrix *CKTmatrix;       /* pointer to sparse matrix */
+     int CKTniState;             /* internal state */
+-    double *CKTrhs;             /* current rhs value - being loaded */
+-    double *CKTrhsOld;          /* previous rhs value for convergence
++    SPICE_REAL *CKTrhs;             /* current rhs value - being loaded */
++    SPICE_REAL *CKTrhsOld;          /* previous rhs value for convergence
+                                    testing */
+-    double *CKTrhsSpare;        /* spare rhs value for reordering */
+-    double *CKTirhs;            /* current rhs value - being loaded
++    SPICE_REAL *CKTrhsSpare;        /* spare rhs value for reordering */
++    SPICE_REAL *CKTirhs;            /* current rhs value - being loaded
+                                    (imag) */
+-    double *CKTirhsOld;         /* previous rhs value (imaginary)*/
+-    double *CKTirhsSpare;       /* spare rhs value (imaginary)*/
+-    double *CKTpred;            /* predicted solution vector */
++    SPICE_REAL *CKTirhsOld;         /* previous rhs value (imaginary)*/
++    SPICE_REAL *CKTirhsSpare;       /* spare rhs value (imaginary)*/
++    SPICE_REAL *CKTpred;            /* predicted solution vector */
+ #ifdef PREDICTOR
+-    double *CKTsols[8];         /* previous 8 solutions */
++    SPICE_REAL *CKTsols[8];         /* previous 8 solutions */
+ #endif /* PREDICTOR */
+ 
+-    double *CKTrhsOp;           /* opearating point values */
+-    double *CKTsenRhs;          /* current sensitivity rhs values */
+-    double *CKTseniRhs;         /* current sensitivity rhs values
++    SPICE_REAL *CKTrhsOp;           /* opearating point values */
++    SPICE_REAL *CKTsenRhs;          /* current sensitivity rhs values */
++    SPICE_REAL *CKTseniRhs;         /* current sensitivity rhs values
+                                    (imag)*/
+ 
+ 
+@@ -207,41 +207,44 @@
+     /* (itl4) */
+     int CKTbreakSize;           /* number of breakpoints in table *CKTbreaks */
+     int CKTbreak;               /* if 1, a breakpoint may be set (only used in isrcacct.c) */
+-    double CKTsaveDelta;        /* previous delta, before breakpoints set a new delta */
+-    double CKTminBreak;         /* minimum time difference between breakpoints */
+-    double *CKTbreaks;          /* List of breakpoints as an array of doubles */
+-    double CKTabstol;           /* --- */
+-    double CKTpivotAbsTol;      /* --- */
+-    double CKTpivotRelTol;      /* --- */
+-    double CKTreltol;           /* --- */
+-    double CKTchgtol;           /* --- */
+-    double CKTvoltTol;          /* --- */
+-    double CKTlteReltol;        /* relative error in voltage based truncation error estimation */
+-    double CKTlteAbstol;        /* absolute error in voltage based truncation error estimation */
+-    double CKTlteTrtol;         /* scaling time step in voltage based truncation error estimation */
++    SPICE_REAL CKTsaveDelta;        /* previous delta, before breakpoints set a new delta */
++    SPICE_REAL CKTminBreak;         /* minimum time difference between breakpoints */
++    SPICE_REAL *CKTbreaks;          /* List of breakpoints as an array of doubles */
++    SPICE_REAL CKTabstol;           /* --- */
++    SPICE_REAL CKTpivotAbsTol;      /* --- */
++    SPICE_REAL CKTpivotRelTol;      /* --- */
++    SPICE_REAL CKTreltol;           /* --- */
++    SPICE_REAL CKTchgtol;           /* --- */
++    SPICE_REAL CKTvoltTol;          /* --- */
++    SPICE_REAL CKTlteReltol;        /* relative error in voltage based truncation error estimation */
++    SPICE_REAL CKTlteAbstol;        /* absolute error in voltage based truncation error estimation */
++    SPICE_REAL CKTlteTrtol;         /* scaling time step in voltage based truncation error estimation */
+     int CKTnewtrunc;            /* enable lte (local truncation error) based on voltages */
+-    double CKTgmin;             /* .options GMIN */
+-    double CKTgshunt;           /* .options RSHUNT */
+-    double CKTcshunt;           /* .options CSHUNT */
+-    double CKTdelmin;           /* minimum time step for tran analysis */
+-    double CKTtrtol;            /* .options TRTOL */
+-    double CKTfinalTime;        /* TSTOP */
+-    double CKTstep;             /* TSTEP */
+-    double CKTmaxStep;          /* TMAX */
+-    double CKTinitTime;         /* TSTART */
+-    double CKTomega;            /* actual angular frequency for ac analysis */
+-    double CKTsrcFact;          /* source stepping scaling factor */
+-    double CKTdiagGmin;         /* actual value during gmin stepping */
++    SPICE_REAL CKTgmin;             /* .options GMIN */
++    SPICE_REAL CKTgshunt;           /* .options RSHUNT */
++    SPICE_REAL CKTcshunt;           /* .options CSHUNT */
++    SPICE_REAL CKTdelmin;           /* minimum time step for tran analysis */
++    SPICE_REAL CKTtrtol;            /* .options TRTOL */
++    SPICE_REAL CKTfinalTime;        /* TSTOP */
++    SPICE_REAL CKTstep;             /* TSTEP */
++    SPICE_REAL CKTmaxStep;          /* TMAX */
++    SPICE_REAL CKTinitTime;         /* TSTART */
++    SPICE_REAL CKTomega;            /* actual angular frequency for ac analysis */
++    SPICE_REAL CKTsrcFact;          /* source stepping scaling factor */
++    SPICE_REAL CKTdiagGmin;         /* actual value during gmin stepping */
+     int CKTnumSrcSteps;         /* .options SRCSTEPS */
+     int CKTnumGminSteps;        /* .options GMINSTEPS */
+-    double CKTgminFactor;       /* gmin stepping scaling factor */
++    SPICE_REAL CKTgminFactor;       /* gmin stepping scaling factor */
++    SPICE_REAL CKTcmin;             /* Cmin stepping: initial shunt capacitance */
++    int CKTnumCminSteps;        /* .options CMINSTEPS */
++    SPICE_REAL CKTcminFactor;       /* Cmin stepping scaling factor */
+     int CKTnoncon;              /* used by devices (and few other places)
+                                    to announce non-convergence */
+-    double CKTdefaultMosM;      /* Default MOS multiplier parameter m */
+-    double CKTdefaultMosL;      /* Default Channel Lenght of MOS devices */
+-    double CKTdefaultMosW;      /* Default Channel Width of MOS devics */
+-    double CKTdefaultMosAD;     /* Default Drain Area of MOS */
+-    double CKTdefaultMosAS;     /* Default Source Area of MOS */
++    SPICE_REAL CKTdefaultMosM;      /* Default MOS multiplier parameter m */
++    SPICE_REAL CKTdefaultMosL;      /* Default Channel Lenght of MOS devices */
++    SPICE_REAL CKTdefaultMosW;      /* Default Channel Width of MOS devics */
++    SPICE_REAL CKTdefaultMosAD;     /* Default Drain Area of MOS */
++    SPICE_REAL CKTdefaultMosAS;     /* Default Source Area of MOS */
+     unsigned int CKThadNodeset:1; /* flag to show that nodes have been set up */
+     unsigned int CKTfixLimit:1; /* flag to indicate that the limiting
+                                    of MOSFETs should be done as in
+@@ -256,9 +259,9 @@
+     JOB *CKTcurJob;             /* Next analysis to be performed ??? */
+ 
+     SENstruct *CKTsenInfo;      /* the sensitivity information */
+-    double *CKTtimePoints;      /* list of all accepted timepoints in
++    SPICE_REAL *CKTtimePoints;      /* list of all accepted timepoints in
+                                    the current transient simulation */
+-    double *CKTdeltaList;       /* list of all timesteps in the
++    SPICE_REAL *CKTdeltaList;       /* list of all timesteps in the
+                                    current transient simulation */
+     int CKTtimeListSize;        /* size of above lists */
+     int CKTtimeIndex;           /* current position in above lists */
+@@ -270,8 +273,9 @@
+     unsigned int CKTkeepOpInfo:1; /* flag for small signal analyses */
+     unsigned int CKTcopyNodesets:1; /* NodesetFIX */
+     unsigned int CKTnodeDamping:1; /* flag for node damping fix */
+-    double CKTabsDv;            /* abs limit for iter-iter voltage change */
+-    double CKTrelDv;            /* rel limit for iter-iter voltage change */
++    unsigned int CKTuseSolLim:1;    /* flag for per-node solution limiting */
++    SPICE_REAL CKTabsDv;            /* abs limit for iter-iter voltage change */
++    SPICE_REAL CKTrelDv;            /* rel limit for iter-iter voltage change */
+     int CKTtroubleNode;         /* Non-convergent node number */
+     GENinstance *CKTtroubleElt; /* Non-convergent device instance */
+     int CKTvarHertz;            /* variable HERTZ in B source */
+@@ -292,19 +296,19 @@
+     CMat* CKTYmat;
+     CMat* CKTZmat;
+     // Data for RF Noise Calculations
+-    double* CKTportY;
++    SPICE_REAL* CKTportY;
+     CMat* CKTNoiseCYmat;
+     int CKTnoiseSourceCount;
+     CMat* CKTadjointRHS;       // Matrix where Znj are stored. Znj = impedance from j-th noise source to n-th port
+ #endif
+ #ifdef WITH_PSS
+ /* SP: Periodic Steady State Analysis - 100609 */
+-    double CKTstabTime;		/* PSS stab time */
+-    double CKTguessedFreq;	/* PSS guessed frequency */
++    SPICE_REAL CKTstabTime;		/* PSS stab time */
++    SPICE_REAL CKTguessedFreq;	/* PSS guessed frequency */
+     int CKTharms;		/* PSS harmonics */
+     long int CKTpsspoints;	/* PSS number of samples */
+     char *CKToscNode;       	/* PSS oscnode */
+-    double CKTsteady_coeff;	/* PSS Steady Coefficient */
++    SPICE_REAL CKTsteady_coeff;	/* PSS Steady Coefficient */
+     int CKTsc_iter;        	/* PSS Maximum Number of Shooting Iterations */
+ /* SP: 100609 */
+ #endif
+@@ -317,7 +321,7 @@
+                            a safe operating area (SOA) check is executed */
+     int CKTsoaMaxWarns; /* specifies the maximum number of SOA warnings */
+ 
+-    double CKTepsmin; /* minimum argument value for some log functions, e.g. diode saturation current*/
++    SPICE_REAL CKTepsmin; /* minimum argument value for some log functions, e.g. diode saturation current*/
+ 
+     NGHASHPTR DEVnameHash;
+     NGHASHPTR MODnameHash;
+@@ -326,7 +330,7 @@
+ 
+ #ifdef KLU
+     unsigned int CKTkluMODE:1;
+-    double CKTkluMemGrowFactor ;
++    SPICE_REAL CKTkluMemGrowFactor ;
+ #endif
+ };
+ 
+@@ -336,7 +340,7 @@
+ extern int ACan(CKTcircuit *, int);
+ extern int ACaskQuest(CKTcircuit *, JOB *, int , IFvalue *);
+ extern int ACsetParm(CKTcircuit *, JOB *, int , IFvalue *);
+-extern int CKTacDump(CKTcircuit *, double , runDesc *);
++extern int CKTacDump(CKTcircuit *, SPICE_REAL , runDesc *);
+ extern int CKTacLoad(CKTcircuit *);
+ extern int CKTaccept(CKTcircuit *);
+ extern int CKTacct(CKTcircuit *, JOB *, int , IFvalue *);
+@@ -356,7 +360,7 @@
+ extern int CKTdltNNum(CKTcircuit *, int);
+ extern int CKTdltNod(CKTcircuit *, CKTnode *);
+ extern int CKTdoJob(CKTcircuit *, int , TSKtask *);
+-extern void CKTdump(CKTcircuit *, double, runDesc *);
++extern void CKTdump(CKTcircuit *, SPICE_REAL, runDesc *);
+ extern int CKTsoaInit(void);
+ extern int CKTsoaCheck(CKTcircuit *);
+ #ifdef CIDER
+@@ -410,15 +414,15 @@
+ extern int CKTsenSetup(CKTcircuit *);
+ extern int CKTsenUpdate(CKTcircuit *);
+ extern int CKTsetAnalPm(CKTcircuit *, JOB *, int , IFvalue *, IFvalue *);
+-extern int CKTsetBreak(CKTcircuit *, double);
++extern int CKTsetBreak(CKTcircuit *, SPICE_REAL);
+ extern int CKTsetNodPm(CKTcircuit *, CKTnode *, int , IFvalue *, IFvalue *);
+ extern int CKTsetOpt(CKTcircuit *, JOB *, int , IFvalue *);
+ extern int CKTsetup(CKTcircuit *);
+ extern int CKTunsetup(CKTcircuit *);
+ extern int CKTtemp(CKTcircuit *);
+ extern char *CKTtrouble(CKTcircuit *, char *);
+-extern void CKTterr(int , CKTcircuit *, double *);
+-extern int CKTtrunc(CKTcircuit *, double *);
++extern void CKTterr(int , CKTcircuit *, SPICE_REAL *);
++extern int CKTtrunc(CKTcircuit *, SPICE_REAL *);
+ extern int CKTtypelook(char *);
+ extern int DCOaskQuest(CKTcircuit *, JOB *, int , IFvalue *);
+ extern int DCOsetParm(CKTcircuit  *, JOB *, int , IFvalue *);
+@@ -464,7 +468,7 @@
+ extern int SPan(CKTcircuit*, int);
+ extern int SPaskQuest(CKTcircuit*, JOB*, int, IFvalue*);
+ extern int SPsetParm(CKTcircuit*, JOB*, int, IFvalue*);
+-extern int CKTspDump(CKTcircuit*, double, runDesc*, int);
++extern int CKTspDump(CKTcircuit*, SPICE_REAL, runDesc*, int);
+ extern int CKTspLoad(CKTcircuit*);
+ extern int CKTmatrixIndex(CKTcircuit*, int, int);
+ extern int CKTspCalcPowerWave(CKTcircuit* ckt);
+@@ -482,7 +486,7 @@
+ extern int NIconvTest(CKTcircuit *);
+ extern void NIdestroy(CKTcircuit *);
+ extern int NIinit(CKTcircuit  *);
+-extern int NIintegrate(CKTcircuit *, double *, double *, double , int);
++extern int NIintegrate(CKTcircuit *, SPICE_REAL *, SPICE_REAL *, SPICE_REAL , int);
+ extern int NIiter(CKTcircuit * , int);
+ extern void NIresetwarnmsg(void);
+ extern int NIpzMuller(PZtrial **, PZtrial *);
+--- a/src/include/ngspice/tskdefs.h	2026-07-20 15:02:40.182233963 +0800
++++ b/src/include/ngspice/tskdefs.h	2026-07-20 15:03:57.651916600 +0800
+@@ -16,11 +16,11 @@
+     JOB taskOptions;    /* job structure at the front to hold options */
+     JOB *jobs;
+     char *TSKname;
+-    double TSKtemp;
+-    double TSKnomTemp;
++    SPICE_REAL TSKtemp;
++    SPICE_REAL TSKnomTemp;
+     int TSKmaxOrder;        /* maximum integration method order */
+     int TSKintegrateMethod; /* the integration method to be used */
+-    double TSKxmu;          /* for trapezoidal method */
++    SPICE_REAL TSKxmu;          /* for trapezoidal method */
+     int TSKindverbosity;    /* control check of inductive systems */
+     int TSKcurrentAnalysis; /* the analysis in progress (if any) */
+ 
+@@ -40,28 +40,31 @@
+                             /* (itl4) */
+     int TSKnumSrcSteps;     /* number of steps for source stepping */
+     int TSKnumGminSteps;    /* number of steps for Gmin stepping */
+-    double TSKgminFactor;   /* factor for Gmin stepping */
+-    double TSKminBreak;     /* minimum time difference between breakpoints */
+-    double TSKabstol;
+-    double TSKpivotAbsTol;
+-    double TSKpivotRelTol;
+-    double TSKreltol;
+-    double TSKchgtol;
+-    double TSKvoltTol;
+-    double TSKlteReltol;
+-    double TSKlteAbstol;
+-    double TSKlteTrtol;
++    SPICE_REAL TSKgminFactor;   /* factor for Gmin stepping */
++    SPICE_REAL TSKcmin;         /* Cmin stepping: initial shunt capacitance */
++    int TSKnumCminSteps;    /* number of steps for Cmin stepping */
++    SPICE_REAL TSKcminFactor;   /* factor for Cmin stepping */
++    SPICE_REAL TSKminBreak;     /* minimum time difference between breakpoints */
++    SPICE_REAL TSKabstol;
++    SPICE_REAL TSKpivotAbsTol;
++    SPICE_REAL TSKpivotRelTol;
++    SPICE_REAL TSKreltol;
++    SPICE_REAL TSKchgtol;
++    SPICE_REAL TSKvoltTol;
++    SPICE_REAL TSKlteReltol;
++    SPICE_REAL TSKlteAbstol;
++    SPICE_REAL TSKlteTrtol;
+     unsigned int TSKnewtrunc:1; /* voltage controlled truncation */
+-    double TSKgmin;
+-    double TSKgshunt;   /* shunt conductance (CKTdiagGmin) */
+-    double TSKcshunt;   /* shunt capacitor to ground */
+-    double TSKdelmin;
+-    double TSKtrtol;
+-    double TSKdefaultMosM;
+-    double TSKdefaultMosL;
+-    double TSKdefaultMosW;
+-    double TSKdefaultMosAD;
+-    double TSKdefaultMosAS;
++    SPICE_REAL TSKgmin;
++    SPICE_REAL TSKgshunt;   /* shunt conductance (CKTdiagGmin) */
++    SPICE_REAL TSKcshunt;   /* shunt capacitor to ground */
++    SPICE_REAL TSKdelmin;
++    SPICE_REAL TSKtrtol;
++    SPICE_REAL TSKdefaultMosM;
++    SPICE_REAL TSKdefaultMosL;
++    SPICE_REAL TSKdefaultMosW;
++    SPICE_REAL TSKdefaultMosAD;
++    SPICE_REAL TSKdefaultMosAS;
+     unsigned int TSKfixLimit:1;
+     unsigned int TSKnoOpIter:1; /* no OP iterating, go straight to gmin step */
+     unsigned int TSKtryToCompact:1; /* flag for LTRA lines */
+@@ -69,14 +72,15 @@
+     unsigned int TSKkeepOpInfo:1; /* flag for small signal analyses */
+     unsigned int TSKcopyNodesets:1; /* flag for nodeset copy */
+     unsigned int TSKnodeDamping:1;  /* flag for node damping */
++    unsigned int TSKuseSolLim:1;    /* flag for per-node solution limiting */
+     unsigned int TSKnoopac:1; /* flag for no OP calculation before AC */
+-    double TSKabsDv;                 /* abs limit for iter-iter voltage change */
+-    double TSKrelDv;                 /* rel limit for iter-iter voltage change */
+-    double TSKepsmin;         /* minimum value for log */
++    SPICE_REAL TSKabsDv;                 /* abs limit for iter-iter voltage change */
++    SPICE_REAL TSKrelDv;                 /* rel limit for iter-iter voltage change */
++    SPICE_REAL TSKepsmin;         /* minimum value for log */
+ 
+ #ifdef KLU
+     unsigned int TSKkluMODE:1;
+-    double TSKkluMemGrowFactor ;
++    SPICE_REAL TSKkluMemGrowFactor ;
+ #endif
+ 
+ };
+--- a/src/include/ngspice/optdefs.h	2026-07-20 15:02:40.182233963 +0800
++++ b/src/include/ngspice/optdefs.h	2026-07-20 15:03:57.443346509 +0800
+@@ -1,3 +1,4 @@
++#include "ngspice/typedefs.h"
+ /**********
+ Copyright 1990 Regents of the University of California.  All rights reserved.
+ Author: 1985 Thomas L. Quarles
+@@ -30,25 +31,25 @@
+ 
+     int STATtotalDev;   /* PN: number of total devices in the netlist */
+ 
+-    double STATtotAnalTime;     /* total time for all analysis */
+-    double STATloadTime;        /* total time spent in device loading */
+-    double STATdecompTime;      /* total time spent in LU decomposition */
+-    double STATsolveTime;       /* total time spent in F-B subst. */
+-    double STATreorderTime;     /* total time spent reordering */
+-    double STATsyncTime;        /* total time spent sync'ing after load */
+-    double STATtranTime;        /* transient analysis time */
+-    double STATtranDecompTime;  /* time spent in transient LU decomposition */
+-    double STATtranSolveTime;   /* time spent in transient F-B subst. */
+-    double STATtranLoadTime;    /* time spent in transient device loading */
+-    double STATtranTruncTime;   /* time spent calculating LTE and new step */
+-    double STATtranSyncTime;    /* time spent in transient sync'ing */
+-    double STATacTime;          /* AC analysis time */
+-    double STATacDecompTime;    /* time spent in AC LU decomposition */
+-    double STATacSolveTime;     /* time spent in AC F-B subst. */
+-    double STATacLoadTime;      /* time spent in AC device loading */
+-    double STATacSyncTime;      /* time spent in transient sync'ing */
++    SPICE_REAL STATtotAnalTime;     /* total time for all analysis */
++    SPICE_REAL STATloadTime;        /* total time spent in device loading */
++    SPICE_REAL STATdecompTime;      /* total time spent in LU decomposition */
++    SPICE_REAL STATsolveTime;       /* total time spent in F-B subst. */
++    SPICE_REAL STATreorderTime;     /* total time spent reordering */
++    SPICE_REAL STATsyncTime;        /* total time spent sync'ing after load */
++    SPICE_REAL STATtranTime;        /* transient analysis time */
++    SPICE_REAL STATtranDecompTime;  /* time spent in transient LU decomposition */
++    SPICE_REAL STATtranSolveTime;   /* time spent in transient F-B subst. */
++    SPICE_REAL STATtranLoadTime;    /* time spent in transient device loading */
++    SPICE_REAL STATtranTruncTime;   /* time spent calculating LTE and new step */
++    SPICE_REAL STATtranSyncTime;    /* time spent in transient sync'ing */
++    SPICE_REAL STATacTime;          /* AC analysis time */
++    SPICE_REAL STATacDecompTime;    /* time spent in AC LU decomposition */
++    SPICE_REAL STATacSolveTime;     /* time spent in AC F-B subst. */
++    SPICE_REAL STATacLoadTime;      /* time spent in AC device loading */
++    SPICE_REAL STATacSyncTime;      /* time spent in transient sync'ing */
+     STATdevList *STATdevNum;    /* PN: Number of instances and models for each device */
+-    double *devTimes;           /* Per-device load times, last entry is overhead */
++    SPICE_REAL *devTimes;           /* Per-device load times, last entry is overhead */
+     size_t *devCounts;          /* Per-device load counts, last entry is overhead */
+ } STATistics;
+ 
+@@ -116,8 +117,12 @@
+     OPT_GSHUNT,
+     OPT_DEFM,
+     OPT_GMINFACT,
++    OPT_CMIN,
++    OPT_CMINSTEPS,
++    OPT_CMINFACTOR,
+     OPT_COPYNODESETS,
+     OPT_NODEDAMPING,
++    OPT_SOLLIM,
+     OPT_ABSDV,
+     OPT_RELDV,
+     OPT_NOOPAC,
+--- a/src/spicelib/analysis/cktsopt.c	2026-07-20 15:02:40.189949288 +0800
++++ b/src/spicelib/analysis/cktsopt.c	2026-07-20 15:04:08.219778724 +0800
+@@ -96,6 +96,15 @@
+     case OPT_GMINFACT:
+         task->TSKgminFactor = val->rValue;
+         break;
++    case OPT_CMIN:
++        task->TSKcmin = val->rValue;
++        break;
++    case OPT_CMINSTEPS:
++        task->TSKnumCminSteps = val->iValue;
++        break;
++    case OPT_CMINFACTOR:
++        task->TSKcminFactor = val->rValue;
++        break;
+     case OPT_DEFM:
+         task->TSKdefaultMosM = val->rValue;
+         break;
+@@ -160,6 +169,9 @@
+     case OPT_NODEDAMPING:
+         task->TSKnodeDamping = (val->iValue != 0);
+         break;
++    case OPT_SOLLIM:
++        task->TSKuseSolLim = (val->iValue != 0);
++        break;
+     case OPT_ABSDV:
+         task->TSKabsDv = val->rValue;
+         break;
+@@ -293,6 +305,9 @@
+  { "srcsteps", OPT_SRCSTEPS, IF_SET|IF_INTEGER,"number of source steps"},
+  { "gminsteps", OPT_GMINSTEPS, IF_SET|IF_INTEGER,"number of Gmin steps"},
+  { "gminfactor", OPT_GMINFACT, IF_SET|IF_REAL,"factor per Gmin step"},
++ { "cmin", OPT_CMIN, IF_SET|IF_REAL,"Cmin stepping: initial shunt capacitance (F)"},
++ { "cminsteps", OPT_CMINSTEPS, IF_SET|IF_INTEGER,"number of Cmin steps (0=disabled)"},
++ { "cminfactor", OPT_CMINFACTOR, IF_SET|IF_REAL,"factor per Cmin step"},
+  { "acct", 0, IF_FLAG ,"Print accounting"},
+  { "list", 0, IF_FLAG, "Print a listing" },
+  { "nomod", 0, IF_FLAG, "Don't print a model summary" },
+@@ -355,6 +370,8 @@
+         "Copy nodesets from device terminals to internal nodes" },
+  { "nodedamping", OPT_NODEDAMPING, IF_SET|IF_FLAG,
+         "Limit iteration to iteration node voltage change" },
++ { "sollim", OPT_SOLLIM, IF_SET|IF_FLAG,
++        "Enable per-node solution limiting (clamp delta-V each Newton step)" },
+  { "absdv", OPT_ABSDV, IF_SET|IF_REAL,
+         "Maximum absolute iter-iter node voltage change" },
+  { "reldv", OPT_RELDV, IF_SET|IF_REAL,
+--- a/src/spicelib/analysis/cktntask.c	2026-07-20 15:02:40.189949288 +0800
++++ b/src/spicelib/analysis/cktntask.c	2026-07-20 15:04:08.325299935 +0800
+@@ -48,6 +48,9 @@
+         tsk->TSKnumSrcSteps     = def->TSKnumSrcSteps;
+         tsk->TSKnumGminSteps    = def->TSKnumGminSteps;
+         tsk->TSKgminFactor      = def->TSKgminFactor;
++        tsk->TSKcmin            = def->TSKcmin;
++        tsk->TSKnumCminSteps    = def->TSKnumCminSteps;
++        tsk->TSKcminFactor      = def->TSKcminFactor;
+         /* minBreak */
+         tsk->TSKabstol          = def->TSKabstol;
+         tsk->TSKpivotAbsTol     = def->TSKpivotAbsTol;
+@@ -72,6 +75,7 @@
+         tsk->TSKkeepOpInfo      = def->TSKkeepOpInfo;
+         tsk->TSKcopyNodesets    = def->TSKcopyNodesets;
+         tsk->TSKnodeDamping     = def->TSKnodeDamping;
++        tsk->TSKuseSolLim       = def->TSKuseSolLim;
+         tsk->TSKabsDv           = def->TSKabsDv;
+         tsk->TSKrelDv           = def->TSKrelDv;
+         tsk->TSKnoopac          = def->TSKnoopac;
+@@ -120,6 +124,9 @@
+         tsk->TSKnumSrcSteps     = 1;
+         tsk->TSKnumGminSteps    = 1;
+         tsk->TSKgminFactor      = 10;
++        tsk->TSKcmin            = 1e-12;
++        tsk->TSKnumCminSteps    = 0;
++        tsk->TSKcminFactor      = 10;
+         tsk->TSKpivotAbsTol     = 1e-13;
+         tsk->TSKpivotRelTol     = 1e-3;
+         tsk->TSKtemp            = 300.15;
+@@ -135,6 +142,7 @@
+         tsk->TSKkeepOpInfo      = 0;
+         tsk->TSKcopyNodesets    = 0;
+         tsk->TSKnodeDamping     = 0;
++        tsk->TSKuseSolLim       = 0;
+         tsk->TSKabsDv           = 0.5;
+         tsk->TSKrelDv           = 2.0;
+         tsk->TSKepsmin          = 1e-28;
+--- a/src/spicelib/analysis/cktdojob.c	2026-07-20 15:02:40.189949288 +0800
++++ b/src/spicelib/analysis/cktdojob.c	2026-07-20 15:04:08.344143009 +0800
+@@ -29,7 +29,7 @@
+ CKTdoJob(CKTcircuit* ckt, int reset, TSKtask* task)
+ {
+     JOB* job;
+-    double	startTime;
++    SPICE_REAL	startTime;
+     int		error, i, error2;
+ 
+     int         ANALmaxnum = spice_num_analysis();
+@@ -62,6 +62,9 @@
+     ckt->CKTnumSrcSteps = task->TSKnumSrcSteps;
+     ckt->CKTnumGminSteps = task->TSKnumGminSteps;
+     ckt->CKTgminFactor = task->TSKgminFactor;
++    ckt->CKTcmin = task->TSKcmin;
++    ckt->CKTnumCminSteps = task->TSKnumCminSteps;
++    ckt->CKTcminFactor = task->TSKcminFactor;
+     ckt->CKTminBreak = task->TSKminBreak;
+     ckt->CKTabstol = task->TSKabstol;
+     ckt->CKTpivotAbsTol = task->TSKpivotAbsTol;
+@@ -102,6 +105,7 @@
+     ckt->CKTkeepOpInfo = task->TSKkeepOpInfo;
+     ckt->CKTcopyNodesets = task->TSKcopyNodesets;
+     ckt->CKTnodeDamping = task->TSKnodeDamping;
++    ckt->CKTuseSolLim = task->TSKuseSolLim;
+     ckt->CKTabsDv = task->TSKabsDv;
+     ckt->CKTrelDv = task->TSKrelDv;
+     ckt->CKTtroubleNode = 0;
+--- a/src/maths/ni/niiter.c	2026-07-20 15:02:40.186091627 +0800
++++ b/src/maths/ni/niiter.c	2026-07-20 15:05:18.117914969 +0800
+@@ -28,7 +28,7 @@
+ int
+ NIiter(CKTcircuit *ckt, int maxIter)
+ {
+-    double startTime, *OldCKTstate0 = NULL;
++    SPICE_REAL startTime, *OldCKTstate0 = NULL;
+     int error, i, j;
+ 
+     int iterno = 0;
+@@ -39,7 +39,7 @@
+         maxIter = 100;
+ 
+     if ((ckt->CKTmode & MODETRANOP) && (ckt->CKTmode & MODEUIC)) {
+-        SWAP(double *, ckt->CKTrhs, ckt->CKTrhsOld);
++        SWAP(SPICE_REAL *, ckt->CKTrhs, ckt->CKTrhsOld);
+         error = CKTload(ckt);
+         if (error)
+             return(error);
+@@ -64,7 +64,7 @@
+         }
+     }
+ 
+-    /* OldCKTstate0 = TMALLOC(double, ckt->CKTnumStates + 1); */
++    /* OldCKTstate0 = TMALLOC(SPICE_REAL, ckt->CKTnumStates + 1); */
+ 
+     for (;;) {
+ 
+@@ -245,10 +245,10 @@
+             /* moved it to here as if xspice is included then CKTload changes
+                CKTnumStates the first time it is run */
+             if (!OldCKTstate0)
+-                OldCKTstate0 = TMALLOC(double, ckt->CKTnumStates + 1);
++                OldCKTstate0 = TMALLOC(SPICE_REAL, ckt->CKTnumStates + 1);
+             if (ckt->CKTstate0)
+                 memcpy(OldCKTstate0, ckt->CKTstate0,
+-                       (size_t) ckt->CKTnumStates * sizeof(double));
++                       (size_t) ckt->CKTnumStates * sizeof(SPICE_REAL));
+ 
+             startTime = SPfrontEnd->IFseconds();
+             SMPsolve(ckt->CKTmatrix, ckt->CKTrhs, ckt->CKTrhsSpare);
+@@ -268,6 +268,28 @@
+             ckt->CKTrhsSpare[0] = 0;
+             ckt->CKTrhsOld[0] = 0;
+ 
++            /* Per-node solution limiting: clamp |delta-V| to prevent
++             * overshoot into FP32 subthreshold NaN regions.  Reuses the
++             * existing CKTabsDv / CKTrelDv fields already settable via
++             * .option absdv / .option reldv.  Enable with .option sollim. */
++            if (ckt->CKTuseSolLim) {
++                CKTnode *node;
++                for (node = ckt->CKTnodes->next; node; node = node->next) {
++                    int num = node->number;
++                    SPICE_REAL newV = ckt->CKTrhs[num];
++                    SPICE_REAL oldV = ckt->CKTrhsOld[num];
++                    SPICE_REAL dV = newV - oldV;
++                    SPICE_REAL maxStep = ckt->CKTrelDv
++                        * ((oldV > 1.0) ? oldV : (-oldV > 1.0 ? -oldV : 1.0));
++                    if (maxStep < ckt->CKTabsDv)
++                        maxStep = ckt->CKTabsDv;
++                    if (dV > maxStep)
++                        ckt->CKTrhs[num] = oldV + maxStep;
++                    else if (dV < -maxStep)
++                        ckt->CKTrhs[num] = oldV - maxStep;
++                }
++            }
++
+             if (iterno > maxIter) {
+                 ckt->CKTstat->STATnumIter += iterno;
+                 /* we don't use this info during transient analysis */
+@@ -298,7 +320,7 @@
+             (iterno > 1))
+         {
+             CKTnode *node;
+-            double diff, maxdiff = 0;
++            SPICE_REAL diff, maxdiff = 0;
+             for (node = ckt->CKTnodes->next; node; node = node->next)
+                 if (node->type == SP_VOLTAGE) {
+                     diff = fabs(ckt->CKTrhs[node->number] - ckt->CKTrhsOld[node->number]);
+@@ -307,7 +329,7 @@
+                 }
+ 
+             if (maxdiff > 10) {
+-                double damp_factor = 10 / maxdiff;
++                SPICE_REAL damp_factor = 10 / maxdiff;
+                 if (damp_factor < 0.1)
+                     damp_factor = 0.1;
+                 for (node = ckt->CKTnodes->next; node; node = node->next) {
+@@ -359,7 +381,7 @@
+         }
+ 
+         /* build up the lvnim1 array from the lvn array */
+-        SWAP(double *, ckt->CKTrhs, ckt->CKTrhsOld);
++        SWAP(SPICE_REAL *, ckt->CKTrhs, ckt->CKTrhsOld);
+         /* printf("after loading, after solving\n"); */
+         /* CKTdump(ckt); */
+     }
+--- a/src/spicelib/analysis/cktop.c	2026-07-20 15:02:40.189949288 +0800
++++ b/src/spicelib/analysis/cktop.c	2026-07-20 15:04:08.404440844 +0800
+@@ -76,6 +76,38 @@
+             return converged;
+     }
+ 
++    /* ... otherwise try Cmin stepping ...
++     * Add shunt capacitors from every node to ground, then step them
++     * down.  Unlike gmin (which alters the DC solution), Cmin only
++     * provides numerical damping during the Newton iteration — at DC
++     * steady-state, capacitors are open circuits so the final solution
++     * is unchanged.  Enable with  .option cminsteps=N  (N > 0).
++     */
++    if (ckt->CKTnumCminSteps >= 1 && converged != 0) {
++        SPICE_REAL saved_diagGmin = ckt->CKTdiagGmin;
++        SPICE_REAL cmin_val = 1e-2;
++        int cmin_steps = ckt->CKTnumCminSteps;
++        SPICE_REAL cmin_factor = ckt->CKTcminFactor;
++        int step;
++
++        /* Note: Starting Cmin stepping */
++
++        for (step = 0; step < cmin_steps; step++) {
++            ckt->CKTdiagGmin = cmin_val;
++            converged = NIiter(ckt, iterlim);
++            if (converged != 0)
++                break;  /* step too small to converge; try final from last good */
++            cmin_val /= cmin_factor;
++        }
++
++        /* Final step: original circuit (no artificial conductance) */
++        ckt->CKTdiagGmin = saved_diagGmin;
++        converged = NIiter(ckt, iterlim);
++
++        if (converged == 0)
++            return converged;
++    }
++
+     /* ... otherwise try stepping sources ...
+      * now, we'll try source stepping - we scale the sources
+      * to 0, converge, then start stepping them up until they
+@@ -162,11 +194,11 @@
+ dynamic_gmin (CKTcircuit *ckt, long int firstmode,
+               long int continuemode, int iterlim)
+ {
+-    double OldGmin, gtarget, factor;
++    SPICE_REAL OldGmin, gtarget, factor;
+     int converged;
+ 
+     int NumNodes, iters, i;
+-    double *OldRhsOld, *OldCKTstate0;
++    SPICE_REAL *OldRhsOld, *OldCKTstate0;
+     CKTnode *n;
+ 
+     ckt->CKTmode = firstmode;
+@@ -176,8 +208,8 @@
+     for (n = ckt->CKTnodes; n; n = n->next)
+         NumNodes++;
+ 
+-    OldRhsOld = TMALLOC(double, NumNodes + 1);
+-    OldCKTstate0 = TMALLOC(double, ckt->CKTnumStates + 1);
++    OldRhsOld = TMALLOC(SPICE_REAL, NumNodes + 1);
++    OldCKTstate0 = TMALLOC(SPICE_REAL, ckt->CKTnumStates + 1);
+ 
+     for (n = ckt->CKTnodes; n; n = n->next)
+         ckt->CKTrhsOld [n->number] = 0;
+@@ -211,7 +243,7 @@
+                 OldRhsOld[i++] = ckt->CKTrhsOld[n->number];
+ 
+             memcpy(OldCKTstate0, ckt->CKTstate0,
+-                   (size_t) ckt->CKTnumStates * sizeof(double));
++                   (size_t) ckt->CKTnumStates * sizeof(SPICE_REAL));
+ 
+             if (iters <= (ckt->CKTdcTrcvMaxIter / 4)) {
+                 factor *= sqrt (factor);
+@@ -245,7 +277,7 @@
+                 ckt->CKTrhsOld[n->number] = OldRhsOld[i++];
+ 
+             memcpy(ckt->CKTstate0, OldCKTstate0,
+-                   (size_t) ckt->CKTnumStates * sizeof(double));
++                   (size_t) ckt->CKTnumStates * sizeof(SPICE_REAL));
+         }
+     }
+ 
+@@ -350,11 +382,11 @@
+ new_gmin(CKTcircuit* ckt, long int firstmode,
+     long int continuemode, int iterlim)
+ {
+-    double OldGmin, gtarget, factor, startgmin;
++    SPICE_REAL OldGmin, gtarget, factor, startgmin;
+     int converged;
+ 
+     int NumNodes, iters, i;
+-    double* OldRhsOld, * OldCKTstate0;
++    SPICE_REAL* OldRhsOld, * OldCKTstate0;
+     CKTnode* n;
+ 
+     ckt->CKTmode = firstmode;
+@@ -364,8 +396,8 @@
+     for (n = ckt->CKTnodes; n; n = n->next)
+         NumNodes++;
+ 
+-    OldRhsOld = TMALLOC(double, NumNodes + 1);
+-    OldCKTstate0 = TMALLOC(double, ckt->CKTnumStates + 1);
++    OldRhsOld = TMALLOC(SPICE_REAL, NumNodes + 1);
++    OldCKTstate0 = TMALLOC(SPICE_REAL, ckt->CKTnumStates + 1);
+ 
+     for (n = ckt->CKTnodes; n; n = n->next)
+         ckt->CKTrhsOld[n->number] = 0;
+@@ -400,7 +432,7 @@
+                 OldRhsOld[i++] = ckt->CKTrhsOld[n->number];
+ 
+             memcpy(OldCKTstate0, ckt->CKTstate0,
+-                (size_t)ckt->CKTnumStates * sizeof(double));
++                (size_t)ckt->CKTnumStates * sizeof(SPICE_REAL));
+ 
+             if (iters <= (ckt->CKTdcTrcvMaxIter / 4)) {
+                 factor *= sqrt(factor);
+@@ -436,7 +468,7 @@
+                 ckt->CKTrhsOld[n->number] = OldRhsOld[i++];
+ 
+             memcpy(ckt->CKTstate0, OldCKTstate0,
+-                (size_t)ckt->CKTnumStates * sizeof(double));
++                (size_t)ckt->CKTnumStates * sizeof(SPICE_REAL));
+         }
+     }
+ 
+@@ -482,9 +514,9 @@
+                long int continuemode, int iterlim)
+ {
+     int converged, i, iters;
+-    double ConvFact;
++    SPICE_REAL ConvFact;
+     CKTnode *n;
+-    double gminstart = ckt->CKTgmin;
++    SPICE_REAL gminstart = ckt->CKTgmin;
+ 
+     NG_IGNORE(iterlim);
+ 
+@@ -552,20 +584,20 @@
+ 
+     if (converged == 0) {
+ 
+-        double *OldRhsOld, *OldCKTstate0, raise = 0.001;
++        SPICE_REAL *OldRhsOld, *OldCKTstate0, raise = 0.001;
+ 
+         int NumNodes = 0;
+         for (n = ckt->CKTnodes; n; n = n->next)
+             NumNodes++;
+ 
+-        OldRhsOld = TMALLOC(double, NumNodes + 1);
+-        OldCKTstate0 = TMALLOC(double, ckt->CKTnumStates + 1);
++        OldRhsOld = TMALLOC(SPICE_REAL, NumNodes + 1);
++        OldCKTstate0 = TMALLOC(SPICE_REAL, ckt->CKTnumStates + 1);
+ 
+         for (i = 0, n = ckt->CKTnodes; n; n = n->next)
+             OldRhsOld[i++] = ckt->CKTrhsOld[n->number];
+ 
+         memcpy(OldCKTstate0, ckt->CKTstate0,
+-               (size_t) ckt->CKTnumStates * sizeof(double));
++               (size_t) ckt->CKTnumStates * sizeof(SPICE_REAL));
+ 
+         if (ft_ngdebug)
+             SPfrontEnd->IFerrorf (ERR_INFO, "One successful source step");
+@@ -594,7 +626,7 @@
+                     OldRhsOld[i++] = ckt->CKTrhsOld[n->number];
+ 
+                 memcpy(OldCKTstate0, ckt->CKTstate0,
+-                       (size_t) ckt->CKTnumStates * sizeof(double));
++                       (size_t) ckt->CKTnumStates * sizeof(SPICE_REAL));
+                 if (ft_ngdebug)
+                     SPfrontEnd->IFerrorf (ERR_INFO, "One successful source step");
+ 
+@@ -632,7 +664,7 @@
+                     ckt->CKTrhsOld[n->number] = OldRhsOld[i++];
+ 
+                 memcpy(ckt->CKTstate0, OldCKTstate0,
+-                       (size_t) ckt->CKTnumStates * sizeof(double));
++                       (size_t) ckt->CKTnumStates * sizeof(SPICE_REAL));
+             }
+ 
+             if (ckt->CKTsrcFact > 1)
+@@ -681,7 +713,7 @@
+     SPfrontEnd->IFerrorf (ERR_INFO, "Starting source stepping");
+ 
+     for (i = 0; i <= ckt->CKTnumSrcSteps; i++) {
+-        ckt->CKTsrcFact = ((double) i) / ((double) ckt->CKTnumSrcSteps);
++        ckt->CKTsrcFact = ((SPICE_REAL) i) / ((SPICE_REAL) ckt->CKTnumSrcSteps);
+ #ifdef XSPICE
+         /* gtri - wbk - add convergence problem reporting flags */
+         ckt->enh->conv_debug.last_NIiter_call = MIF_TRUE;

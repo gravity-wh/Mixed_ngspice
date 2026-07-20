@@ -1,0 +1,98 @@
+--- a/src/include/ngspice/typedefs.h	2026-07-20 15:02:40.182233963 +0800
++++ b/src/include/ngspice/typedefs.h	2026-07-20 15:03:57.166590041 +0800
+@@ -6,6 +6,53 @@
+ #ifndef ngspice_TYPEDEFS_H
+ #define ngspice_TYPEDEFS_H
+ 
++#include "ngspice/config.h"
++
++/* Global floating-point type: float under --enable-single-precision, else SPICE_REAL */
++#ifdef SINGLE_PRECISION
++typedef float SPICE_REAL;
++#define SPICE_SIN(x)  sinf(x)
++#define SPICE_COS(x)  cosf(x)
++#define SPICE_EXP(x)  expf(x)
++#define SPICE_LOG(x)  logf(x)
++#define SPICE_SQRT(x) sqrtf(x)
++#define SPICE_POW(x,y) powf(x,y)
++#define SPICE_FABS(x) fabsf(x)
++#define SPICE_ATAN(x) atanf(x)
++#define SPICE_TAN(x)  tanf(x)
++#define SPICE_TANH(x) tanhf(x)
++#define SPICE_ASINH(x) asinhf(x)
++#define SPICE_FMOD(x,y) fmodf(x,y)
++#define SPICE_HYPOT(x,y) hypotf(x,y)
++#define SPICE_LOG10(x) log10f(x)
++#define SPICE_COSH(x) coshf(x)
++#define SPICE_SINH(x) sinhf(x)
++#define SPICE_ACOSH(x) acoshf(x)
++#define SPICE_CEIL(x) ceilf(x)
++#define SPICE_FLOOR(x) floorf(x)
++#else
++typedef double SPICE_REAL;
++#define SPICE_SIN(x)  sin(x)
++#define SPICE_COS(x)  cos(x)
++#define SPICE_EXP(x)  exp(x)
++#define SPICE_LOG(x)  log(x)
++#define SPICE_SQRT(x) sqrt(x)
++#define SPICE_POW(x,y) pow(x,y)
++#define SPICE_FABS(x) fabs(x)
++#define SPICE_ATAN(x) atan(x)
++#define SPICE_TAN(x)  tan(x)
++#define SPICE_TANH(x) tanh(x)
++#define SPICE_ASINH(x) asinh(x)
++#define SPICE_FMOD(x,y) fmod(x,y)
++#define SPICE_HYPOT(x,y) hypot(x,y)
++#define SPICE_LOG10(x) log10(x)
++#define SPICE_COSH(x) cosh(x)
++#define SPICE_SINH(x) sinh(x)
++#define SPICE_ACOSH(x) acosh(x)
++#define SPICE_CEIL(x) ceil(x)
++#define SPICE_FLOOR(x) floor(x)
++#endif
++
+ 
+ typedef struct CKTcircuit CKTcircuit;
+ typedef struct CKTnode CKTnode;
+--- a/src/maths/sparse/spconfig.h	2026-07-20 15:02:40.186091627 +0800
++++ b/src/maths/sparse/spconfig.h	2026-07-20 15:05:19.236408186 +0800
+@@ -1,3 +1,4 @@
++#include "ngspice/typedefs.h"
+ /*
+  *  CONFIGURATION MACRO DEFINITIONS for sparse matrix routines
+  *
+@@ -53,8 +54,8 @@
+  *      The precision of the arithmetic used by Sparse can be set by
+  *      changing changing the spREAL macro.  This macro is
+  *      contained in the file spMatrix.h.  It is strongly suggested to
+- *      used double precision with circuit simulators.  Note that
+- *      because C always performs arithmetic operations in double
++ *      used SPICE_REAL precision with circuit simulators.  Note that
++ *      because C always performs arithmetic operations in SPICE_REAL
+  *      precision, the only benefit to using single precision is that
+  *      less storage is required.  There is often a noticeable speed
+  *      penalty when using single precision.  Sparse internally refers
+--- /mnt/e/MyResearch/Ngspice/ngspice-46/configure.ac	2026-03-29 17:14:54.000000000 +0800
++++ /mnt/e/MyResearch/Ngspice/ngspice-46_mixed/configure.ac	2026-07-13 14:19:42.000000000 +0800
+@@ -269,6 +269,10 @@
+ AC_ARG_ENABLE([smoketest],
+     [AS_HELP_STRING([--enable-smoketest], [Enable smoketest compile])])
+ 
++# --enable-single-precision: use float instead of double for SPICE_REAL
++AC_ARG_ENABLE([single-precision],
++    [AS_HELP_STRING([--enable-single-precision], [Use single precision (float) instead of double. Default=no.])])
++
+ # --enable-experimental: define EXPERIMENTAL_CODE for the code
+ AC_ARG_ENABLE([experimental],
+     [AS_HELP_STRING([--enable-experimental], [Enable some experimental code])])
+@@ -1044,6 +1048,10 @@
+     AC_DEFINE([EXPERIMENTAL_CODE], [], [Define if we want some experimental code])
+     AC_MSG_RESULT([EXPERIMENTAL_CODE enabled])
+ fi
++if test "x$enable_single_precision" = xyes; then
++    AC_DEFINE([SINGLE_PRECISION], [1], [Define if we want single precision (float) arithmetic])
++    AC_MSG_RESULT([Single precision (float) arithmetic enabled])
++fi
+ if test "x$enable_cpdebug" = xyes; then
+     AC_DEFINE([CPDEBUG], [], [Define if you want to debug ngspice shell])
+     AC_MSG_RESULT([WARNING: Shell debug is enabled])

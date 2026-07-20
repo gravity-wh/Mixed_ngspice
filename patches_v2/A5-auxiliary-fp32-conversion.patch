@@ -1,0 +1,2351 @@
+diff -ruN /tmp/ngspice_patches/step4/src/spicelib/devices/bsim4v5/b4v5acld.c /tmp/ngspice_patches/step5/src/spicelib/devices/bsim4v5/b4v5acld.c
+--- /tmp/ngspice_patches/step4/src/spicelib/devices/bsim4v5/b4v5acld.c	2026-07-20 15:00:12.988495384 +0800
++++ /tmp/ngspice_patches/step5/src/spicelib/devices/bsim4v5/b4v5acld.c	2026-07-20 15:00:13.325480116 +0800
+@@ -15,6 +15,32 @@
+ #include "ngspice/sperror.h"
+ #include "ngspice/suffix.h"
+ 
++// MIXED-PRECISION: fp32 transcendental math
++#define B4V5_FP32_MATH
++#ifdef B4V5_FP32_MATH
++#undef SPICE_EXP
++#undef SPICE_LOG
++#undef SPICE_SQRT
++#undef SPICE_POW
++#undef SPICE_SIN
++#undef SPICE_COS
++#undef SPICE_FABS
++#undef SPICE_ATAN
++#undef SPICE_TAN
++#undef SPICE_TANH
++#define SPICE_EXP(x)  expf((float)(x))
++#define SPICE_LOG(x)  logf((float)(x))
++#define SPICE_SQRT(x) sqrtf((float)(x))
++#define SPICE_POW(x,y) powf((float)(x),(float)(y))
++#define SPICE_SIN(x)  sinf((float)(x))
++#define SPICE_COS(x)  cosf((float)(x))
++#define SPICE_FABS(x) fabsf((float)(x))
++#define SPICE_ATAN(x) atanf((float)(x))
++#define SPICE_TAN(x)  tanf((float)(x))
++#define SPICE_TANH(x) tanhf((float)(x))
++#include "b4v5_fp32_math.h"  /* shared header — supersedes inline macros above */
++#endif
++
+ 
+ int
+ BSIM4v5acLoad(
+@@ -24,35 +50,35 @@
+ BSIM4v5model *model = (BSIM4v5model*)inModel;
+ BSIM4v5instance *here;
+ 
+-double gjbd, gjbs, geltd, gcrg, gcrgg, gcrgd, gcrgs, gcrgb;
+-double xcbgb, xcbdb, xcbsb, xcbbb;
+-double xcggbr, xcgdbr, xcgsbr, xcgbbr, xcggbi, xcgdbi, xcgsbi, xcgbbi;
+-double Cggr, Cgdr, Cgsr, Cgbr, Cggi, Cgdi, Cgsi, Cgbi;
+-double xcddbr, xcdgbr, xcdsbr, xcdbbr, xcsdbr, xcsgbr, xcssbr, xcsbbr;
+-double xcddbi, xcdgbi, xcdsbi, xcdbbi, xcsdbi, xcsgbi, xcssbi, xcsbbi;
+-double xcdbdb, xcsbsb=0.0, xcgmgmb=0.0, xcgmdb=0.0, xcgmsb=0.0, xcdgmb, xcsgmb;
+-double xcgmbb=0.0, xcbgmb;
+-double capbd, capbs, omega;
+-double gstot, gstotd, gstotg, gstots, gstotb, gspr;
+-double gdtot, gdtotd, gdtotg, gdtots, gdtotb, gdpr;
+-double gIstotg, gIstotd, gIstots, gIstotb;
+-double gIdtotg, gIdtotd, gIdtots, gIdtotb;
+-double gIbtotg, gIbtotd, gIbtots, gIbtotb;
+-double gIgtotg, gIgtotd, gIgtots, gIgtotb;
+-double cgso, cgdo, cgbo;
+-double gbspsp, gbbdp, gbbsp, gbspg, gbspb;
+-double gbspdp, gbdpdp, gbdpg, gbdpb, gbdpsp;
+-double T0=0.0, T1, T2, T3;
+-double Csg, Csd, Css;
+-double Cdgr, Cddr, Cdsr, Cdbr, Csgr, Csdr, Cssr, Csbr;
+-double Cdgi, Cddi, Cdsi, Cdbi, Csgi, Csdi, Cssi, Csbi;
+-double gmr, gmi, gmbsr, gmbsi, gdsr, gdsi;
+-double FwdSumr, RevSumr, Gmr, Gmbsr;
+-double FwdSumi, RevSumi, Gmi, Gmbsi;
++SPICE_REAL gjbd, gjbs, geltd, gcrg, gcrgg, gcrgd, gcrgs, gcrgb;
++SPICE_REAL xcbgb, xcbdb, xcbsb, xcbbb;
++SPICE_REAL xcggbr, xcgdbr, xcgsbr, xcgbbr, xcggbi, xcgdbi, xcgsbi, xcgbbi;
++SPICE_REAL Cggr, Cgdr, Cgsr, Cgbr, Cggi, Cgdi, Cgsi, Cgbi;
++SPICE_REAL xcddbr, xcdgbr, xcdsbr, xcdbbr, xcsdbr, xcsgbr, xcssbr, xcsbbr;
++SPICE_REAL xcddbi, xcdgbi, xcdsbi, xcdbbi, xcsdbi, xcsgbi, xcssbi, xcsbbi;
++SPICE_REAL xcdbdb, xcsbsb=0.0, xcgmgmb=0.0, xcgmdb=0.0, xcgmsb=0.0, xcdgmb, xcsgmb;
++SPICE_REAL xcgmbb=0.0, xcbgmb;
++SPICE_REAL capbd, capbs, omega;
++SPICE_REAL gstot, gstotd, gstotg, gstots, gstotb, gspr;
++SPICE_REAL gdtot, gdtotd, gdtotg, gdtots, gdtotb, gdpr;
++SPICE_REAL gIstotg, gIstotd, gIstots, gIstotb;
++SPICE_REAL gIdtotg, gIdtotd, gIdtots, gIdtotb;
++SPICE_REAL gIbtotg, gIbtotd, gIbtots, gIbtotb;
++SPICE_REAL gIgtotg, gIgtotd, gIgtots, gIgtotb;
++SPICE_REAL cgso, cgdo, cgbo;
++SPICE_REAL gbspsp, gbbdp, gbbsp, gbspg, gbspb;
++SPICE_REAL gbspdp, gbdpdp, gbdpg, gbdpb, gbdpsp;
++SPICE_REAL T0=0.0, T1, T2, T3;
++SPICE_REAL Csg, Csd, Css;
++SPICE_REAL Cdgr, Cddr, Cdsr, Cdbr, Csgr, Csdr, Cssr, Csbr;
++SPICE_REAL Cdgi, Cddi, Cdsi, Cdbi, Csgi, Csdi, Cssi, Csbi;
++SPICE_REAL gmr, gmi, gmbsr, gmbsi, gdsr, gdsi;
++SPICE_REAL FwdSumr, RevSumr, Gmr, Gmbsr;
++SPICE_REAL FwdSumi, RevSumi, Gmi, Gmbsi;
+ struct bsim4v5SizeDependParam *pParam;
+-double ggidld, ggidlg, ggidlb, ggislg, ggislb, ggisls;
++SPICE_REAL ggidld, ggidlg, ggidlb, ggislg, ggislb, ggisls;
+ 
+-double m;
++SPICE_REAL m;
+ 
+     omega = ckt->CKTomega;
+     for (; model != NULL; model = BSIM4v5nextModel(model)) 
+diff -ruN /tmp/ngspice_patches/step4/src/spicelib/devices/bsim4v5/b4v5geo.c /tmp/ngspice_patches/step5/src/spicelib/devices/bsim4v5/b4v5geo.c
+--- /tmp/ngspice_patches/step4/src/spicelib/devices/bsim4v5/b4v5geo.c	2026-07-20 15:00:12.988495384 +0800
++++ /tmp/ngspice_patches/step5/src/spicelib/devices/bsim4v5/b4v5geo.c	2026-07-20 15:00:13.336839152 +0800
+@@ -11,6 +11,11 @@
+ #include "ngspice/ngspice.h"
+ #include "bsim4v5def.h"
+ 
++/* MIXED-PRECISION Phase 1A: use float for all local geometry calculations.
++ * These are pure linear operations (+, -, *, /), called once during setup.
++ * No exp/log/sqrt/pow — fp32 is perfectly safe here. */
++typedef float b4v5_real;
++
+ /*
+  * WDLiu:
+  * This subrutine is a special module to process the geometry dependent
+@@ -19,34 +24,35 @@
+  */
+ 
+ int
+-BSIM4v5RdsEndIso(double, double, double, double, double, double, int, int, double *);
++BSIM4v5RdsEndIso(SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, int, int, SPICE_REAL *);
+ int
+-BSIM4v5RdsEndSha(double, double, double, double, double, double, int, int, double *);
++BSIM4v5RdsEndSha(SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, int, int, SPICE_REAL *);
+ 
+ static int
+ BSIM4v5NumFingerDiff(
+-double nf,
++SPICE_REAL nf,
+ int minSD,
+-double *nuIntD, double *nuEndD, double *nuIntS, double *nuEndS)
++SPICE_REAL *nuIntD, SPICE_REAL *nuEndD, SPICE_REAL *nuIntS, SPICE_REAL *nuEndS)
+ {
+ int NF;
+-        NF = (int)nf;
++b4v5_real fnf = (b4v5_real)nf;
++        NF = (int)fnf;
+ 	if ((NF%2) != 0)
+-	{   *nuEndD = *nuEndS = 1.0;
+-	    *nuIntD = *nuIntS = 2.0 * MAX((nf - 1.0) / 2.0, 0.0);
++	{   *nuEndD = *nuEndS = (SPICE_REAL)1.0f;
++	    *nuIntD = *nuIntS = (SPICE_REAL)(2.0f * MAX((fnf - 1.0f) / 2.0f, 0.0f));
+ 	}
+ 	else
+ 	{   if (minSD == 1) /* minimize # of source */
+-	    {   *nuEndD = 2.0;
+-		*nuIntD = 2.0 * MAX((nf / 2.0 - 1.0), 0.0);
+-		*nuEndS = 0.0;
+-		*nuIntS = nf;
++	    {   *nuEndD = (SPICE_REAL)2.0f;
++		*nuIntD = (SPICE_REAL)(2.0f * MAX((fnf / 2.0f - 1.0f), 0.0f));
++		*nuEndS = (SPICE_REAL)0.0f;
++		*nuIntS = (SPICE_REAL)fnf;
+ 	    }
+ 	    else
+-	    {   *nuEndD = 0.0;
+-                *nuIntD = nf;
+-                *nuEndS = 2.0;
+-                *nuIntS = 2.0 * MAX((nf / 2.0 - 1.0), 0.0);
++	    {   *nuEndD = (SPICE_REAL)0.0f;
++                *nuIntD = (SPICE_REAL)fnf;
++                *nuEndS = (SPICE_REAL)2.0f;
++                *nuIntS = (SPICE_REAL)(2.0f * MAX((fnf / 2.0f - 1.0f), 0.0f));
+ 	    }
+ 	}
+ return 0;
+@@ -55,100 +61,109 @@
+ 
+ int
+ BSIM4v5PAeffGeo(
+-double nf,
++SPICE_REAL nf,
+ int geo, int minSD,
+-double Weffcj, double DMCG, double DMCI, double DMDG,
+-double *Ps, double *Pd, double *As, double *Ad)
++SPICE_REAL Weffcj, SPICE_REAL DMCG, SPICE_REAL DMCI, SPICE_REAL DMDG,
++SPICE_REAL *Ps, SPICE_REAL *Pd, SPICE_REAL *As, SPICE_REAL *Ad)
+ {
+-double T0, T1, T2;
+-double ADiso, ADsha, ADmer, ASiso, ASsha, ASmer;
+-double PDiso, PDsha, PDmer, PSiso, PSsha, PSmer;
+-double nuIntD = 0.0, nuEndD = 0.0, nuIntS = 0.0, nuEndS = 0.0;
++b4v5_real T0, T1, T2;
++b4v5_real ADiso, ADsha, ADmer, ASiso, ASsha, ASmer;
++b4v5_real PDiso, PDsha, PDmer, PSiso, PSsha, PSmer;
++b4v5_real nuIntD = 0.0f, nuEndD = 0.0f, nuIntS = 0.0f, nuEndS = 0.0f;
++b4v5_real fWcj = (b4v5_real)Weffcj;
++b4v5_real fDMCG = (b4v5_real)DMCG;
++b4v5_real fDMCI = (b4v5_real)DMCI;
++b4v5_real fDMDG = (b4v5_real)DMDG;
++b4v5_real fnf = (b4v5_real)nf;
+ 
+ 	if (geo < 9) /* For geo = 9 and 10, the numbers of S/D diffusions already known */
+-	BSIM4v5NumFingerDiff(nf, minSD, &nuIntD, &nuEndD, &nuIntS, &nuEndS);
++	{   SPICE_REAL snuIntD, snuEndD, snuIntS, snuEndS;
++	    BSIM4v5NumFingerDiff(nf, minSD, &snuIntD, &snuEndD, &snuIntS, &snuEndS);
++	    nuIntD = (b4v5_real)snuIntD; nuEndD = (b4v5_real)snuEndD;
++	    nuIntS = (b4v5_real)snuIntS; nuEndS = (b4v5_real)snuEndS;
++	}
+ 
+-	T0 = DMCG + DMCI;
+-	T1 = DMCG + DMCG;
+-	T2 = DMDG + DMDG;
++	T0 = fDMCG + fDMCI;
++	T1 = fDMCG + fDMCG;
++	T2 = fDMDG + fDMDG;
+ 
+-	PSiso = PDiso = T0 + T0 + Weffcj;
++	PSiso = PDiso = T0 + T0 + fWcj;
+ 	PSsha = PDsha = T1;
+ 	PSmer = PDmer = T2;
+ 
+-	ASiso = ADiso = T0 * Weffcj;
+-	ASsha = ADsha = DMCG * Weffcj;
+-	ASmer = ADmer = DMDG * Weffcj;
++	ASiso = ADiso = T0 * fWcj;
++	ASsha = ADsha = fDMCG * fWcj;
++	ASmer = ADmer = fDMDG * fWcj;
+ 
+ 	switch(geo)
+ 	{   case 0:
+-		*Ps = nuEndS * PSiso + nuIntS * PSsha;
+-		*Pd = nuEndD * PDiso + nuIntD * PDsha;
+-		*As = nuEndS * ASiso + nuIntS * ASsha;
+-		*Ad = nuEndD * ADiso + nuIntD * ADsha;
++		*Ps = (SPICE_REAL)(nuEndS * PSiso + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDiso + nuIntD * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASiso + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADiso + nuIntD * ADsha);
+ 		break;
+ 	    case 1:
+-                *Ps = nuEndS * PSiso + nuIntS * PSsha;
+-                *Pd = (nuEndD + nuIntD) * PDsha;
+-                *As = nuEndS * ASiso + nuIntS * ASsha;
+-                *Ad = (nuEndD + nuIntD) * ADsha;
+-                break;
+-            case 2:
+-                *Ps = (nuEndS + nuIntS) * PSsha;
+-                *Pd = nuEndD * PDiso + nuIntD * PDsha;
+-                *As = (nuEndS + nuIntS) * ASsha;
+-                *Ad = nuEndD * ADiso + nuIntD * ADsha;
+-                break;
+-            case 3:
+-                *Ps = (nuEndS + nuIntS) * PSsha;
+-                *Pd = (nuEndD + nuIntD) * PDsha;
+-                *As = (nuEndS + nuIntS) * ASsha;
+-                *Ad = (nuEndD + nuIntD) * ADsha;
+-                break;
+-            case 4:
+-                *Ps = nuEndS * PSiso + nuIntS * PSsha;
+-                *Pd = nuEndD * PDmer + nuIntD * PDsha;
+-                *As = nuEndS * ASiso + nuIntS * ASsha;
+-                *Ad = nuEndD * ADmer + nuIntD * ADsha;
+-                break;
+-            case 5:
+-                *Ps = (nuEndS + nuIntS) * PSsha;
+-                *Pd = nuEndD * PDmer + nuIntD * PDsha;
+-                *As = (nuEndS + nuIntS) * ASsha;
+-                *Ad = nuEndD * ADmer + nuIntD * ADsha;
+-                break;
+-            case 6:
+-                *Ps = nuEndS * PSmer + nuIntS * PSsha;
+-                *Pd = nuEndD * PDiso + nuIntD * PDsha;
+-                *As = nuEndS * ASmer + nuIntS * ASsha;
+-                *Ad = nuEndD * ADiso + nuIntD * ADsha;
+-                break;
+-            case 7:
+-                *Ps = nuEndS * PSmer + nuIntS * PSsha;
+-                *Pd = (nuEndD + nuIntD) * PDsha;
+-                *As = nuEndS * ASmer + nuIntS * ASsha;
+-                *Ad = (nuEndD + nuIntD) * ADsha;
+-                break;
+-            case 8:
+-                *Ps = nuEndS * PSmer + nuIntS * PSsha;
+-                *Pd = nuEndD * PDmer + nuIntD * PDsha;
+-                *As = nuEndS * ASmer + nuIntS * ASsha;
+-                *Ad = nuEndD * ADmer + nuIntD * ADsha;
+-                break;
+-            case 9: /* geo = 9 and 10 happen only when nf = even */
+-                *Ps = PSiso + (nf - 1.0) * PSsha;
+-                *Pd = nf * PDsha;
+-                *As = ASiso + (nf - 1.0) * ASsha;
+-                *Ad = nf * ADsha;
+-                break;
+-            case 10:
+-                *Ps = nf * PSsha;
+-                *Pd = PDiso + (nf - 1.0) * PDsha;
+-                *As = nf * ASsha;
+-                *Ad = ADiso + (nf - 1.0) * ADsha;
+-                break;
++		*Ps = (SPICE_REAL)(nuEndS * PSiso + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)((nuEndD + nuIntD) * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASiso + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)((nuEndD + nuIntD) * ADsha);
++		break;
++	    case 2:
++		*Ps = (SPICE_REAL)((nuEndS + nuIntS) * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDiso + nuIntD * PDsha);
++		*As = (SPICE_REAL)((nuEndS + nuIntS) * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADiso + nuIntD * ADsha);
++		break;
++	    case 3:
++		*Ps = (SPICE_REAL)((nuEndS + nuIntS) * PSsha);
++		*Pd = (SPICE_REAL)((nuEndD + nuIntD) * PDsha);
++		*As = (SPICE_REAL)((nuEndS + nuIntS) * ASsha);
++		*Ad = (SPICE_REAL)((nuEndD + nuIntD) * ADsha);
++		break;
++	    case 4:
++		*Ps = (SPICE_REAL)(nuEndS * PSiso + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDmer + nuIntD * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASiso + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADmer + nuIntD * ADsha);
++		break;
++	    case 5:
++		*Ps = (SPICE_REAL)((nuEndS + nuIntS) * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDmer + nuIntD * PDsha);
++		*As = (SPICE_REAL)((nuEndS + nuIntS) * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADmer + nuIntD * ADsha);
++		break;
++	    case 6:
++		*Ps = (SPICE_REAL)(nuEndS * PSmer + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDiso + nuIntD * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASmer + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADiso + nuIntD * ADsha);
++		break;
++	    case 7:
++		*Ps = (SPICE_REAL)(nuEndS * PSmer + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)((nuEndD + nuIntD) * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASmer + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)((nuEndD + nuIntD) * ADsha);
++		break;
++	    case 8:
++		*Ps = (SPICE_REAL)(nuEndS * PSmer + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDmer + nuIntD * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASmer + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADmer + nuIntD * ADsha);
++		break;
++	    case 9: /* geo = 9 and 10 happen only when nf = even */
++		*Ps = (SPICE_REAL)(PSiso + (fnf - 1.0f) * PSsha);
++		*Pd = (SPICE_REAL)(fnf * PDsha);
++		*As = (SPICE_REAL)(ASiso + (fnf - 1.0f) * ASsha);
++		*Ad = (SPICE_REAL)(fnf * ADsha);
++		break;
++	    case 10:
++		*Ps = (SPICE_REAL)(fnf * PSsha);
++		*Pd = (SPICE_REAL)(PDiso + (fnf - 1.0f) * PDsha);
++		*As = (SPICE_REAL)(fnf * ASsha);
++		*Ad = (SPICE_REAL)(ADiso + (fnf - 1.0f) * ADsha);
++		break;
+ 	    default:
+-		printf("Warning: Specified GEO = %d not matched\n", geo); 
++		printf("Warning: Specified GEO = %d not matched\n", geo);
+ 	}
+ return 0;
+ }
+@@ -156,14 +171,14 @@
+ 
+ int
+ BSIM4v5RdseffGeo(
+-double nf,
++SPICE_REAL nf,
+ int geo, int rgeo, int minSD,
+-double Weffcj, double Rsh, double DMCG, double DMCI, double DMDG,
++SPICE_REAL Weffcj, SPICE_REAL Rsh, SPICE_REAL DMCG, SPICE_REAL DMCI, SPICE_REAL DMDG,
+ int Type,
+-double *Rtot)
++SPICE_REAL *Rtot)
+ {
+-double Rint=0.0, Rend = 0.0;
+-double nuIntD = 0.0, nuEndD = 0.0, nuIntS = 0.0, nuEndS = 0.0;
++SPICE_REAL Rint=0.0, Rend = 0.0;
++SPICE_REAL nuIntD = 0.0, nuEndD = 0.0, nuIntS = 0.0, nuEndS = 0.0;
+ 
+         if (geo < 9) /* since geo = 9 and 10 only happen when nf = even */
+         {   BSIM4v5NumFingerDiff(nf, minSD, &nuIntD, &nuEndD, &nuIntS, &nuEndS);
+@@ -276,10 +291,10 @@
+ 
+ int
+ BSIM4v5RdsEndIso(
+-double Weffcj, double Rsh, double DMCG, double DMCI, double DMDG,
+-double nuEnd,
++SPICE_REAL Weffcj, SPICE_REAL Rsh, SPICE_REAL DMCG, SPICE_REAL DMCI, SPICE_REAL DMDG,
++SPICE_REAL nuEnd,
+ int rgeo, int Type,
+-double *Rend)
++SPICE_REAL *Rend)
+ {	
+ 	NG_IGNORE(DMDG);
+ 
+@@ -337,10 +352,10 @@
+ 
+ int
+ BSIM4v5RdsEndSha(
+-double Weffcj, double Rsh, double DMCG, double DMCI, double DMDG,
+-double nuEnd,
++SPICE_REAL Weffcj, SPICE_REAL Rsh, SPICE_REAL DMCG, SPICE_REAL DMCI, SPICE_REAL DMDG,
++SPICE_REAL nuEnd,
+ int rgeo, int Type,
+-double *Rend)
++SPICE_REAL *Rend)
+ {
+         NG_IGNORE(DMCI);
+         NG_IGNORE(DMDG);
+diff -ruN /tmp/ngspice_patches/step4/src/spicelib/devices/bsim4v5/b4v5noi.c /tmp/ngspice_patches/step5/src/spicelib/devices/bsim4v5/b4v5noi.c
+--- /tmp/ngspice_patches/step4/src/spicelib/devices/bsim4v5/b4v5noi.c	2026-07-20 15:00:12.988495384 +0800
++++ /tmp/ngspice_patches/step5/src/spicelib/devices/bsim4v5/b4v5noi.c	2026-07-20 15:00:13.302762044 +0800
+@@ -22,6 +22,39 @@
+ #include "ngspice/suffix.h"
+ #include "ngspice/const.h"
+ 
++// MIXED-PRECISION: fp32 transcendental math
++#ifdef SINGLE_PRECISION
++extern unsigned long long g_double_ops;
++#define COUNT_DOUBLE_OPS(n) g_double_ops += (n)
++#else
++#define COUNT_DOUBLE_OPS(n) do {} while(0)
++#include "b4v5_fp32_math.h"  /* shared header — supersedes inline macros above */
++#endif
++#define B4V5_FP32_MATH
++#ifdef B4V5_FP32_MATH
++#undef SPICE_EXP
++#undef SPICE_LOG
++#undef SPICE_SQRT
++#undef SPICE_POW
++#undef SPICE_SIN
++#undef SPICE_COS
++#undef SPICE_FABS
++#undef SPICE_ATAN
++#undef SPICE_TAN
++#undef SPICE_TANH
++#define SPICE_EXP(x)  expf((float)(x))
++#define SPICE_LOG(x)  logf((float)(x))
++#define SPICE_SQRT(x) sqrtf((float)(x))
++#define SPICE_POW(x,y) powf((float)(x),(float)(y))
++#define SPICE_SIN(x)  sinf((float)(x))
++#define SPICE_COS(x)  cosf((float)(x))
++#define SPICE_FABS(x) fabsf((float)(x))
++#define SPICE_ATAN(x) atanf((float)(x))
++#define SPICE_TAN(x)  tanf((float)(x))
++#define SPICE_TANH(x) tanhf((float)(x))
++#include "b4v5_fp32_math.h"  /* shared header — supersedes inline macros above */
++#endif
++
+ 
+ /*
+  * WDL: 1/f noise model has been smoothed out and enhanced with
+@@ -29,16 +62,16 @@
+  * conversion into the SI unit system.
+  */
+ 
+-static double
++static SPICE_REAL
+ BSIM4v5Eval1ovFNoise(
+-double Vds,
++SPICE_REAL Vds,
+ BSIM4v5model *model,
+ BSIM4v5instance *here,
+-double freq, double temp)
++SPICE_REAL freq, SPICE_REAL temp)
+ {
+ struct bsim4v5SizeDependParam *pParam;
+-double cd, esat, DelClm, EffFreq, N0, Nl, Leff, Leffsq;
+-double T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, Ssi;
++SPICE_REAL cd, esat, DelClm, EffFreq, N0, Nl, Leff, Leffsq;
++SPICE_REAL T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, Ssi;
+ 
+     pParam = here->pParam;
+     cd = fabs(here->BSIM4v5cd);
+@@ -59,6 +92,57 @@
+     Nl = model->BSIM4v5coxe * here->BSIM4v5Vgsteff
+        * (1.0 - here->BSIM4v5AbovVgst2Vtm * here->BSIM4v5Vdseff) / CHARGE;
+ 
++#ifdef SINGLE_PRECISION
++    /* FP64 island: oxideTrapDensity defaults (NOIA=6.25e41 NMOS, 6.188e40 PMOS)
++     * exceed FLT_MAX(3.4e38) → stored as +Inf in the float model struct.
++     * Recompute in double from the model type flag, then compute T3-T9 in
++     * double to keep intermediate products within FP64 range.  ~50 double ops
++     * per call, ~80 frequency points × ~5 devices = ~20k ops per .noise run. */
++    {
++        double d_otA, d_otB, d_otC;
++        double d_T3, d_T4, d_T5, d_T6, d_T7, d_T8, d_T9, d_Ssi;
++        double d_cd, d_N0, d_Nl, d_Leff, d_Leffsq, d_EffFreq;
++
++        if (model->BSIM4v5type == NMOS) {
++            d_otA = 6.25e41;   d_otB = 3.125e26;  d_otC = 8.75e9;
++        } else {
++            d_otA = 6.188e40;  d_otB = 1.5e25;    d_otC = 8.75e9;
++        }
++        /* User-overridden NOIA/NOIB/NOIC: if given, the float-stored values
++         * are below FLT_MAX (valid).  Cast to double for consistent precision. */
++        if (model->BSIM4v5oxideTrapDensityAGiven)
++            d_otA = (double)model->BSIM4v5oxideTrapDensityA;
++        if (model->BSIM4v5oxideTrapDensityBGiven)
++            d_otB = (double)model->BSIM4v5oxideTrapDensityB;
++        if (model->BSIM4v5oxideTrapDensityCGiven)
++            d_otC = (double)model->BSIM4v5oxideTrapDensityC;
++
++        d_cd     = (double)cd;
++        d_N0     = (double)N0;
++        d_Nl     = (double)Nl;
++        d_Leff   = (double)Leff;
++        d_Leffsq = (double)Leffsq;
++        d_EffFreq = (double)EffFreq;
++        COUNT_DOUBLE_OPS(12);  /* 10 loads + 2 branches for model type */
++
++        d_T3 = d_otA
++             * log(MAX(((d_N0 + (double)here->BSIM4v5nstar)
++                      / (d_Nl + (double)here->BSIM4v5nstar)), (double)N_MINLOG));
++        d_T4 = d_otB * (d_N0 - d_Nl);
++        d_T5 = d_otC * 0.5 * (d_N0 * d_N0 - d_Nl * d_Nl);
++
++        d_T6 = (double)CONSTboltz * (double)temp * d_cd * d_cd;
++        d_T7 = 1.0e10 * d_EffFreq * d_Leffsq
++             * (double)pParam->BSIM4v5weff * (double)here->BSIM4v5nf;
++        d_T8 = d_otA + d_otB * d_Nl + d_otC * d_Nl * d_Nl;
++        d_T9 = (d_Nl + (double)here->BSIM4v5nstar)
++             * (d_Nl + (double)here->BSIM4v5nstar);
++        d_Ssi = (double)T1 / (double)T2 * (d_T3 + d_T4 + d_T5)
++              + d_T6 / d_T7 * (double)DelClm * d_T8 / d_T9;
++        COUNT_DOUBLE_OPS(40);  /* ~40 arithmetic ops in the block above */
++        return (SPICE_REAL)d_Ssi;
++    }
++#else
+     T3 = model->BSIM4v5oxideTrapDensityA
+        * log(MAX(((N0 + here->BSIM4v5nstar) / (Nl + here->BSIM4v5nstar)), N_MINLOG));
+     T4 = model->BSIM4v5oxideTrapDensityB * (N0 - Nl);
+@@ -71,6 +155,8 @@
+     T9 = (Nl + here->BSIM4v5nstar) * (Nl + here->BSIM4v5nstar);
+     Ssi = T1 / T2 * (T3 + T4 + T5) + T6 / T7 * DelClm * T8 / T9;
+     return Ssi;
++#include "b4v5_fp32_math.h"  /* shared header — supersedes inline macros above */
++#endif
+ }
+ 
+ 
+@@ -80,23 +166,23 @@
+ GENmodel *inModel,
+ CKTcircuit *ckt,
+ Ndata *data,
+-double *OnDens)
++SPICE_REAL *OnDens)
+ {
+ NOISEAN *job = (NOISEAN *) ckt->CKTcurJob;
+ 
+ BSIM4v5model *model = (BSIM4v5model *)inModel;
+ BSIM4v5instance *here;
+ struct bsim4v5SizeDependParam *pParam;
+-double tempOnoise;
+-double tempInoise;
+-double noizDens[BSIM4v5NSRCS];
+-double lnNdens[BSIM4v5NSRCS];
+-
+-double T0, T1, T2, T5, T10, T11;
+-double Vds, Ssi, Swi;
+-double tmp=0.0, gdpr, gspr, npart_theta=0.0, npart_beta=0.0, igsquare, bodymode;
++SPICE_REAL tempOnoise;
++SPICE_REAL tempInoise;
++SPICE_REAL noizDens[BSIM4v5NSRCS];
++SPICE_REAL lnNdens[BSIM4v5NSRCS];
++
++SPICE_REAL T0, T1, T2, T5, T10, T11;
++SPICE_REAL Vds, Ssi, Swi;
++SPICE_REAL tmp=0.0, gdpr, gspr, npart_theta=0.0, npart_beta=0.0, igsquare, bodymode;
+ 
+-double m;
++SPICE_REAL m;
+ 
+ int i;
+ 
+@@ -335,7 +421,7 @@
+ 
+                               NevalSrc(&noizDens[BSIM4v5FLNOIZ], NULL,
+                                        ckt, N_GAIN, here->BSIM4v5dNodePrime,
+-                                       here->BSIM4v5sNodePrime, (double) 0.0);
++                                       here->BSIM4v5sNodePrime, (SPICE_REAL) 0.0);
+ 
+                               switch(model->BSIM4v5fnoiMod)
+                               {  case 0:
+@@ -355,6 +441,37 @@
+ 
+                                       Ssi = BSIM4v5Eval1ovFNoise(Vds, model, here,
+                                           data->freq, ckt->CKTtemp);
++#ifdef SINGLE_PRECISION
++                                      /* FP64 island: T10/T11/Swi also use oxideTrapDensityA
++                                       * which is +Inf in float → protect with double */
++                                      {   double d_otA;
++                                          if (model->BSIM4v5oxideTrapDensityAGiven)
++                                              d_otA = (double)model->BSIM4v5oxideTrapDensityA;
++                                          else if (model->BSIM4v5type == NMOS)
++                                              d_otA = 6.25e41;
++                                          else
++                                              d_otA = 6.188e40;
++                                          double d_T10 = d_otA * (double)CONSTboltz
++                                                       * (double)ckt->CKTtemp;
++                                          double d_T11 = (double)pParam->BSIM4v5weff
++                                                       * (double)here->BSIM4v5nf
++                                                       * (double)pParam->BSIM4v5leff
++                                                       * pow((double)data->freq,
++                                                             (double)model->BSIM4v5ef)
++                                                       * 1.0e10
++                                                       * (double)here->BSIM4v5nstar
++                                                       * (double)here->BSIM4v5nstar;
++                                          double d_cd = (double)here->BSIM4v5cd;
++                                          double d_Swi = d_T10 / d_T11 * d_cd * d_cd;
++                                          double d_Ssi = (double)Ssi;
++                                          double d_T1 = d_Swi + d_Ssi;
++                                          COUNT_DOUBLE_OPS(18);
++                                          if (d_T1 > 0.0)
++                                              noizDens[BSIM4v5FLNOIZ] *= (SPICE_REAL)(m * (d_Ssi * d_Swi) / d_T1);
++                                          else
++                                              noizDens[BSIM4v5FLNOIZ] *= 0.0;
++                                      }
++#else
+                                       T10 = model->BSIM4v5oxideTrapDensityA
+                                           * CONSTboltz * ckt->CKTtemp;
+                                       T11 = pParam->BSIM4v5weff * here->BSIM4v5nf * pParam->BSIM4v5leff
+@@ -367,6 +484,8 @@
+                                           noizDens[BSIM4v5FLNOIZ] *= m * (Ssi * Swi) / T1;
+                                       else
+                                           noizDens[BSIM4v5FLNOIZ] *= 0.0;
++#include "b4v5_fp32_math.h"  /* shared header — supersedes inline macros above */
++#endif
+                                       break;
+                               }
+ 
+diff -ruN /tmp/ngspice_patches/step4/src/spicelib/devices/bsim4v5/b4v5pzld.c /tmp/ngspice_patches/step5/src/spicelib/devices/bsim4v5/b4v5pzld.c
+--- /tmp/ngspice_patches/step4/src/spicelib/devices/bsim4v5/b4v5pzld.c	2026-07-20 15:00:12.988495384 +0800
++++ /tmp/ngspice_patches/step5/src/spicelib/devices/bsim4v5/b4v5pzld.c	2026-07-20 15:00:13.310334734 +0800
+@@ -16,6 +16,32 @@
+ #include "bsim4v5def.h"
+ #include "ngspice/suffix.h"
+ 
++// MIXED-PRECISION: fp32 transcendental math
++#define B4V5_FP32_MATH
++#ifdef B4V5_FP32_MATH
++#undef SPICE_EXP
++#undef SPICE_LOG
++#undef SPICE_SQRT
++#undef SPICE_POW
++#undef SPICE_SIN
++#undef SPICE_COS
++#undef SPICE_FABS
++#undef SPICE_ATAN
++#undef SPICE_TAN
++#undef SPICE_TANH
++#define SPICE_EXP(x)  expf((float)(x))
++#define SPICE_LOG(x)  logf((float)(x))
++#define SPICE_SQRT(x) sqrtf((float)(x))
++#define SPICE_POW(x,y) powf((float)(x),(float)(y))
++#define SPICE_SIN(x)  sinf((float)(x))
++#define SPICE_COS(x)  cosf((float)(x))
++#define SPICE_FABS(x) fabsf((float)(x))
++#define SPICE_ATAN(x) atanf((float)(x))
++#define SPICE_TAN(x)  tanf((float)(x))
++#define SPICE_TANH(x) tanhf((float)(x))
++#include "b4v5_fp32_math.h"  /* shared header — supersedes inline macros above */
++#endif
++
+ int
+ BSIM4v5pzLoad(
+ GENmodel *inModel,
+@@ -25,30 +51,30 @@
+ BSIM4v5model *model = (BSIM4v5model*)inModel;
+ BSIM4v5instance *here;
+ 
+-double gjbd, gjbs, geltd, gcrg, gcrgg, gcrgd, gcrgs, gcrgb;
+-double xcggb, xcgdb, xcgsb, xcgbb, xcbgb, xcbdb, xcbsb, xcbbb;
+-double xcdgb, xcddb, xcdsb, xcdbb, xcsgb, xcsdb, xcssb, xcsbb;
+-double gds, capbd, capbs, FwdSum, RevSum, Gm, Gmbs;
+-double gstot, gstotd, gstotg, gstots, gstotb, gspr;
+-double gdtot, gdtotd, gdtotg, gdtots, gdtotb, gdpr;
+-double gIstotg, gIstotd, gIstots, gIstotb;
+-double gIdtotg, gIdtotd, gIdtots, gIdtotb;
+-double gIbtotg, gIbtotd, gIbtots, gIbtotb;
+-double gIgtotg, gIgtotd, gIgtots, gIgtotb;
+-double cgso, cgdo, cgbo;
+-double xcdbdb=0.0, xcsbsb=0.0, xcgmgmb=0.0, xcgmdb=0.0, xcgmsb=0.0, xcdgmb=0.0, xcsgmb=0.0;
+-double xcgmbb=0.0, xcbgmb=0.0;
+-double dxpart, sxpart, xgtg, xgtd, xgts, xgtb, xcqgb=0.0, xcqdb=0.0, xcqsb=0.0, xcqbb=0.0;
+-double gbspsp, gbbdp, gbbsp, gbspg, gbspb;
+-double gbspdp, gbdpdp, gbdpg, gbdpb, gbdpsp;
+-double ddxpart_dVd, ddxpart_dVg, ddxpart_dVb, ddxpart_dVs;
+-double dsxpart_dVd, dsxpart_dVg, dsxpart_dVb, dsxpart_dVs;
+-double T0=0.0, T1, CoxWL, qcheq, Cdg, Cdd, Cds, Csg, Csd, Css;
+-double ScalingFactor = 1.0e-9;
++SPICE_REAL gjbd, gjbs, geltd, gcrg, gcrgg, gcrgd, gcrgs, gcrgb;
++SPICE_REAL xcggb, xcgdb, xcgsb, xcgbb, xcbgb, xcbdb, xcbsb, xcbbb;
++SPICE_REAL xcdgb, xcddb, xcdsb, xcdbb, xcsgb, xcsdb, xcssb, xcsbb;
++SPICE_REAL gds, capbd, capbs, FwdSum, RevSum, Gm, Gmbs;
++SPICE_REAL gstot, gstotd, gstotg, gstots, gstotb, gspr;
++SPICE_REAL gdtot, gdtotd, gdtotg, gdtots, gdtotb, gdpr;
++SPICE_REAL gIstotg, gIstotd, gIstots, gIstotb;
++SPICE_REAL gIdtotg, gIdtotd, gIdtots, gIdtotb;
++SPICE_REAL gIbtotg, gIbtotd, gIbtots, gIbtotb;
++SPICE_REAL gIgtotg, gIgtotd, gIgtots, gIgtotb;
++SPICE_REAL cgso, cgdo, cgbo;
++SPICE_REAL xcdbdb=0.0, xcsbsb=0.0, xcgmgmb=0.0, xcgmdb=0.0, xcgmsb=0.0, xcdgmb=0.0, xcsgmb=0.0;
++SPICE_REAL xcgmbb=0.0, xcbgmb=0.0;
++SPICE_REAL dxpart, sxpart, xgtg, xgtd, xgts, xgtb, xcqgb=0.0, xcqdb=0.0, xcqsb=0.0, xcqbb=0.0;
++SPICE_REAL gbspsp, gbbdp, gbbsp, gbspg, gbspb;
++SPICE_REAL gbspdp, gbdpdp, gbdpg, gbdpb, gbdpsp;
++SPICE_REAL ddxpart_dVd, ddxpart_dVg, ddxpart_dVb, ddxpart_dVs;
++SPICE_REAL dsxpart_dVd, dsxpart_dVg, dsxpart_dVb, dsxpart_dVs;
++SPICE_REAL T0=0.0, T1, CoxWL, qcheq, Cdg, Cdd, Cds, Csg, Csd, Css;
++SPICE_REAL ScalingFactor = 1.0e-9;
+ struct bsim4v5SizeDependParam *pParam;
+-double ggidld, ggidlg, ggidlb, ggislg, ggislb, ggisls;
++SPICE_REAL ggidld, ggidlg, ggidlb, ggislg, ggislb, ggisls;
+ 
+-double m;
++SPICE_REAL m;
+ 
+     for (; model != NULL; model = BSIM4v5nextModel(model)) 
+     {    for (here = BSIM4v5instances(model); here!= NULL;
+diff -ruN /tmp/ngspice_patches/step4/src/spicelib/devices/bsim4v5/b4v5set.c /tmp/ngspice_patches/step5/src/spicelib/devices/bsim4v5/b4v5set.c
+--- /tmp/ngspice_patches/step4/src/spicelib/devices/bsim4v5/b4v5set.c	2026-07-20 15:00:12.988495384 +0800
++++ /tmp/ngspice_patches/step5/src/spicelib/devices/bsim4v5/b4v5set.c	2026-07-20 15:00:13.291403009 +0800
+@@ -49,7 +49,7 @@
+ int error;
+ CKTnode *tmp;
+ int    noiseAnalGiven = 0, createNode;  /* Criteria for new node creation */
+-double Rtot, DMCGeff, DMCIeff, DMDGeff;
++SPICE_REAL Rtot, DMCGeff, DMCIeff, DMDGeff;
+ JOB   *job;
+ 
+ #ifdef USE_OMP
+diff -ruN /tmp/ngspice_patches/step4/src/spicelib/devices/bsim4v5/b4v5temp.c /tmp/ngspice_patches/step5/src/spicelib/devices/bsim4v5/b4v5temp.c
+--- /tmp/ngspice_patches/step4/src/spicelib/devices/bsim4v5/b4v5temp.c	2026-07-20 15:00:12.988495384 +0800
++++ /tmp/ngspice_patches/step5/src/spicelib/devices/bsim4v5/b4v5temp.c	2026-07-20 15:00:13.272471282 +0800
+@@ -22,6 +22,31 @@
+ #include "ngspice/sperror.h"
+ #include "ngspice/suffix.h"
+ 
++// MIXED-PRECISION Phase 3: fp32 transcendental math
++#define B4V5_FP32_MATH
++#ifdef B4V5_FP32_MATH
++#undef SPICE_EXP
++#undef SPICE_LOG
++#undef SPICE_SQRT
++#undef SPICE_POW
++#undef SPICE_SIN
++#undef SPICE_COS
++#undef SPICE_FABS
++#undef SPICE_ATAN
++#undef SPICE_TAN
++#undef SPICE_TANH
++#define SPICE_EXP(x)  expf((float)(x))
++#define SPICE_LOG(x)  logf((float)(x))
++#define SPICE_SQRT(x) sqrtf((float)(x))
++#define SPICE_POW(x,y) powf((float)(x),(float)(y))
++#define SPICE_SIN(x)  sinf((float)(x))
++#define SPICE_COS(x)  cosf((float)(x))
++#define SPICE_FABS(x) fabsf((float)(x))
++#define SPICE_ATAN(x) atanf((float)(x))
++#define SPICE_TAN(x)  tanf((float)(x))
++#define SPICE_TANH(x) tanhf((float)(x))
++#endif
++
+ #define Kb 1.3806226e-23
+ #define KboQ 8.617087e-5
+ #define EPS0 8.85418e-12
+@@ -32,6 +57,17 @@
+ #define EXP_THRESHOLD 34.0
+ #define Charge_q 1.60219e-19
+ #define DELTA  1.0E-9
++#ifdef B4V5_FP32_MATH
++#define DEXP(A,B) {                                                        \
++        if ((A) > EXP_THRESHOLD) {                                         \
++            B = (SPICE_REAL)(MAX_EXP*(1.0f+(float)(A)-EXP_THRESHOLD));     \
++        } else if ((A) < -EXP_THRESHOLD)  {                                \
++            B = (SPICE_REAL)MIN_EXP;                                       \
++        } else   {                                                         \
++            B = (SPICE_REAL)expf((float)(A));                              \
++        }                                                                  \
++    }
++#else
+ #define DEXP(A,B) {                                                        \
+         if (A > EXP_THRESHOLD) {                                           \
+             B = MAX_EXP*(1.0+(A)-EXP_THRESHOLD);                           \
+@@ -41,15 +77,16 @@
+             B = exp(A);                                                    \
+         }                                                                  \
+     }
++#endif
+ 
+ 
+ 
+ static int
+ BSIM4v5DioIjthVjmEval(
+-double Nvtm, double Ijth, double Isb, double XExpBV,
+-double *Vjm)
++SPICE_REAL Nvtm, SPICE_REAL Ijth, SPICE_REAL Isb, SPICE_REAL XExpBV,
++SPICE_REAL *Vjm)
+ {
+-double Tb, Tc, EVjmovNv;
++SPICE_REAL Tb, Tc, EVjmovNv;
+ 
+        Tc = XExpBV;
+        Tb = 1.0 + Ijth / Isb - Tc;
+@@ -68,17 +105,17 @@
+ BSIM4v5model *model = (BSIM4v5model*) inModel;
+ BSIM4v5instance *here;
+ struct bsim4v5SizeDependParam *pSizeDependParamKnot, *pLastKnot, *pParam = NULL;
+-double tmp, tmp1, tmp2, Eg, Eg0, ni;
+-double T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, Lnew=0.0, Wnew;
+-double delTemp, Temp, TRatio, Inv_L, Inv_W, Inv_LW, Vtm0, Tnom;
+-double dumPs, dumPd, dumAs, dumAd, PowWeffWr;
+-double DMCGeff, DMCIeff, DMDGeff;
+-double Nvtms, Nvtmd, SourceSatCurrent, DrainSatCurrent;
+-double T10;
+-double Inv_saref, Inv_sbref, Inv_sa, Inv_sb, rho, Ldrn, dvth0_lod;
+-double W_tmp, Inv_ODeff, OD_offset, dk2_lod, deta0_lod;
+-double lnl, lnw, lnnf, rbpbx, rbpby, rbsbx, rbsby, rbdbx, rbdby,bodymode;
+-double kvsat, wlod, sceff, Wdrn;
++SPICE_REAL tmp, tmp1, tmp2, Eg, Eg0, ni;
++SPICE_REAL T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, Lnew=0.0, Wnew;
++SPICE_REAL delTemp, Temp, TRatio, Inv_L, Inv_W, Inv_LW, Vtm0, Tnom;
++SPICE_REAL dumPs, dumPd, dumAs, dumAd, PowWeffWr;
++SPICE_REAL DMCGeff, DMCIeff, DMDGeff;
++SPICE_REAL Nvtms, Nvtmd, SourceSatCurrent, DrainSatCurrent;
++SPICE_REAL T10;
++SPICE_REAL Inv_saref, Inv_sbref, Inv_sa, Inv_sb, rho, Ldrn, dvth0_lod;
++SPICE_REAL W_tmp, Inv_ODeff, OD_offset, dk2_lod, deta0_lod;
++SPICE_REAL lnl, lnw, lnnf, rbpbx, rbpby, rbsbx, rbsby, rbdbx, rbdby,bodymode;
++SPICE_REAL kvsat, wlod, sceff, Wdrn;
+ 
+ int Size_Not_Found, i;
+ 
+@@ -382,68 +419,94 @@
+                   Lnew = here->BSIM4v5l  + model->BSIM4v5xl ;
+                   Wnew = here->BSIM4v5w / here->BSIM4v5nf + model->BSIM4v5xw;
+ 
+-                  T0 = pow(Lnew, model->BSIM4v5Lln);
+-                  T1 = pow(Wnew, model->BSIM4v5Lwn);
+-                  tmp1 = model->BSIM4v5Ll / T0 + model->BSIM4v5Lw / T1
+-                       + model->BSIM4v5Lwl / (T0 * T1);
+-                  pParam->BSIM4v5dl = model->BSIM4v5Lint + tmp1;
+-                  tmp2 = model->BSIM4v5Llc / T0 + model->BSIM4v5Lwc / T1
+-                       + model->BSIM4v5Lwlc / (T0 * T1);
+-                  pParam->BSIM4v5dlc = model->BSIM4v5dlc + tmp2;
+-
+-                  T2 = pow(Lnew, model->BSIM4v5Wln);
+-                  T3 = pow(Wnew, model->BSIM4v5Wwn);
+-                  tmp1 = model->BSIM4v5Wl / T2 + model->BSIM4v5Ww / T3
+-                       + model->BSIM4v5Wwl / (T2 * T3);
+-                  pParam->BSIM4v5dw = model->BSIM4v5Wint + tmp1;
+-                  tmp2 = model->BSIM4v5Wlc / T2 + model->BSIM4v5Wwc / T3
+-                       + model->BSIM4v5Wwlc / (T2 * T3);
+-                  pParam->BSIM4v5dwc = model->BSIM4v5dwc + tmp2;
+-                  pParam->BSIM4v5dwj = model->BSIM4v5dwj + tmp2;
+-
+-                  pParam->BSIM4v5leff = Lnew - 2.0 * pParam->BSIM4v5dl;
+-                  if (pParam->BSIM4v5leff <= 0.0)
+-                  {
+-                      SPfrontEnd->IFerrorf (ERR_FATAL,
+-                      "BSIM4v5: mosfet %s, model %s: Effective channel length <= 0",
+-                       model->BSIM4v5modName, here->BSIM4v5name);
+-                      return(E_BADPARM);
+-                  }
+-
+-                  pParam->BSIM4v5weff = Wnew - 2.0 * pParam->BSIM4v5dw;
+-                  if (pParam->BSIM4v5weff <= 0.0)
+-                  {
+-                      SPfrontEnd->IFerrorf (ERR_FATAL,
+-                      "BSIM4v5: mosfet %s, model %s: Effective channel width <= 0",
+-                       model->BSIM4v5modName, here->BSIM4v5name);
+-                      return(E_BADPARM);
+-                  }
+-
+-                  pParam->BSIM4v5leffCV = Lnew - 2.0 * pParam->BSIM4v5dlc;
+-                  if (pParam->BSIM4v5leffCV <= 0.0)
++                  /* MIXED-PRECISION FIX: compute size-dependent params
++                   * (dl, dw, leff, weff) in double precision even when
++                   * the rest of ngspice uses SPICE_REAL=float.  The binning
++                   * parameters span 20+ orders of magnitude and the final
++                   * subtraction Lnew-2*dl involves close numbers — both
++                   * are catastrophic-cancellation risks in fp32. */
+                   {
+-                      SPfrontEnd->IFerrorf (ERR_FATAL,
+-                      "BSIM4v5: mosfet %s, model %s: Effective channel length for C-V <= 0",
+-                       model->BSIM4v5modName, here->BSIM4v5name);
+-                      return(E_BADPARM);
+-                  }
+-
+-                  pParam->BSIM4v5weffCV = Wnew - 2.0 * pParam->BSIM4v5dwc;
+-                  if (pParam->BSIM4v5weffCV <= 0.0)
+-                  {
+-                      SPfrontEnd->IFerrorf (ERR_FATAL,
+-                      "BSIM4v5: mosfet %s, model %s: Effective channel width for C-V <= 0",
+-                       model->BSIM4v5modName, here->BSIM4v5name);
+-                      return(E_BADPARM);
+-                  }
+-
+-                  pParam->BSIM4v5weffCJ = Wnew - 2.0 * pParam->BSIM4v5dwj;
+-                  if (pParam->BSIM4v5weffCJ <= 0.0)
+-                  {
+-                      SPfrontEnd->IFerrorf (ERR_FATAL,
+-                      "BSIM4v5: mosfet %s, model %s: Effective channel width for S/D junctions <= 0",
+-                       model->BSIM4v5modName, here->BSIM4v5name);
+-                      return(E_BADPARM);
++                      double dLnew = (double)Lnew;
++                      double dWnew = (double)Wnew;
++                      double dT0, dT1, dT2, dT3, dtmp1, dtmp2;
++
++                      dT0 = pow(dLnew, (double)model->BSIM4v5Lln);
++                      dT1 = pow(dWnew, (double)model->BSIM4v5Lwn);
++                      dtmp1 = (double)model->BSIM4v5Ll / dT0
++                            + (double)model->BSIM4v5Lw / dT1
++                            + (double)model->BSIM4v5Lwl / (dT0 * dT1);
++                      pParam->BSIM4v5dl = (SPICE_REAL)(
++                          (double)model->BSIM4v5Lint + dtmp1);
++                      dtmp2 = (double)model->BSIM4v5Llc / dT0
++                            + (double)model->BSIM4v5Lwc / dT1
++                            + (double)model->BSIM4v5Lwlc / (dT0 * dT1);
++                      pParam->BSIM4v5dlc = (SPICE_REAL)(
++                          (double)model->BSIM4v5dlc + dtmp2);
++
++                      dT2 = pow(dLnew, (double)model->BSIM4v5Wln);
++                      dT3 = pow(dWnew, (double)model->BSIM4v5Wwn);
++                      dtmp1 = (double)model->BSIM4v5Wl / dT2
++                            + (double)model->BSIM4v5Ww / dT3
++                            + (double)model->BSIM4v5Wwl / (dT2 * dT3);
++                      pParam->BSIM4v5dw = (SPICE_REAL)(
++                          (double)model->BSIM4v5Wint + dtmp1);
++                      dtmp2 = (double)model->BSIM4v5Wlc / dT2
++                            + (double)model->BSIM4v5Wwc / dT3
++                            + (double)model->BSIM4v5Wwlc / (dT2 * dT3);
++                      pParam->BSIM4v5dwc = (SPICE_REAL)(
++                          (double)model->BSIM4v5dwc + dtmp2);
++                      pParam->BSIM4v5dwj = (SPICE_REAL)(
++                          (double)model->BSIM4v5dwj + dtmp2);
++
++                      pParam->BSIM4v5leff = (SPICE_REAL)(
++                          dLnew - 2.0 * (double)pParam->BSIM4v5dl);
++                      if (pParam->BSIM4v5leff <= 0.0)
++                      {
++                          SPfrontEnd->IFerrorf (ERR_FATAL,
++                          "BSIM4v5: mosfet %s, model %s: Effective channel length <= 0",
++                           model->BSIM4v5modName, here->BSIM4v5name);
++                          return(E_BADPARM);
++                      }
++
++                      pParam->BSIM4v5weff = (SPICE_REAL)(
++                          dWnew - 2.0 * (double)pParam->BSIM4v5dw);
++                      if (pParam->BSIM4v5weff <= 0.0)
++                      {
++                          SPfrontEnd->IFerrorf (ERR_FATAL,
++                          "BSIM4v5: mosfet %s, model %s: Effective channel width <= 0",
++                           model->BSIM4v5modName, here->BSIM4v5name);
++                          return(E_BADPARM);
++                      }
++
++                      pParam->BSIM4v5leffCV = (SPICE_REAL)(
++                          dLnew - 2.0 * (double)pParam->BSIM4v5dlc);
++                      if (pParam->BSIM4v5leffCV <= 0.0)
++                      {
++                          SPfrontEnd->IFerrorf (ERR_FATAL,
++                          "BSIM4v5: mosfet %s, model %s: Effective channel length for C-V <= 0",
++                           model->BSIM4v5modName, here->BSIM4v5name);
++                          return(E_BADPARM);
++                      }
++
++                      pParam->BSIM4v5weffCV = (SPICE_REAL)(
++                          dWnew - 2.0 * (double)pParam->BSIM4v5dwc);
++                      if (pParam->BSIM4v5weffCV <= 0.0)
++                      {
++                          SPfrontEnd->IFerrorf (ERR_FATAL,
++                          "BSIM4v5: mosfet %s, model %s: Effective channel width for C-V <= 0",
++                           model->BSIM4v5modName, here->BSIM4v5name);
++                          return(E_BADPARM);
++                      }
++
++                      pParam->BSIM4v5weffCJ = (SPICE_REAL)(
++                          dWnew - 2.0 * (double)pParam->BSIM4v5dwj);
++                      if (pParam->BSIM4v5weffCJ <= 0.0)
++                      {
++                          SPfrontEnd->IFerrorf (ERR_FATAL,
++                          "BSIM4v5: mosfet %s, model %s: Effective channel width for S/D junctions <= 0",
++                           model->BSIM4v5modName, here->BSIM4v5name);
++                          return(E_BADPARM);
++                      }
+                   }
+ 
+ 
+@@ -1113,8 +1176,8 @@
+                   pParam->BSIM4v5sqrtXdep0 = sqrt(pParam->BSIM4v5Xdep0);
+                   pParam->BSIM4v5litl = sqrt(3.0 * pParam->BSIM4v5xj
+                                     * model->BSIM4v5toxe);
+-                  pParam->BSIM4v5vbi = Vtm0 * log(pParam->BSIM4v5nsd
+-                                   * pParam->BSIM4v5ndep / (ni * ni));
++                  pParam->BSIM4v5vbi = (SPICE_REAL)((double)Vtm0 * log((double)pParam->BSIM4v5nsd
++                                   * (double)pParam->BSIM4v5ndep / ((double)ni * (double)ni)));
+ 
+                   if (pParam->BSIM4v5ngate > 0.0)
+                   {   pParam->BSIM4v5vfbsd = Vtm0 * log(pParam->BSIM4v5ngate
+--- a/src/spicelib/devices/bsim4v5/b4v5temp.c	2026-07-20 15:02:40.201522275 +0800
++++ b/src/spicelib/devices/bsim4v5/b4v5temp.c	2026-07-20 15:04:28.396567837 +0800
+@@ -22,6 +22,31 @@
+ #include "ngspice/sperror.h"
+ #include "ngspice/suffix.h"
+ 
++// MIXED-PRECISION Phase 3: fp32 transcendental math
++#define B4V5_FP32_MATH
++#ifdef B4V5_FP32_MATH
++#undef SPICE_EXP
++#undef SPICE_LOG
++#undef SPICE_SQRT
++#undef SPICE_POW
++#undef SPICE_SIN
++#undef SPICE_COS
++#undef SPICE_FABS
++#undef SPICE_ATAN
++#undef SPICE_TAN
++#undef SPICE_TANH
++#define SPICE_EXP(x)  expf((float)(x))
++#define SPICE_LOG(x)  logf((float)(x))
++#define SPICE_SQRT(x) sqrtf((float)(x))
++#define SPICE_POW(x,y) powf((float)(x),(float)(y))
++#define SPICE_SIN(x)  sinf((float)(x))
++#define SPICE_COS(x)  cosf((float)(x))
++#define SPICE_FABS(x) fabsf((float)(x))
++#define SPICE_ATAN(x) atanf((float)(x))
++#define SPICE_TAN(x)  tanf((float)(x))
++#define SPICE_TANH(x) tanhf((float)(x))
++#endif
++
+ #define Kb 1.3806226e-23
+ #define KboQ 8.617087e-5
+ #define EPS0 8.85418e-12
+@@ -32,6 +57,17 @@
+ #define EXP_THRESHOLD 34.0
+ #define Charge_q 1.60219e-19
+ #define DELTA  1.0E-9
++#ifdef B4V5_FP32_MATH
++#define DEXP(A,B) {                                                        \
++        if ((A) > EXP_THRESHOLD) {                                         \
++            B = (SPICE_REAL)(MAX_EXP*(1.0f+(float)(A)-EXP_THRESHOLD));     \
++        } else if ((A) < -EXP_THRESHOLD)  {                                \
++            B = (SPICE_REAL)MIN_EXP;                                       \
++        } else   {                                                         \
++            B = (SPICE_REAL)expf((float)(A));                              \
++        }                                                                  \
++    }
++#else
+ #define DEXP(A,B) {                                                        \
+         if (A > EXP_THRESHOLD) {                                           \
+             B = MAX_EXP*(1.0+(A)-EXP_THRESHOLD);                           \
+@@ -41,15 +77,16 @@
+             B = exp(A);                                                    \
+         }                                                                  \
+     }
++#endif
+ 
+ 
+ 
+ static int
+ BSIM4v5DioIjthVjmEval(
+-double Nvtm, double Ijth, double Isb, double XExpBV,
+-double *Vjm)
++SPICE_REAL Nvtm, SPICE_REAL Ijth, SPICE_REAL Isb, SPICE_REAL XExpBV,
++SPICE_REAL *Vjm)
+ {
+-double Tb, Tc, EVjmovNv;
++SPICE_REAL Tb, Tc, EVjmovNv;
+ 
+        Tc = XExpBV;
+        Tb = 1.0 + Ijth / Isb - Tc;
+@@ -68,17 +105,17 @@
+ BSIM4v5model *model = (BSIM4v5model*) inModel;
+ BSIM4v5instance *here;
+ struct bsim4v5SizeDependParam *pSizeDependParamKnot, *pLastKnot, *pParam = NULL;
+-double tmp, tmp1, tmp2, Eg, Eg0, ni;
+-double T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, Lnew=0.0, Wnew;
+-double delTemp, Temp, TRatio, Inv_L, Inv_W, Inv_LW, Vtm0, Tnom;
+-double dumPs, dumPd, dumAs, dumAd, PowWeffWr;
+-double DMCGeff, DMCIeff, DMDGeff;
+-double Nvtms, Nvtmd, SourceSatCurrent, DrainSatCurrent;
+-double T10;
+-double Inv_saref, Inv_sbref, Inv_sa, Inv_sb, rho, Ldrn, dvth0_lod;
+-double W_tmp, Inv_ODeff, OD_offset, dk2_lod, deta0_lod;
+-double lnl, lnw, lnnf, rbpbx, rbpby, rbsbx, rbsby, rbdbx, rbdby,bodymode;
+-double kvsat, wlod, sceff, Wdrn;
++SPICE_REAL tmp, tmp1, tmp2, Eg, Eg0, ni;
++SPICE_REAL T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, Lnew=0.0, Wnew;
++SPICE_REAL delTemp, Temp, TRatio, Inv_L, Inv_W, Inv_LW, Vtm0, Tnom;
++SPICE_REAL dumPs, dumPd, dumAs, dumAd, PowWeffWr;
++SPICE_REAL DMCGeff, DMCIeff, DMDGeff;
++SPICE_REAL Nvtms, Nvtmd, SourceSatCurrent, DrainSatCurrent;
++SPICE_REAL T10;
++SPICE_REAL Inv_saref, Inv_sbref, Inv_sa, Inv_sb, rho, Ldrn, dvth0_lod;
++SPICE_REAL W_tmp, Inv_ODeff, OD_offset, dk2_lod, deta0_lod;
++SPICE_REAL lnl, lnw, lnnf, rbpbx, rbpby, rbsbx, rbsby, rbdbx, rbdby,bodymode;
++SPICE_REAL kvsat, wlod, sceff, Wdrn;
+ 
+ int Size_Not_Found, i;
+ 
+@@ -382,68 +419,94 @@
+                   Lnew = here->BSIM4v5l  + model->BSIM4v5xl ;
+                   Wnew = here->BSIM4v5w / here->BSIM4v5nf + model->BSIM4v5xw;
+ 
+-                  T0 = pow(Lnew, model->BSIM4v5Lln);
+-                  T1 = pow(Wnew, model->BSIM4v5Lwn);
+-                  tmp1 = model->BSIM4v5Ll / T0 + model->BSIM4v5Lw / T1
+-                       + model->BSIM4v5Lwl / (T0 * T1);
+-                  pParam->BSIM4v5dl = model->BSIM4v5Lint + tmp1;
+-                  tmp2 = model->BSIM4v5Llc / T0 + model->BSIM4v5Lwc / T1
+-                       + model->BSIM4v5Lwlc / (T0 * T1);
+-                  pParam->BSIM4v5dlc = model->BSIM4v5dlc + tmp2;
+-
+-                  T2 = pow(Lnew, model->BSIM4v5Wln);
+-                  T3 = pow(Wnew, model->BSIM4v5Wwn);
+-                  tmp1 = model->BSIM4v5Wl / T2 + model->BSIM4v5Ww / T3
+-                       + model->BSIM4v5Wwl / (T2 * T3);
+-                  pParam->BSIM4v5dw = model->BSIM4v5Wint + tmp1;
+-                  tmp2 = model->BSIM4v5Wlc / T2 + model->BSIM4v5Wwc / T3
+-                       + model->BSIM4v5Wwlc / (T2 * T3);
+-                  pParam->BSIM4v5dwc = model->BSIM4v5dwc + tmp2;
+-                  pParam->BSIM4v5dwj = model->BSIM4v5dwj + tmp2;
+-
+-                  pParam->BSIM4v5leff = Lnew - 2.0 * pParam->BSIM4v5dl;
+-                  if (pParam->BSIM4v5leff <= 0.0)
+-                  {
+-                      SPfrontEnd->IFerrorf (ERR_FATAL,
+-                      "BSIM4v5: mosfet %s, model %s: Effective channel length <= 0",
+-                       model->BSIM4v5modName, here->BSIM4v5name);
+-                      return(E_BADPARM);
+-                  }
+-
+-                  pParam->BSIM4v5weff = Wnew - 2.0 * pParam->BSIM4v5dw;
+-                  if (pParam->BSIM4v5weff <= 0.0)
+-                  {
+-                      SPfrontEnd->IFerrorf (ERR_FATAL,
+-                      "BSIM4v5: mosfet %s, model %s: Effective channel width <= 0",
+-                       model->BSIM4v5modName, here->BSIM4v5name);
+-                      return(E_BADPARM);
+-                  }
+-
+-                  pParam->BSIM4v5leffCV = Lnew - 2.0 * pParam->BSIM4v5dlc;
+-                  if (pParam->BSIM4v5leffCV <= 0.0)
++                  /* MIXED-PRECISION FIX: compute size-dependent params
++                   * (dl, dw, leff, weff) in double precision even when
++                   * the rest of ngspice uses SPICE_REAL=float.  The binning
++                   * parameters span 20+ orders of magnitude and the final
++                   * subtraction Lnew-2*dl involves close numbers — both
++                   * are catastrophic-cancellation risks in fp32. */
+                   {
+-                      SPfrontEnd->IFerrorf (ERR_FATAL,
+-                      "BSIM4v5: mosfet %s, model %s: Effective channel length for C-V <= 0",
+-                       model->BSIM4v5modName, here->BSIM4v5name);
+-                      return(E_BADPARM);
+-                  }
+-
+-                  pParam->BSIM4v5weffCV = Wnew - 2.0 * pParam->BSIM4v5dwc;
+-                  if (pParam->BSIM4v5weffCV <= 0.0)
+-                  {
+-                      SPfrontEnd->IFerrorf (ERR_FATAL,
+-                      "BSIM4v5: mosfet %s, model %s: Effective channel width for C-V <= 0",
+-                       model->BSIM4v5modName, here->BSIM4v5name);
+-                      return(E_BADPARM);
+-                  }
+-
+-                  pParam->BSIM4v5weffCJ = Wnew - 2.0 * pParam->BSIM4v5dwj;
+-                  if (pParam->BSIM4v5weffCJ <= 0.0)
+-                  {
+-                      SPfrontEnd->IFerrorf (ERR_FATAL,
+-                      "BSIM4v5: mosfet %s, model %s: Effective channel width for S/D junctions <= 0",
+-                       model->BSIM4v5modName, here->BSIM4v5name);
+-                      return(E_BADPARM);
++                      double dLnew = (double)Lnew;
++                      double dWnew = (double)Wnew;
++                      double dT0, dT1, dT2, dT3, dtmp1, dtmp2;
++
++                      dT0 = pow(dLnew, (double)model->BSIM4v5Lln);
++                      dT1 = pow(dWnew, (double)model->BSIM4v5Lwn);
++                      dtmp1 = (double)model->BSIM4v5Ll / dT0
++                            + (double)model->BSIM4v5Lw / dT1
++                            + (double)model->BSIM4v5Lwl / (dT0 * dT1);
++                      pParam->BSIM4v5dl = (SPICE_REAL)(
++                          (double)model->BSIM4v5Lint + dtmp1);
++                      dtmp2 = (double)model->BSIM4v5Llc / dT0
++                            + (double)model->BSIM4v5Lwc / dT1
++                            + (double)model->BSIM4v5Lwlc / (dT0 * dT1);
++                      pParam->BSIM4v5dlc = (SPICE_REAL)(
++                          (double)model->BSIM4v5dlc + dtmp2);
++
++                      dT2 = pow(dLnew, (double)model->BSIM4v5Wln);
++                      dT3 = pow(dWnew, (double)model->BSIM4v5Wwn);
++                      dtmp1 = (double)model->BSIM4v5Wl / dT2
++                            + (double)model->BSIM4v5Ww / dT3
++                            + (double)model->BSIM4v5Wwl / (dT2 * dT3);
++                      pParam->BSIM4v5dw = (SPICE_REAL)(
++                          (double)model->BSIM4v5Wint + dtmp1);
++                      dtmp2 = (double)model->BSIM4v5Wlc / dT2
++                            + (double)model->BSIM4v5Wwc / dT3
++                            + (double)model->BSIM4v5Wwlc / (dT2 * dT3);
++                      pParam->BSIM4v5dwc = (SPICE_REAL)(
++                          (double)model->BSIM4v5dwc + dtmp2);
++                      pParam->BSIM4v5dwj = (SPICE_REAL)(
++                          (double)model->BSIM4v5dwj + dtmp2);
++
++                      pParam->BSIM4v5leff = (SPICE_REAL)(
++                          dLnew - 2.0 * (double)pParam->BSIM4v5dl);
++                      if (pParam->BSIM4v5leff <= 0.0)
++                      {
++                          SPfrontEnd->IFerrorf (ERR_FATAL,
++                          "BSIM4v5: mosfet %s, model %s: Effective channel length <= 0",
++                           model->BSIM4v5modName, here->BSIM4v5name);
++                          return(E_BADPARM);
++                      }
++
++                      pParam->BSIM4v5weff = (SPICE_REAL)(
++                          dWnew - 2.0 * (double)pParam->BSIM4v5dw);
++                      if (pParam->BSIM4v5weff <= 0.0)
++                      {
++                          SPfrontEnd->IFerrorf (ERR_FATAL,
++                          "BSIM4v5: mosfet %s, model %s: Effective channel width <= 0",
++                           model->BSIM4v5modName, here->BSIM4v5name);
++                          return(E_BADPARM);
++                      }
++
++                      pParam->BSIM4v5leffCV = (SPICE_REAL)(
++                          dLnew - 2.0 * (double)pParam->BSIM4v5dlc);
++                      if (pParam->BSIM4v5leffCV <= 0.0)
++                      {
++                          SPfrontEnd->IFerrorf (ERR_FATAL,
++                          "BSIM4v5: mosfet %s, model %s: Effective channel length for C-V <= 0",
++                           model->BSIM4v5modName, here->BSIM4v5name);
++                          return(E_BADPARM);
++                      }
++
++                      pParam->BSIM4v5weffCV = (SPICE_REAL)(
++                          dWnew - 2.0 * (double)pParam->BSIM4v5dwc);
++                      if (pParam->BSIM4v5weffCV <= 0.0)
++                      {
++                          SPfrontEnd->IFerrorf (ERR_FATAL,
++                          "BSIM4v5: mosfet %s, model %s: Effective channel width for C-V <= 0",
++                           model->BSIM4v5modName, here->BSIM4v5name);
++                          return(E_BADPARM);
++                      }
++
++                      pParam->BSIM4v5weffCJ = (SPICE_REAL)(
++                          dWnew - 2.0 * (double)pParam->BSIM4v5dwj);
++                      if (pParam->BSIM4v5weffCJ <= 0.0)
++                      {
++                          SPfrontEnd->IFerrorf (ERR_FATAL,
++                          "BSIM4v5: mosfet %s, model %s: Effective channel width for S/D junctions <= 0",
++                           model->BSIM4v5modName, here->BSIM4v5name);
++                          return(E_BADPARM);
++                      }
+                   }
+ 
+ 
+@@ -1113,8 +1176,8 @@
+                   pParam->BSIM4v5sqrtXdep0 = sqrt(pParam->BSIM4v5Xdep0);
+                   pParam->BSIM4v5litl = sqrt(3.0 * pParam->BSIM4v5xj
+                                     * model->BSIM4v5toxe);
+-                  pParam->BSIM4v5vbi = Vtm0 * log(pParam->BSIM4v5nsd
+-                                   * pParam->BSIM4v5ndep / (ni * ni));
++                  pParam->BSIM4v5vbi = (SPICE_REAL)((double)Vtm0 * log((double)pParam->BSIM4v5nsd
++                                   * (double)pParam->BSIM4v5ndep / ((double)ni * (double)ni)));
+ 
+                   if (pParam->BSIM4v5ngate > 0.0)
+                   {   pParam->BSIM4v5vfbsd = Vtm0 * log(pParam->BSIM4v5ngate
+--- a/src/spicelib/devices/bsim4v5/b4v5set.c	2026-07-20 15:02:40.197664614 +0800
++++ b/src/spicelib/devices/bsim4v5/b4v5set.c	2026-07-20 15:04:28.192996823 +0800
+@@ -49,7 +49,7 @@
+ int error;
+ CKTnode *tmp;
+ int    noiseAnalGiven = 0, createNode;  /* Criteria for new node creation */
+-double Rtot, DMCGeff, DMCIeff, DMDGeff;
++SPICE_REAL Rtot, DMCGeff, DMCIeff, DMDGeff;
+ JOB   *job;
+ 
+ #ifdef USE_OMP
+--- a/src/spicelib/devices/bsim4v5/b4v5noi.c	2026-07-20 15:02:40.197664614 +0800
++++ b/src/spicelib/devices/bsim4v5/b4v5noi.c	2026-07-20 15:04:27.500855376 +0800
+@@ -22,6 +22,39 @@
+ #include "ngspice/suffix.h"
+ #include "ngspice/const.h"
+ 
++// MIXED-PRECISION: fp32 transcendental math
++#ifdef SINGLE_PRECISION
++extern unsigned long long g_double_ops;
++#define COUNT_DOUBLE_OPS(n) g_double_ops += (n)
++#else
++#define COUNT_DOUBLE_OPS(n) do {} while(0)
++#include "b4v5_fp32_math.h"  /* shared header — supersedes inline macros above */
++#endif
++#define B4V5_FP32_MATH
++#ifdef B4V5_FP32_MATH
++#undef SPICE_EXP
++#undef SPICE_LOG
++#undef SPICE_SQRT
++#undef SPICE_POW
++#undef SPICE_SIN
++#undef SPICE_COS
++#undef SPICE_FABS
++#undef SPICE_ATAN
++#undef SPICE_TAN
++#undef SPICE_TANH
++#define SPICE_EXP(x)  expf((float)(x))
++#define SPICE_LOG(x)  logf((float)(x))
++#define SPICE_SQRT(x) sqrtf((float)(x))
++#define SPICE_POW(x,y) powf((float)(x),(float)(y))
++#define SPICE_SIN(x)  sinf((float)(x))
++#define SPICE_COS(x)  cosf((float)(x))
++#define SPICE_FABS(x) fabsf((float)(x))
++#define SPICE_ATAN(x) atanf((float)(x))
++#define SPICE_TAN(x)  tanf((float)(x))
++#define SPICE_TANH(x) tanhf((float)(x))
++#include "b4v5_fp32_math.h"  /* shared header — supersedes inline macros above */
++#endif
++
+ 
+ /*
+  * WDL: 1/f noise model has been smoothed out and enhanced with
+@@ -29,16 +62,16 @@
+  * conversion into the SI unit system.
+  */
+ 
+-static double
++static SPICE_REAL
+ BSIM4v5Eval1ovFNoise(
+-double Vds,
++SPICE_REAL Vds,
+ BSIM4v5model *model,
+ BSIM4v5instance *here,
+-double freq, double temp)
++SPICE_REAL freq, SPICE_REAL temp)
+ {
+ struct bsim4v5SizeDependParam *pParam;
+-double cd, esat, DelClm, EffFreq, N0, Nl, Leff, Leffsq;
+-double T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, Ssi;
++SPICE_REAL cd, esat, DelClm, EffFreq, N0, Nl, Leff, Leffsq;
++SPICE_REAL T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, Ssi;
+ 
+     pParam = here->pParam;
+     cd = fabs(here->BSIM4v5cd);
+@@ -59,6 +92,57 @@
+     Nl = model->BSIM4v5coxe * here->BSIM4v5Vgsteff
+        * (1.0 - here->BSIM4v5AbovVgst2Vtm * here->BSIM4v5Vdseff) / CHARGE;
+ 
++#ifdef SINGLE_PRECISION
++    /* FP64 island: oxideTrapDensity defaults (NOIA=6.25e41 NMOS, 6.188e40 PMOS)
++     * exceed FLT_MAX(3.4e38) → stored as +Inf in the float model struct.
++     * Recompute in double from the model type flag, then compute T3-T9 in
++     * double to keep intermediate products within FP64 range.  ~50 double ops
++     * per call, ~80 frequency points × ~5 devices = ~20k ops per .noise run. */
++    {
++        double d_otA, d_otB, d_otC;
++        double d_T3, d_T4, d_T5, d_T6, d_T7, d_T8, d_T9, d_Ssi;
++        double d_cd, d_N0, d_Nl, d_Leff, d_Leffsq, d_EffFreq;
++
++        if (model->BSIM4v5type == NMOS) {
++            d_otA = 6.25e41;   d_otB = 3.125e26;  d_otC = 8.75e9;
++        } else {
++            d_otA = 6.188e40;  d_otB = 1.5e25;    d_otC = 8.75e9;
++        }
++        /* User-overridden NOIA/NOIB/NOIC: if given, the float-stored values
++         * are below FLT_MAX (valid).  Cast to double for consistent precision. */
++        if (model->BSIM4v5oxideTrapDensityAGiven)
++            d_otA = (double)model->BSIM4v5oxideTrapDensityA;
++        if (model->BSIM4v5oxideTrapDensityBGiven)
++            d_otB = (double)model->BSIM4v5oxideTrapDensityB;
++        if (model->BSIM4v5oxideTrapDensityCGiven)
++            d_otC = (double)model->BSIM4v5oxideTrapDensityC;
++
++        d_cd     = (double)cd;
++        d_N0     = (double)N0;
++        d_Nl     = (double)Nl;
++        d_Leff   = (double)Leff;
++        d_Leffsq = (double)Leffsq;
++        d_EffFreq = (double)EffFreq;
++        COUNT_DOUBLE_OPS(12);  /* 10 loads + 2 branches for model type */
++
++        d_T3 = d_otA
++             * log(MAX(((d_N0 + (double)here->BSIM4v5nstar)
++                      / (d_Nl + (double)here->BSIM4v5nstar)), (double)N_MINLOG));
++        d_T4 = d_otB * (d_N0 - d_Nl);
++        d_T5 = d_otC * 0.5 * (d_N0 * d_N0 - d_Nl * d_Nl);
++
++        d_T6 = (double)CONSTboltz * (double)temp * d_cd * d_cd;
++        d_T7 = 1.0e10 * d_EffFreq * d_Leffsq
++             * (double)pParam->BSIM4v5weff * (double)here->BSIM4v5nf;
++        d_T8 = d_otA + d_otB * d_Nl + d_otC * d_Nl * d_Nl;
++        d_T9 = (d_Nl + (double)here->BSIM4v5nstar)
++             * (d_Nl + (double)here->BSIM4v5nstar);
++        d_Ssi = (double)T1 / (double)T2 * (d_T3 + d_T4 + d_T5)
++              + d_T6 / d_T7 * (double)DelClm * d_T8 / d_T9;
++        COUNT_DOUBLE_OPS(40);  /* ~40 arithmetic ops in the block above */
++        return (SPICE_REAL)d_Ssi;
++    }
++#else
+     T3 = model->BSIM4v5oxideTrapDensityA
+        * log(MAX(((N0 + here->BSIM4v5nstar) / (Nl + here->BSIM4v5nstar)), N_MINLOG));
+     T4 = model->BSIM4v5oxideTrapDensityB * (N0 - Nl);
+@@ -71,6 +155,8 @@
+     T9 = (Nl + here->BSIM4v5nstar) * (Nl + here->BSIM4v5nstar);
+     Ssi = T1 / T2 * (T3 + T4 + T5) + T6 / T7 * DelClm * T8 / T9;
+     return Ssi;
++#include "b4v5_fp32_math.h"  /* shared header — supersedes inline macros above */
++#endif
+ }
+ 
+ 
+@@ -80,23 +166,23 @@
+ GENmodel *inModel,
+ CKTcircuit *ckt,
+ Ndata *data,
+-double *OnDens)
++SPICE_REAL *OnDens)
+ {
+ NOISEAN *job = (NOISEAN *) ckt->CKTcurJob;
+ 
+ BSIM4v5model *model = (BSIM4v5model *)inModel;
+ BSIM4v5instance *here;
+ struct bsim4v5SizeDependParam *pParam;
+-double tempOnoise;
+-double tempInoise;
+-double noizDens[BSIM4v5NSRCS];
+-double lnNdens[BSIM4v5NSRCS];
+-
+-double T0, T1, T2, T5, T10, T11;
+-double Vds, Ssi, Swi;
+-double tmp=0.0, gdpr, gspr, npart_theta=0.0, npart_beta=0.0, igsquare, bodymode;
++SPICE_REAL tempOnoise;
++SPICE_REAL tempInoise;
++SPICE_REAL noizDens[BSIM4v5NSRCS];
++SPICE_REAL lnNdens[BSIM4v5NSRCS];
++
++SPICE_REAL T0, T1, T2, T5, T10, T11;
++SPICE_REAL Vds, Ssi, Swi;
++SPICE_REAL tmp=0.0, gdpr, gspr, npart_theta=0.0, npart_beta=0.0, igsquare, bodymode;
+ 
+-double m;
++SPICE_REAL m;
+ 
+ int i;
+ 
+@@ -335,7 +421,7 @@
+ 
+                               NevalSrc(&noizDens[BSIM4v5FLNOIZ], NULL,
+                                        ckt, N_GAIN, here->BSIM4v5dNodePrime,
+-                                       here->BSIM4v5sNodePrime, (double) 0.0);
++                                       here->BSIM4v5sNodePrime, (SPICE_REAL) 0.0);
+ 
+                               switch(model->BSIM4v5fnoiMod)
+                               {  case 0:
+@@ -355,6 +441,37 @@
+ 
+                                       Ssi = BSIM4v5Eval1ovFNoise(Vds, model, here,
+                                           data->freq, ckt->CKTtemp);
++#ifdef SINGLE_PRECISION
++                                      /* FP64 island: T10/T11/Swi also use oxideTrapDensityA
++                                       * which is +Inf in float → protect with double */
++                                      {   double d_otA;
++                                          if (model->BSIM4v5oxideTrapDensityAGiven)
++                                              d_otA = (double)model->BSIM4v5oxideTrapDensityA;
++                                          else if (model->BSIM4v5type == NMOS)
++                                              d_otA = 6.25e41;
++                                          else
++                                              d_otA = 6.188e40;
++                                          double d_T10 = d_otA * (double)CONSTboltz
++                                                       * (double)ckt->CKTtemp;
++                                          double d_T11 = (double)pParam->BSIM4v5weff
++                                                       * (double)here->BSIM4v5nf
++                                                       * (double)pParam->BSIM4v5leff
++                                                       * pow((double)data->freq,
++                                                             (double)model->BSIM4v5ef)
++                                                       * 1.0e10
++                                                       * (double)here->BSIM4v5nstar
++                                                       * (double)here->BSIM4v5nstar;
++                                          double d_cd = (double)here->BSIM4v5cd;
++                                          double d_Swi = d_T10 / d_T11 * d_cd * d_cd;
++                                          double d_Ssi = (double)Ssi;
++                                          double d_T1 = d_Swi + d_Ssi;
++                                          COUNT_DOUBLE_OPS(18);
++                                          if (d_T1 > 0.0)
++                                              noizDens[BSIM4v5FLNOIZ] *= (SPICE_REAL)(m * (d_Ssi * d_Swi) / d_T1);
++                                          else
++                                              noizDens[BSIM4v5FLNOIZ] *= 0.0;
++                                      }
++#else
+                                       T10 = model->BSIM4v5oxideTrapDensityA
+                                           * CONSTboltz * ckt->CKTtemp;
+                                       T11 = pParam->BSIM4v5weff * here->BSIM4v5nf * pParam->BSIM4v5leff
+@@ -367,6 +484,8 @@
+                                           noizDens[BSIM4v5FLNOIZ] *= m * (Ssi * Swi) / T1;
+                                       else
+                                           noizDens[BSIM4v5FLNOIZ] *= 0.0;
++#include "b4v5_fp32_math.h"  /* shared header — supersedes inline macros above */
++#endif
+                                       break;
+                               }
+ 
+--- a/src/spicelib/devices/bsim4v5/b4v5pzld.c	2026-07-20 15:02:40.197664614 +0800
++++ b/src/spicelib/devices/bsim4v5/b4v5pzld.c	2026-07-20 15:04:28.799638445 +0800
+@@ -16,6 +16,32 @@
+ #include "bsim4v5def.h"
+ #include "ngspice/suffix.h"
+ 
++// MIXED-PRECISION: fp32 transcendental math
++#define B4V5_FP32_MATH
++#ifdef B4V5_FP32_MATH
++#undef SPICE_EXP
++#undef SPICE_LOG
++#undef SPICE_SQRT
++#undef SPICE_POW
++#undef SPICE_SIN
++#undef SPICE_COS
++#undef SPICE_FABS
++#undef SPICE_ATAN
++#undef SPICE_TAN
++#undef SPICE_TANH
++#define SPICE_EXP(x)  expf((float)(x))
++#define SPICE_LOG(x)  logf((float)(x))
++#define SPICE_SQRT(x) sqrtf((float)(x))
++#define SPICE_POW(x,y) powf((float)(x),(float)(y))
++#define SPICE_SIN(x)  sinf((float)(x))
++#define SPICE_COS(x)  cosf((float)(x))
++#define SPICE_FABS(x) fabsf((float)(x))
++#define SPICE_ATAN(x) atanf((float)(x))
++#define SPICE_TAN(x)  tanf((float)(x))
++#define SPICE_TANH(x) tanhf((float)(x))
++#include "b4v5_fp32_math.h"  /* shared header — supersedes inline macros above */
++#endif
++
+ int
+ BSIM4v5pzLoad(
+ GENmodel *inModel,
+@@ -25,30 +51,30 @@
+ BSIM4v5model *model = (BSIM4v5model*)inModel;
+ BSIM4v5instance *here;
+ 
+-double gjbd, gjbs, geltd, gcrg, gcrgg, gcrgd, gcrgs, gcrgb;
+-double xcggb, xcgdb, xcgsb, xcgbb, xcbgb, xcbdb, xcbsb, xcbbb;
+-double xcdgb, xcddb, xcdsb, xcdbb, xcsgb, xcsdb, xcssb, xcsbb;
+-double gds, capbd, capbs, FwdSum, RevSum, Gm, Gmbs;
+-double gstot, gstotd, gstotg, gstots, gstotb, gspr;
+-double gdtot, gdtotd, gdtotg, gdtots, gdtotb, gdpr;
+-double gIstotg, gIstotd, gIstots, gIstotb;
+-double gIdtotg, gIdtotd, gIdtots, gIdtotb;
+-double gIbtotg, gIbtotd, gIbtots, gIbtotb;
+-double gIgtotg, gIgtotd, gIgtots, gIgtotb;
+-double cgso, cgdo, cgbo;
+-double xcdbdb=0.0, xcsbsb=0.0, xcgmgmb=0.0, xcgmdb=0.0, xcgmsb=0.0, xcdgmb=0.0, xcsgmb=0.0;
+-double xcgmbb=0.0, xcbgmb=0.0;
+-double dxpart, sxpart, xgtg, xgtd, xgts, xgtb, xcqgb=0.0, xcqdb=0.0, xcqsb=0.0, xcqbb=0.0;
+-double gbspsp, gbbdp, gbbsp, gbspg, gbspb;
+-double gbspdp, gbdpdp, gbdpg, gbdpb, gbdpsp;
+-double ddxpart_dVd, ddxpart_dVg, ddxpart_dVb, ddxpart_dVs;
+-double dsxpart_dVd, dsxpart_dVg, dsxpart_dVb, dsxpart_dVs;
+-double T0=0.0, T1, CoxWL, qcheq, Cdg, Cdd, Cds, Csg, Csd, Css;
+-double ScalingFactor = 1.0e-9;
++SPICE_REAL gjbd, gjbs, geltd, gcrg, gcrgg, gcrgd, gcrgs, gcrgb;
++SPICE_REAL xcggb, xcgdb, xcgsb, xcgbb, xcbgb, xcbdb, xcbsb, xcbbb;
++SPICE_REAL xcdgb, xcddb, xcdsb, xcdbb, xcsgb, xcsdb, xcssb, xcsbb;
++SPICE_REAL gds, capbd, capbs, FwdSum, RevSum, Gm, Gmbs;
++SPICE_REAL gstot, gstotd, gstotg, gstots, gstotb, gspr;
++SPICE_REAL gdtot, gdtotd, gdtotg, gdtots, gdtotb, gdpr;
++SPICE_REAL gIstotg, gIstotd, gIstots, gIstotb;
++SPICE_REAL gIdtotg, gIdtotd, gIdtots, gIdtotb;
++SPICE_REAL gIbtotg, gIbtotd, gIbtots, gIbtotb;
++SPICE_REAL gIgtotg, gIgtotd, gIgtots, gIgtotb;
++SPICE_REAL cgso, cgdo, cgbo;
++SPICE_REAL xcdbdb=0.0, xcsbsb=0.0, xcgmgmb=0.0, xcgmdb=0.0, xcgmsb=0.0, xcdgmb=0.0, xcsgmb=0.0;
++SPICE_REAL xcgmbb=0.0, xcbgmb=0.0;
++SPICE_REAL dxpart, sxpart, xgtg, xgtd, xgts, xgtb, xcqgb=0.0, xcqdb=0.0, xcqsb=0.0, xcqbb=0.0;
++SPICE_REAL gbspsp, gbbdp, gbbsp, gbspg, gbspb;
++SPICE_REAL gbspdp, gbdpdp, gbdpg, gbdpb, gbdpsp;
++SPICE_REAL ddxpart_dVd, ddxpart_dVg, ddxpart_dVb, ddxpart_dVs;
++SPICE_REAL dsxpart_dVd, dsxpart_dVg, dsxpart_dVb, dsxpart_dVs;
++SPICE_REAL T0=0.0, T1, CoxWL, qcheq, Cdg, Cdd, Cds, Csg, Csd, Css;
++SPICE_REAL ScalingFactor = 1.0e-9;
+ struct bsim4v5SizeDependParam *pParam;
+-double ggidld, ggidlg, ggidlb, ggislg, ggislb, ggisls;
++SPICE_REAL ggidld, ggidlg, ggidlb, ggislg, ggislb, ggisls;
+ 
+-double m;
++SPICE_REAL m;
+ 
+     for (; model != NULL; model = BSIM4v5nextModel(model)) 
+     {    for (here = BSIM4v5instances(model); here!= NULL;
+--- a/src/spicelib/devices/bsim4v5/b4v5acld.c	2026-07-20 15:02:40.197664614 +0800
++++ b/src/spicelib/devices/bsim4v5/b4v5acld.c	2026-07-20 15:04:28.315139431 +0800
+@@ -15,6 +15,32 @@
+ #include "ngspice/sperror.h"
+ #include "ngspice/suffix.h"
+ 
++// MIXED-PRECISION: fp32 transcendental math
++#define B4V5_FP32_MATH
++#ifdef B4V5_FP32_MATH
++#undef SPICE_EXP
++#undef SPICE_LOG
++#undef SPICE_SQRT
++#undef SPICE_POW
++#undef SPICE_SIN
++#undef SPICE_COS
++#undef SPICE_FABS
++#undef SPICE_ATAN
++#undef SPICE_TAN
++#undef SPICE_TANH
++#define SPICE_EXP(x)  expf((float)(x))
++#define SPICE_LOG(x)  logf((float)(x))
++#define SPICE_SQRT(x) sqrtf((float)(x))
++#define SPICE_POW(x,y) powf((float)(x),(float)(y))
++#define SPICE_SIN(x)  sinf((float)(x))
++#define SPICE_COS(x)  cosf((float)(x))
++#define SPICE_FABS(x) fabsf((float)(x))
++#define SPICE_ATAN(x) atanf((float)(x))
++#define SPICE_TAN(x)  tanf((float)(x))
++#define SPICE_TANH(x) tanhf((float)(x))
++#include "b4v5_fp32_math.h"  /* shared header — supersedes inline macros above */
++#endif
++
+ 
+ int
+ BSIM4v5acLoad(
+@@ -24,35 +50,35 @@
+ BSIM4v5model *model = (BSIM4v5model*)inModel;
+ BSIM4v5instance *here;
+ 
+-double gjbd, gjbs, geltd, gcrg, gcrgg, gcrgd, gcrgs, gcrgb;
+-double xcbgb, xcbdb, xcbsb, xcbbb;
+-double xcggbr, xcgdbr, xcgsbr, xcgbbr, xcggbi, xcgdbi, xcgsbi, xcgbbi;
+-double Cggr, Cgdr, Cgsr, Cgbr, Cggi, Cgdi, Cgsi, Cgbi;
+-double xcddbr, xcdgbr, xcdsbr, xcdbbr, xcsdbr, xcsgbr, xcssbr, xcsbbr;
+-double xcddbi, xcdgbi, xcdsbi, xcdbbi, xcsdbi, xcsgbi, xcssbi, xcsbbi;
+-double xcdbdb, xcsbsb=0.0, xcgmgmb=0.0, xcgmdb=0.0, xcgmsb=0.0, xcdgmb, xcsgmb;
+-double xcgmbb=0.0, xcbgmb;
+-double capbd, capbs, omega;
+-double gstot, gstotd, gstotg, gstots, gstotb, gspr;
+-double gdtot, gdtotd, gdtotg, gdtots, gdtotb, gdpr;
+-double gIstotg, gIstotd, gIstots, gIstotb;
+-double gIdtotg, gIdtotd, gIdtots, gIdtotb;
+-double gIbtotg, gIbtotd, gIbtots, gIbtotb;
+-double gIgtotg, gIgtotd, gIgtots, gIgtotb;
+-double cgso, cgdo, cgbo;
+-double gbspsp, gbbdp, gbbsp, gbspg, gbspb;
+-double gbspdp, gbdpdp, gbdpg, gbdpb, gbdpsp;
+-double T0=0.0, T1, T2, T3;
+-double Csg, Csd, Css;
+-double Cdgr, Cddr, Cdsr, Cdbr, Csgr, Csdr, Cssr, Csbr;
+-double Cdgi, Cddi, Cdsi, Cdbi, Csgi, Csdi, Cssi, Csbi;
+-double gmr, gmi, gmbsr, gmbsi, gdsr, gdsi;
+-double FwdSumr, RevSumr, Gmr, Gmbsr;
+-double FwdSumi, RevSumi, Gmi, Gmbsi;
++SPICE_REAL gjbd, gjbs, geltd, gcrg, gcrgg, gcrgd, gcrgs, gcrgb;
++SPICE_REAL xcbgb, xcbdb, xcbsb, xcbbb;
++SPICE_REAL xcggbr, xcgdbr, xcgsbr, xcgbbr, xcggbi, xcgdbi, xcgsbi, xcgbbi;
++SPICE_REAL Cggr, Cgdr, Cgsr, Cgbr, Cggi, Cgdi, Cgsi, Cgbi;
++SPICE_REAL xcddbr, xcdgbr, xcdsbr, xcdbbr, xcsdbr, xcsgbr, xcssbr, xcsbbr;
++SPICE_REAL xcddbi, xcdgbi, xcdsbi, xcdbbi, xcsdbi, xcsgbi, xcssbi, xcsbbi;
++SPICE_REAL xcdbdb, xcsbsb=0.0, xcgmgmb=0.0, xcgmdb=0.0, xcgmsb=0.0, xcdgmb, xcsgmb;
++SPICE_REAL xcgmbb=0.0, xcbgmb;
++SPICE_REAL capbd, capbs, omega;
++SPICE_REAL gstot, gstotd, gstotg, gstots, gstotb, gspr;
++SPICE_REAL gdtot, gdtotd, gdtotg, gdtots, gdtotb, gdpr;
++SPICE_REAL gIstotg, gIstotd, gIstots, gIstotb;
++SPICE_REAL gIdtotg, gIdtotd, gIdtots, gIdtotb;
++SPICE_REAL gIbtotg, gIbtotd, gIbtots, gIbtotb;
++SPICE_REAL gIgtotg, gIgtotd, gIgtots, gIgtotb;
++SPICE_REAL cgso, cgdo, cgbo;
++SPICE_REAL gbspsp, gbbdp, gbbsp, gbspg, gbspb;
++SPICE_REAL gbspdp, gbdpdp, gbdpg, gbdpb, gbdpsp;
++SPICE_REAL T0=0.0, T1, T2, T3;
++SPICE_REAL Csg, Csd, Css;
++SPICE_REAL Cdgr, Cddr, Cdsr, Cdbr, Csgr, Csdr, Cssr, Csbr;
++SPICE_REAL Cdgi, Cddi, Cdsi, Cdbi, Csgi, Csdi, Cssi, Csbi;
++SPICE_REAL gmr, gmi, gmbsr, gmbsi, gdsr, gdsi;
++SPICE_REAL FwdSumr, RevSumr, Gmr, Gmbsr;
++SPICE_REAL FwdSumi, RevSumi, Gmi, Gmbsi;
+ struct bsim4v5SizeDependParam *pParam;
+-double ggidld, ggidlg, ggidlb, ggislg, ggislb, ggisls;
++SPICE_REAL ggidld, ggidlg, ggidlb, ggislg, ggislb, ggisls;
+ 
+-double m;
++SPICE_REAL m;
+ 
+     omega = ckt->CKTomega;
+     for (; model != NULL; model = BSIM4v5nextModel(model)) 
+--- a/src/spicelib/devices/bsim4v5/b4v5geo.c	2026-07-20 15:02:40.197664614 +0800
++++ b/src/spicelib/devices/bsim4v5/b4v5geo.c	2026-07-20 15:04:28.038282853 +0800
+@@ -11,6 +11,11 @@
+ #include "ngspice/ngspice.h"
+ #include "bsim4v5def.h"
+ 
++/* MIXED-PRECISION Phase 1A: use float for all local geometry calculations.
++ * These are pure linear operations (+, -, *, /), called once during setup.
++ * No exp/log/sqrt/pow — fp32 is perfectly safe here. */
++typedef float b4v5_real;
++
+ /*
+  * WDLiu:
+  * This subrutine is a special module to process the geometry dependent
+@@ -19,34 +24,35 @@
+  */
+ 
+ int
+-BSIM4v5RdsEndIso(double, double, double, double, double, double, int, int, double *);
++BSIM4v5RdsEndIso(SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, int, int, SPICE_REAL *);
+ int
+-BSIM4v5RdsEndSha(double, double, double, double, double, double, int, int, double *);
++BSIM4v5RdsEndSha(SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, SPICE_REAL, int, int, SPICE_REAL *);
+ 
+ static int
+ BSIM4v5NumFingerDiff(
+-double nf,
++SPICE_REAL nf,
+ int minSD,
+-double *nuIntD, double *nuEndD, double *nuIntS, double *nuEndS)
++SPICE_REAL *nuIntD, SPICE_REAL *nuEndD, SPICE_REAL *nuIntS, SPICE_REAL *nuEndS)
+ {
+ int NF;
+-        NF = (int)nf;
++b4v5_real fnf = (b4v5_real)nf;
++        NF = (int)fnf;
+ 	if ((NF%2) != 0)
+-	{   *nuEndD = *nuEndS = 1.0;
+-	    *nuIntD = *nuIntS = 2.0 * MAX((nf - 1.0) / 2.0, 0.0);
++	{   *nuEndD = *nuEndS = (SPICE_REAL)1.0f;
++	    *nuIntD = *nuIntS = (SPICE_REAL)(2.0f * MAX((fnf - 1.0f) / 2.0f, 0.0f));
+ 	}
+ 	else
+ 	{   if (minSD == 1) /* minimize # of source */
+-	    {   *nuEndD = 2.0;
+-		*nuIntD = 2.0 * MAX((nf / 2.0 - 1.0), 0.0);
+-		*nuEndS = 0.0;
+-		*nuIntS = nf;
++	    {   *nuEndD = (SPICE_REAL)2.0f;
++		*nuIntD = (SPICE_REAL)(2.0f * MAX((fnf / 2.0f - 1.0f), 0.0f));
++		*nuEndS = (SPICE_REAL)0.0f;
++		*nuIntS = (SPICE_REAL)fnf;
+ 	    }
+ 	    else
+-	    {   *nuEndD = 0.0;
+-                *nuIntD = nf;
+-                *nuEndS = 2.0;
+-                *nuIntS = 2.0 * MAX((nf / 2.0 - 1.0), 0.0);
++	    {   *nuEndD = (SPICE_REAL)0.0f;
++                *nuIntD = (SPICE_REAL)fnf;
++                *nuEndS = (SPICE_REAL)2.0f;
++                *nuIntS = (SPICE_REAL)(2.0f * MAX((fnf / 2.0f - 1.0f), 0.0f));
+ 	    }
+ 	}
+ return 0;
+@@ -55,100 +61,109 @@
+ 
+ int
+ BSIM4v5PAeffGeo(
+-double nf,
++SPICE_REAL nf,
+ int geo, int minSD,
+-double Weffcj, double DMCG, double DMCI, double DMDG,
+-double *Ps, double *Pd, double *As, double *Ad)
++SPICE_REAL Weffcj, SPICE_REAL DMCG, SPICE_REAL DMCI, SPICE_REAL DMDG,
++SPICE_REAL *Ps, SPICE_REAL *Pd, SPICE_REAL *As, SPICE_REAL *Ad)
+ {
+-double T0, T1, T2;
+-double ADiso, ADsha, ADmer, ASiso, ASsha, ASmer;
+-double PDiso, PDsha, PDmer, PSiso, PSsha, PSmer;
+-double nuIntD = 0.0, nuEndD = 0.0, nuIntS = 0.0, nuEndS = 0.0;
++b4v5_real T0, T1, T2;
++b4v5_real ADiso, ADsha, ADmer, ASiso, ASsha, ASmer;
++b4v5_real PDiso, PDsha, PDmer, PSiso, PSsha, PSmer;
++b4v5_real nuIntD = 0.0f, nuEndD = 0.0f, nuIntS = 0.0f, nuEndS = 0.0f;
++b4v5_real fWcj = (b4v5_real)Weffcj;
++b4v5_real fDMCG = (b4v5_real)DMCG;
++b4v5_real fDMCI = (b4v5_real)DMCI;
++b4v5_real fDMDG = (b4v5_real)DMDG;
++b4v5_real fnf = (b4v5_real)nf;
+ 
+ 	if (geo < 9) /* For geo = 9 and 10, the numbers of S/D diffusions already known */
+-	BSIM4v5NumFingerDiff(nf, minSD, &nuIntD, &nuEndD, &nuIntS, &nuEndS);
++	{   SPICE_REAL snuIntD, snuEndD, snuIntS, snuEndS;
++	    BSIM4v5NumFingerDiff(nf, minSD, &snuIntD, &snuEndD, &snuIntS, &snuEndS);
++	    nuIntD = (b4v5_real)snuIntD; nuEndD = (b4v5_real)snuEndD;
++	    nuIntS = (b4v5_real)snuIntS; nuEndS = (b4v5_real)snuEndS;
++	}
+ 
+-	T0 = DMCG + DMCI;
+-	T1 = DMCG + DMCG;
+-	T2 = DMDG + DMDG;
++	T0 = fDMCG + fDMCI;
++	T1 = fDMCG + fDMCG;
++	T2 = fDMDG + fDMDG;
+ 
+-	PSiso = PDiso = T0 + T0 + Weffcj;
++	PSiso = PDiso = T0 + T0 + fWcj;
+ 	PSsha = PDsha = T1;
+ 	PSmer = PDmer = T2;
+ 
+-	ASiso = ADiso = T0 * Weffcj;
+-	ASsha = ADsha = DMCG * Weffcj;
+-	ASmer = ADmer = DMDG * Weffcj;
++	ASiso = ADiso = T0 * fWcj;
++	ASsha = ADsha = fDMCG * fWcj;
++	ASmer = ADmer = fDMDG * fWcj;
+ 
+ 	switch(geo)
+ 	{   case 0:
+-		*Ps = nuEndS * PSiso + nuIntS * PSsha;
+-		*Pd = nuEndD * PDiso + nuIntD * PDsha;
+-		*As = nuEndS * ASiso + nuIntS * ASsha;
+-		*Ad = nuEndD * ADiso + nuIntD * ADsha;
++		*Ps = (SPICE_REAL)(nuEndS * PSiso + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDiso + nuIntD * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASiso + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADiso + nuIntD * ADsha);
+ 		break;
+ 	    case 1:
+-                *Ps = nuEndS * PSiso + nuIntS * PSsha;
+-                *Pd = (nuEndD + nuIntD) * PDsha;
+-                *As = nuEndS * ASiso + nuIntS * ASsha;
+-                *Ad = (nuEndD + nuIntD) * ADsha;
+-                break;
+-            case 2:
+-                *Ps = (nuEndS + nuIntS) * PSsha;
+-                *Pd = nuEndD * PDiso + nuIntD * PDsha;
+-                *As = (nuEndS + nuIntS) * ASsha;
+-                *Ad = nuEndD * ADiso + nuIntD * ADsha;
+-                break;
+-            case 3:
+-                *Ps = (nuEndS + nuIntS) * PSsha;
+-                *Pd = (nuEndD + nuIntD) * PDsha;
+-                *As = (nuEndS + nuIntS) * ASsha;
+-                *Ad = (nuEndD + nuIntD) * ADsha;
+-                break;
+-            case 4:
+-                *Ps = nuEndS * PSiso + nuIntS * PSsha;
+-                *Pd = nuEndD * PDmer + nuIntD * PDsha;
+-                *As = nuEndS * ASiso + nuIntS * ASsha;
+-                *Ad = nuEndD * ADmer + nuIntD * ADsha;
+-                break;
+-            case 5:
+-                *Ps = (nuEndS + nuIntS) * PSsha;
+-                *Pd = nuEndD * PDmer + nuIntD * PDsha;
+-                *As = (nuEndS + nuIntS) * ASsha;
+-                *Ad = nuEndD * ADmer + nuIntD * ADsha;
+-                break;
+-            case 6:
+-                *Ps = nuEndS * PSmer + nuIntS * PSsha;
+-                *Pd = nuEndD * PDiso + nuIntD * PDsha;
+-                *As = nuEndS * ASmer + nuIntS * ASsha;
+-                *Ad = nuEndD * ADiso + nuIntD * ADsha;
+-                break;
+-            case 7:
+-                *Ps = nuEndS * PSmer + nuIntS * PSsha;
+-                *Pd = (nuEndD + nuIntD) * PDsha;
+-                *As = nuEndS * ASmer + nuIntS * ASsha;
+-                *Ad = (nuEndD + nuIntD) * ADsha;
+-                break;
+-            case 8:
+-                *Ps = nuEndS * PSmer + nuIntS * PSsha;
+-                *Pd = nuEndD * PDmer + nuIntD * PDsha;
+-                *As = nuEndS * ASmer + nuIntS * ASsha;
+-                *Ad = nuEndD * ADmer + nuIntD * ADsha;
+-                break;
+-            case 9: /* geo = 9 and 10 happen only when nf = even */
+-                *Ps = PSiso + (nf - 1.0) * PSsha;
+-                *Pd = nf * PDsha;
+-                *As = ASiso + (nf - 1.0) * ASsha;
+-                *Ad = nf * ADsha;
+-                break;
+-            case 10:
+-                *Ps = nf * PSsha;
+-                *Pd = PDiso + (nf - 1.0) * PDsha;
+-                *As = nf * ASsha;
+-                *Ad = ADiso + (nf - 1.0) * ADsha;
+-                break;
++		*Ps = (SPICE_REAL)(nuEndS * PSiso + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)((nuEndD + nuIntD) * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASiso + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)((nuEndD + nuIntD) * ADsha);
++		break;
++	    case 2:
++		*Ps = (SPICE_REAL)((nuEndS + nuIntS) * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDiso + nuIntD * PDsha);
++		*As = (SPICE_REAL)((nuEndS + nuIntS) * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADiso + nuIntD * ADsha);
++		break;
++	    case 3:
++		*Ps = (SPICE_REAL)((nuEndS + nuIntS) * PSsha);
++		*Pd = (SPICE_REAL)((nuEndD + nuIntD) * PDsha);
++		*As = (SPICE_REAL)((nuEndS + nuIntS) * ASsha);
++		*Ad = (SPICE_REAL)((nuEndD + nuIntD) * ADsha);
++		break;
++	    case 4:
++		*Ps = (SPICE_REAL)(nuEndS * PSiso + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDmer + nuIntD * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASiso + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADmer + nuIntD * ADsha);
++		break;
++	    case 5:
++		*Ps = (SPICE_REAL)((nuEndS + nuIntS) * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDmer + nuIntD * PDsha);
++		*As = (SPICE_REAL)((nuEndS + nuIntS) * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADmer + nuIntD * ADsha);
++		break;
++	    case 6:
++		*Ps = (SPICE_REAL)(nuEndS * PSmer + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDiso + nuIntD * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASmer + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADiso + nuIntD * ADsha);
++		break;
++	    case 7:
++		*Ps = (SPICE_REAL)(nuEndS * PSmer + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)((nuEndD + nuIntD) * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASmer + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)((nuEndD + nuIntD) * ADsha);
++		break;
++	    case 8:
++		*Ps = (SPICE_REAL)(nuEndS * PSmer + nuIntS * PSsha);
++		*Pd = (SPICE_REAL)(nuEndD * PDmer + nuIntD * PDsha);
++		*As = (SPICE_REAL)(nuEndS * ASmer + nuIntS * ASsha);
++		*Ad = (SPICE_REAL)(nuEndD * ADmer + nuIntD * ADsha);
++		break;
++	    case 9: /* geo = 9 and 10 happen only when nf = even */
++		*Ps = (SPICE_REAL)(PSiso + (fnf - 1.0f) * PSsha);
++		*Pd = (SPICE_REAL)(fnf * PDsha);
++		*As = (SPICE_REAL)(ASiso + (fnf - 1.0f) * ASsha);
++		*Ad = (SPICE_REAL)(fnf * ADsha);
++		break;
++	    case 10:
++		*Ps = (SPICE_REAL)(fnf * PSsha);
++		*Pd = (SPICE_REAL)(PDiso + (fnf - 1.0f) * PDsha);
++		*As = (SPICE_REAL)(fnf * ASsha);
++		*Ad = (SPICE_REAL)(ADiso + (fnf - 1.0f) * ADsha);
++		break;
+ 	    default:
+-		printf("Warning: Specified GEO = %d not matched\n", geo); 
++		printf("Warning: Specified GEO = %d not matched\n", geo);
+ 	}
+ return 0;
+ }
+@@ -156,14 +171,14 @@
+ 
+ int
+ BSIM4v5RdseffGeo(
+-double nf,
++SPICE_REAL nf,
+ int geo, int rgeo, int minSD,
+-double Weffcj, double Rsh, double DMCG, double DMCI, double DMDG,
++SPICE_REAL Weffcj, SPICE_REAL Rsh, SPICE_REAL DMCG, SPICE_REAL DMCI, SPICE_REAL DMDG,
+ int Type,
+-double *Rtot)
++SPICE_REAL *Rtot)
+ {
+-double Rint=0.0, Rend = 0.0;
+-double nuIntD = 0.0, nuEndD = 0.0, nuIntS = 0.0, nuEndS = 0.0;
++SPICE_REAL Rint=0.0, Rend = 0.0;
++SPICE_REAL nuIntD = 0.0, nuEndD = 0.0, nuIntS = 0.0, nuEndS = 0.0;
+ 
+         if (geo < 9) /* since geo = 9 and 10 only happen when nf = even */
+         {   BSIM4v5NumFingerDiff(nf, minSD, &nuIntD, &nuEndD, &nuIntS, &nuEndS);
+@@ -276,10 +291,10 @@
+ 
+ int
+ BSIM4v5RdsEndIso(
+-double Weffcj, double Rsh, double DMCG, double DMCI, double DMDG,
+-double nuEnd,
++SPICE_REAL Weffcj, SPICE_REAL Rsh, SPICE_REAL DMCG, SPICE_REAL DMCI, SPICE_REAL DMDG,
++SPICE_REAL nuEnd,
+ int rgeo, int Type,
+-double *Rend)
++SPICE_REAL *Rend)
+ {	
+ 	NG_IGNORE(DMDG);
+ 
+@@ -337,10 +352,10 @@
+ 
+ int
+ BSIM4v5RdsEndSha(
+-double Weffcj, double Rsh, double DMCG, double DMCI, double DMDG,
+-double nuEnd,
++SPICE_REAL Weffcj, SPICE_REAL Rsh, SPICE_REAL DMCG, SPICE_REAL DMCI, SPICE_REAL DMDG,
++SPICE_REAL nuEnd,
+ int rgeo, int Type,
+-double *Rend)
++SPICE_REAL *Rend)
+ {
+         NG_IGNORE(DMCI);
+         NG_IGNORE(DMDG);
+--- a/src/spicelib/devices/devsup.c	2026-07-20 15:02:40.205379939 +0800
++++ b/src/spicelib/devices/devsup.c	2026-07-20 15:04:14.608823209 +0800
+@@ -17,8 +17,8 @@
+ /* 
+  * Limit the per-iteration change of VDS 
+  */
+-double
+-DEVlimvds(double vnew, double vold)
++SPICE_REAL
++DEVlimvds(SPICE_REAL vnew, SPICE_REAL vold)
+ {
+ 
+     if(vold >= 3.5) {
+@@ -46,10 +46,10 @@
+  * This code has been fixed by Alan Gillespie adding limiting
+  * for negative voltages.
+  */
+-double
+-DEVpnjlim(double vnew, double vold, double vt, double vcrit, int *icheck)
++SPICE_REAL
++DEVpnjlim(SPICE_REAL vnew, SPICE_REAL vold, SPICE_REAL vt, SPICE_REAL vcrit, int *icheck)
+ {
+-    double arg;
++    SPICE_REAL arg;
+ 
+     if((vnew > vcrit) && (fabs(vnew - vold) > (vt + vt))) {
+         if(vold > 0) {
+@@ -89,14 +89,14 @@
+  * This code has been fixed by Alan Gillespie: a new
+  * definition for vtstlo. 
+  */
+-double
+-DEVfetlim(double vnew, double vold, double vto)
++SPICE_REAL
++DEVfetlim(SPICE_REAL vnew, SPICE_REAL vold, SPICE_REAL vto)
+ {
+-    double vtsthi;
+-    double vtstlo;
+-    double vtox;
+-    double delv;
+-    double vtemp;
++    SPICE_REAL vtsthi;
++    SPICE_REAL vtstlo;
++    SPICE_REAL vtox;
++    SPICE_REAL delv;
++    SPICE_REAL vtemp;
+ 
+     vtsthi = fabs(2*(vold-vto))+2;
+     vtstlo = fabs(vold-vto)+1;
+@@ -153,11 +153,11 @@
+ /* DEVlimitlog(deltemp, deltemp_old, LIM_TOL, check)
+  * Logarithmic damping the per-iteration change of deltemp beyond LIM_TOL.
+  */
+-double
++SPICE_REAL
+ DEVlimitlog(
+-    double deltemp,
+-    double deltemp_old,
+-    double LIM_TOL,
++    SPICE_REAL deltemp,
++    SPICE_REAL deltemp_old,
++    SPICE_REAL LIM_TOL,
+     int *check)
+ {
+     static bool shown = FALSE;
+@@ -186,23 +186,23 @@
+ int
+ ACM_SourceDrainResistances(
+ int ACM,
+-double LD,
+-double LDIF,
+-double HDIF,
+-double WMLT,
+-double w,
+-double XW,
+-double RSH,
++SPICE_REAL LD,
++SPICE_REAL LDIF,
++SPICE_REAL HDIF,
++SPICE_REAL WMLT,
++SPICE_REAL w,
++SPICE_REAL XW,
++SPICE_REAL RSH,
+ int drainSquaresGiven,
+-double RD,
+-double RDC,
+-double drainSquares,
++SPICE_REAL RD,
++SPICE_REAL RDC,
++SPICE_REAL drainSquares,
+ int sourceSquaresGiven,
+-double RS,
+-double RSC,
+-double sourceSquares,
+-double *drainResistance,
+-double *sourceResistance
++SPICE_REAL RS,
++SPICE_REAL RSC,
++SPICE_REAL sourceSquares,
++SPICE_REAL *drainResistance,
++SPICE_REAL *sourceResistance
+ )
+ {
+     switch (ACM)
+@@ -242,22 +242,22 @@
+ int ACM,
+ int CALCACM,
+ int GEO,
+-double HDIF,
+-double WMLT,
+-double w,
+-double XW,
+-double jctTempSatCurDensity,
+-double jctSidewallTempSatCurDensity,
++SPICE_REAL HDIF,
++SPICE_REAL WMLT,
++SPICE_REAL w,
++SPICE_REAL XW,
++SPICE_REAL jctTempSatCurDensity,
++SPICE_REAL jctSidewallTempSatCurDensity,
+ int drainAreaGiven,
+-double drainArea,
++SPICE_REAL drainArea,
+ int drainPerimeterGiven,
+-double drainPerimeter,
++SPICE_REAL drainPerimeter,
+ int sourceAreaGiven,
+-double sourceArea,
++SPICE_REAL sourceArea,
+ int sourcePerimeterGiven,
+-double sourcePerimeter,
+-double *DrainSatCurrent,
+-double *SourceSatCurrent
++SPICE_REAL sourcePerimeter,
++SPICE_REAL *DrainSatCurrent,
++SPICE_REAL *SourceSatCurrent
+ )
+ {
+     switch (ACM)
+@@ -356,27 +356,27 @@
+ int ACM,
+ int CALCACM,
+ int GEO,
+-double HDIF,
+-double WMLT,
+-double w,
+-double XW,
++SPICE_REAL HDIF,
++SPICE_REAL WMLT,
++SPICE_REAL w,
++SPICE_REAL XW,
+ int drainAreaGiven,
+-double drainArea,
++SPICE_REAL drainArea,
+ int drainPerimeterGiven,
+-double drainPerimeter,
++SPICE_REAL drainPerimeter,
+ int sourceAreaGiven,
+-double sourceArea,
++SPICE_REAL sourceArea,
+ int sourcePerimeterGiven,
+-double sourcePerimeter,
+-double CJ,
+-double CJSW,
+-double CJGATE,
+-double *areaDrainBulkCapacitance,
+-double *periDrainBulkCapacitance,
+-double *gateDrainBulkCapacitance,
+-double *areaSourceBulkCapacitance,
+-double *periSourceBulkCapacitance,
+-double *gateSourceBulkCapacitance
++SPICE_REAL sourcePerimeter,
++SPICE_REAL CJ,
++SPICE_REAL CJSW,
++SPICE_REAL CJGATE,
++SPICE_REAL *areaDrainBulkCapacitance,
++SPICE_REAL *periDrainBulkCapacitance,
++SPICE_REAL *gateDrainBulkCapacitance,
++SPICE_REAL *areaSourceBulkCapacitance,
++SPICE_REAL *periSourceBulkCapacitance,
++SPICE_REAL *gateSourceBulkCapacitance
+ )
+ {
+     switch (ACM)
+@@ -566,33 +566,33 @@
+  * PN 2002: As of ngspice this code is not used by any device. 
+  */
+ void
+-DEVcmeyer(double vgs0,		/* initial voltage gate-source */
+-	  double vgd0,		/* initial voltage gate-drain */
+-	  double vgb0,		/* initial voltage gate-bulk */
+-	  double von0,
+-	  double vdsat0,
+-	  double vgs1,		/* final voltage gate-source */
+-	  double vgd1,		/* final voltage gate-drain */
+-	  double vgb1,		/* final voltage gate-bulk */
+-	  double covlgs,	/* overlap capacitance gate-source */
+-	  double covlgd,	/* overlap capacitance gate-drain */
+-	  double covlgb,	/* overlap capacitance gate-bulk */
+-	  double *cgs,
+-	  double *cgd,
+-	  double *cgb,
+-	  double phi,
+-	  double cox,
+-	  double von,
+-	  double vdsat)
++DEVcmeyer(SPICE_REAL vgs0,		/* initial voltage gate-source */
++	  SPICE_REAL vgd0,		/* initial voltage gate-drain */
++	  SPICE_REAL vgb0,		/* initial voltage gate-bulk */
++	  SPICE_REAL von0,
++	  SPICE_REAL vdsat0,
++	  SPICE_REAL vgs1,		/* final voltage gate-source */
++	  SPICE_REAL vgd1,		/* final voltage gate-drain */
++	  SPICE_REAL vgb1,		/* final voltage gate-bulk */
++	  SPICE_REAL covlgs,	/* overlap capacitance gate-source */
++	  SPICE_REAL covlgd,	/* overlap capacitance gate-drain */
++	  SPICE_REAL covlgb,	/* overlap capacitance gate-bulk */
++	  SPICE_REAL *cgs,
++	  SPICE_REAL *cgd,
++	  SPICE_REAL *cgb,
++	  SPICE_REAL phi,
++	  SPICE_REAL cox,
++	  SPICE_REAL von,
++	  SPICE_REAL vdsat)
+ {
+ 
+ 
+-    double vdb;
+-    double vdbsat;
+-    double vddif;
+-    double vddif1;
+-    double vddif2;
+-    double vgbt;
++    SPICE_REAL vdb;
++    SPICE_REAL vdbsat;
++    SPICE_REAL vddif;
++    SPICE_REAL vddif1;
++    SPICE_REAL vddif2;
++    SPICE_REAL vgbt;
+ 
+     *cgs = 0;
+     *cgd = 0;
+@@ -651,12 +651,12 @@
+ http://ltwiki.org/index.php5?title=Undocumented_LTspice#VDMOS:_Breakdown_and_Sub-threshold_Enhancements
+ */
+ void
+-DevCapVDMOS(double vgd, double cgdmin,
+-            double cgdmax, double a, double cgs,
+-            double *capgs, double *capgd)
++DevCapVDMOS(SPICE_REAL vgd, SPICE_REAL cgdmin,
++            SPICE_REAL cgdmax, SPICE_REAL a, SPICE_REAL cgs,
++            SPICE_REAL *capgs, SPICE_REAL *capgd)
+ {
+-    double s = (cgdmax - cgdmin) / (1 + M_PI / 2);
+-    double y = cgdmax - s;
++    SPICE_REAL s = (cgdmax - cgdmin) / (1 + M_PI / 2);
++    SPICE_REAL y = cgdmax - s;
+     if (vgd > 0)
+         *capgd = 0.5 * (s * tanh(a * vgd) + y);
+     else
+@@ -671,25 +671,25 @@
+  *          device models.
+  */
+ void
+-DEVqmeyer(double vgs,		/* initial voltage gate-source */
+-	  double vgd,		/* initial voltage gate-drain */
+-	  double vgb,		/* initial voltage gate-bulk */
+-	  double von,
+-	  double vdsat,
+-	  double *capgs,	/* non-constant portion of g-s overlap
++DEVqmeyer(SPICE_REAL vgs,		/* initial voltage gate-source */
++	  SPICE_REAL vgd,		/* initial voltage gate-drain */
++	  SPICE_REAL vgb,		/* initial voltage gate-bulk */
++	  SPICE_REAL von,
++	  SPICE_REAL vdsat,
++	  SPICE_REAL *capgs,	/* non-constant portion of g-s overlap
+                                    capacitance */
+-	  double *capgd,	/* non-constant portion of g-d overlap
++	  SPICE_REAL *capgd,	/* non-constant portion of g-d overlap
+                                    capacitance */
+-	  double *capgb,	/* non-constant portion of g-b overlap
++	  SPICE_REAL *capgb,	/* non-constant portion of g-b overlap
+                                    capacitance */
+-	  double phi,
+-	  double cox)		/* oxide capactiance */
++	  SPICE_REAL phi,
++	  SPICE_REAL cox)		/* oxide capactiance */
+ {
+-    double vds;
+-    double vddif;
+-    double vddif1;
+-    double vddif2;
+-    double vgst;
++    SPICE_REAL vds;
++    SPICE_REAL vddif;
++    SPICE_REAL vddif1;
++    SPICE_REAL vddif2;
++    SPICE_REAL vgst;
+ 
+     NG_IGNORE(vgb);
+ 
+@@ -743,14 +743,14 @@
+  * PN 2002: This is industrial archaelology
+  */
+ void
+-DEVcap(CKTcircuit *ckt, double vgd, double vgs, double vgb, double covlgd,
+-       double covlgs, double covlgb, double capbd, double capbs, double cggb,
+-       double cgdb, double cgsb, double cbgb, double cbdb, double cbsb,
+-       double *gcggb, double *gcgdb, double *gcgsb, double *gcbgb, 
+-       double *gcbdb, double *gcbsb, double *gcdgb, double *gcddb, 
+-       double *gcdsb, double *gcsgb, double *gcsdb, double *gcssb,
+-       double qgate, double qchan, double qbulk, double *qdrn, double *qsrc,
+-       double xqc)
++DEVcap(CKTcircuit *ckt, SPICE_REAL vgd, SPICE_REAL vgs, SPICE_REAL vgb, SPICE_REAL covlgd,
++       SPICE_REAL covlgs, SPICE_REAL covlgb, SPICE_REAL capbd, SPICE_REAL capbs, SPICE_REAL cggb,
++       SPICE_REAL cgdb, SPICE_REAL cgsb, SPICE_REAL cbgb, SPICE_REAL cbdb, SPICE_REAL cbsb,
++       SPICE_REAL *gcggb, SPICE_REAL *gcgdb, SPICE_REAL *gcgsb, SPICE_REAL *gcbgb, 
++       SPICE_REAL *gcbdb, SPICE_REAL *gcbsb, SPICE_REAL *gcdgb, SPICE_REAL *gcddb, 
++       SPICE_REAL *gcdsb, SPICE_REAL *gcsgb, SPICE_REAL *gcsdb, SPICE_REAL *gcssb,
++       SPICE_REAL qgate, SPICE_REAL qchan, SPICE_REAL qbulk, SPICE_REAL *qdrn, SPICE_REAL *qsrc,
++       SPICE_REAL xqc)
+ 
+     /*
+      *     compute equivalent conductances
+@@ -758,18 +758,18 @@
+      */
+ {
+ 
+-    double gcd;
+-    double gcdxd;
+-    double gcdxs;
+-    double gcg;
+-    double gcgxd;
+-    double gcgxs;
+-    double gcs;
+-    double gcsxd;
+-    double gcsxs;
+-    double qgb;
+-    double qgd;
+-    double qgs;
++    SPICE_REAL gcd;
++    SPICE_REAL gcdxd;
++    SPICE_REAL gcdxs;
++    SPICE_REAL gcg;
++    SPICE_REAL gcgxd;
++    SPICE_REAL gcgxs;
++    SPICE_REAL gcs;
++    SPICE_REAL gcsxd;
++    SPICE_REAL gcsxs;
++    SPICE_REAL qgb;
++    SPICE_REAL qgd;
++    SPICE_REAL qgs;
+ 
+     gcg = (cggb+cbgb)*ckt->CKTag[1];
+     gcd = (cgdb+cbdb)*ckt->CKTag[1];
+@@ -811,11 +811,11 @@
+ 
+ /* Predict a value for the capacitor at loct by extrapolating from
+  * previous values */
+-double
++SPICE_REAL
+ DEVpred(CKTcircuit *ckt, int loct)
+ {
+     if (!ckt->CKTnewtrunc) {
+-        double xfact;
++        SPICE_REAL xfact;
+ 
+         xfact = ckt->CKTdelta / ckt->CKTdeltaOld[1];
+         return(((1 + xfact) * *(ckt->CKTstate1 + loct)) -
