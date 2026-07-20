@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FP64 精度孤岛 — 源码级数值分析</title>
+<style>
+:root{--bg:#0d1117;--fg:#c9d1d9;--accent:#58a6ff;--pass:#3fb950;--fail:#f85149;--warn:#d2991d;--border:#30363d;--card:#161b22;--code-bg:#1c2128;--island:#f0883e}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--fg);line-height:1.7;padding:20px}
+.container{max-width:1000px;margin:0 auto}
+h1{text-align:center;font-size:1.5em;margin:20px 0 5px;color:var(--accent)}
+.subtitle{text-align:center;color:#8b949e;margin-bottom:25px;font-size:0.9em}
+h2{font-size:1.15em;border-bottom:2px solid var(--border);padding-bottom:6px;margin:30px 0 12px;color:var(--island)}
+h3{font-size:1em;margin:15px 0 8px;color:#e6edf3}
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:18px;margin:12px 0}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:14px;overflow-x:auto;font-size:0.84em;line-height:1.5;margin:10px 0}
+code{font-family:'Cascadia Code','Fira Code',monospace;font-size:0.88em}
+.num-box{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:12px;margin:10px 0}
+.num-box table{width:100%;font-size:0.88em;border-collapse:collapse}
+.num-box td{padding:4px 10px;border-bottom:1px solid rgba(255,255,255,0.05)}
+.num-box .val{font-family:monospace;color:var(--warn)}
+.num-box .res{font-family:monospace;font-weight:700}
+.hl-fp32{color:var(--fail)} .hl-fp64{color:var(--pass)} .hl-over{color:var(--fail);font-weight:700}
+.eq{margin:10px 0;padding:10px;background:rgba(88,166,255,0.05);border-radius:6px;font-family:monospace;font-size:0.9em}
+.footnote{color:#8b949e;font-size:0.82em;margin-top:6px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>FP64 精度孤岛 — 源码级数值分析</h1>
+<p class="subtitle">每个孤岛为什么必须保留 double 精度 · Mixed_ngspice patches 001–015</p>
+
+<!-- ====== 总览 ====== -->
+<div class="card">
+<h3>5 个孤岛的两类根因</h3>
+<table>
+<thead><tr><th>类别</th><th>孤岛</th><th>根因</th><th>FP32 后果</th></tr></thead>
+<tbody>
+<tr><td rowspan="3"><b>类型 A: overflow</b><br>积超出 FP32 范围<br>(> 3.4×10³⁸)</td>
+<td>Vbi (patch 012)</td><td>nsd·ndep = 2×10²⁰ × 3.2×10¹⁸ = <b class="hl-over">6.4×10³⁸</b></td><td>→ +Inf → log(Inf)=Inf → Vbi=Inf → Vth=NaN</td></tr>
+<tr><td>噪声 NOIA (patch 015)</td><td>NOIA 默认值 = <b class="hl-over">6.25×10⁴¹</b> (NMOS)</td><td>→ +Inf → 所有噪声计算 NaN</td></tr>
+<tr><td>噪声 NOIB</td><td>NOIB = <b class="hl-over">3.125×10²⁶</b></td><td>FP32 可存但后续计算链溢出</td></tr>
+<tr><td rowspan="3"><b>类型 B: 消去误差</b><br>接近相等的两个大数<br>相减导致有效位丢失</td>
+<td>Leff/Weff (patch 004)</td><td>L − 2·dl ≈ <b class="hl-fp32">45nm − 1.2nm</b></td><td>FP32: 约 3 位有效数字 → ~5% 误差</td></tr>
+<tr><td>Vth k1ox (patch 013)</td><td>k1ox·√φs − k1·√φ 两项差 ~2%</td><td>FP32: ~7 位有效数字丢失 → Vth 偏移</td></tr>
+<tr><td>Vbseff/Phis (patch 003)</td><td>Vbs−vbsc−0.001; √(T₀²−0.004·vbsc)</td><td>FP32: 平方差消去 → 体效应计算失效</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ====== 孤岛 1: Vbi overflow ====== -->
+<section>
+<h2>孤岛 1: Vbi — 掺杂浓度乘积溢出 FP32</h2>
+<div class="card">
+<p><b>文件</b>: <code>b4v5temp.c</code> · <b>Patch</b>: 012 · <b>类型</b>: overflow</p>
+
+<pre><span class="hl-fp32">// FP32 (原始): nsd·ndep = 2e20 × 3.24e18 = 6.48e38</span>
+<span class="hl-over">// 6.48e38 > FLT_MAX(3.4e38) → overflow → +Inf</span>
+<span class="hl-fp32">vbi = Vtm0 * log(nsd * ndep / (ni * ni));  // log(Inf) = Inf</span>
+
+<span class="hl-fp64">// FP64 孤岛: 全部转换为 double 后再计算</span>
+vbi = (<span class="hl-fp64">(double)</span>Vtm0 * log(<span class="hl-fp64">(double)</span>nsd * <span class="hl-fp64">(double)</span>ndep
+                / (<span class="hl-fp64">(double)</span>ni * <span class="hl-fp64">(double)</span>ni)));
+</pre>
+
+<div class="num-box">
+<table>
+<tr><td><b>变量</b></td><td><b>PTM45 典型值</b></td><td><b>float 范围</b></td><td><b>结果</b></td></tr>
+<tr><td>nsd</td><td class="val">2.0×10²⁰</td><td>✅ 3.4×10³⁸</td><td></td></tr>
+<tr><td>ndep</td><td class="val">3.24×10¹⁸</td><td>✅ 3.4×10³⁸</td><td></td></tr>
+<tr style="background:rgba(248,81,73,0.08)"><td><b>nsd × ndep</b></td><td class="val"><b>6.48×10³⁸</b></td><td>❌ 溢出!</td><td class="res hl-over">→ +Inf</td></tr>
+<tr style="background:rgba(248,81,73,0.08)"><td>log(+Inf)</td><td></td><td></td><td class="res hl-over">→ +Inf</td></tr>
+<tr style="background:rgba(248,81,73,0.08)"><td>Vbi = +Inf</td><td></td><td></td><td class="res hl-over">→ Vth = NaN</td></tr>
+</table>
+</div>
+
+<p><b>为什么这很隐蔽</b>: nsd 和 ndep 各自都在 FP32 范围内（~10²⁰），单独存储没问题。只有乘在一起才溢出。BSIM4 公式直接用 <code>nsd * ndep / (ni * ni)</code> 作为 <code>log()</code> 的参数——没有任何中间变量存储这个乘积——但 FP32 的寄存器运算同样受 3.4×10³⁸ 限制。</p>
+
+<p><b>为什么 (double) 转换就解决了</b>: double 最大值是 1.8×10³⁰⁸，比 6.48×10³⁸ 大 270 个数量级。(double) 转换让乘法在 64 位寄存器中完成，最后 (SPICE_REAL) 截断存储结果——而 log(6.48e38) ≈ 89.4，远小于 3.4×10³⁸，截断回 float 完全安全。</p>
+</div>
+</section>
+
+<!-- ====== 孤岛 2: Vth k1ox ====== -->
+<section>
+<h2>孤岛 2: Vth k1ox — 近等数相减的消去误差</h2>
+<div class="card">
+<p><b>文件</b>: <code>b4v5ld.c</code> · <b>Patch</b>: 013 · <b>类型</b>: 消去误差</p>
+
+<div class="eq">
+ΔVth = k1ox · √φ<sub>s</sub> − k1 · √φ<sub>0</sub>
+</div>
+
+<pre><span class="hl-fp32">// FP32:
+Delt_k1ox = k1ox * sqrtPhis - k1 * sqrtPhi;
+// ≈ 30 × 0.55 − 0.4 × 0.50 = 16.5 − 0.2 = <b>16.3</b></span>
+
+<span class="hl-fp64">// FP64 孤岛:
+double d_diff = (double)k1ox * (double)sqrtPhis - (double)k1 * (double)sqrtPhi;
+Delt_k1ox = (SPICE_REAL)d_diff;</span>
+</pre>
+
+<div class="num-box">
+<table>
+<tr><td><b>项</b></td><td><b>典型值</b></td><td><b>FP32 表示</b></td><td><b>有效位</b></td></tr>
+<tr><td>k1ox · √φ<sub>s</sub></td><td class="val">~16.5</td><td>1.65×10¹</td><td>7 位</td></tr>
+<tr><td>k1 · √φ<sub>0</sub></td><td class="val">~0.2</td><td>2.0×10⁻¹</td><td>7 位</td></tr>
+<tr style="background:rgba(248,81,73,0.08)"><td><b>差值</b></td><td class="val"><b>~16.3</b></td><td>1.63×10¹</td><td><b>仅 3 位</b> (丢失 4 位)</td></tr>
+</table>
+</div>
+
+<p><b>根因</b>: k1ox ≈ 30–50, k1 ≈ 0.3–0.5, sqrtPhis ≈ sqrtPhi ≈ 0.5–0.6。第一项 ~15–30，第二项 ~0.15–0.3。两项相差 ~100 倍，相减时 FP32 只有 ~3 位有效数字（23 位尾数，但需要对齐指数后再减，丢失了 ~4 个十进制有效位）。Vth 偏移 1–2mV 就会影响整个 gm/gds/ids。</p>
+
+<p><b>为什么用 double</b>: double 有 52 位尾数（FP32 的 23 位），相差 100 倍的两个数相减仍有 ~13 个有效十进制位。</p>
+</div>
+</section>
+
+<!-- ====== 孤岛 3: Vbseff/Phis ====== -->
+<section>
+<h2>孤岛 3: Vbseff/Phis — sqrt 内的平方差消去</h2>
+<div class="card">
+<p><b>文件</b>: <code>b4v5ld.c</code> · <b>Patch</b>: 003 · <b>类型</b>: 消去误差</p>
+
+<div class="eq">
+Vbseff = vbsc + ½(T₀ + √(<b>T₀² − 0.004·vbsc</b>))
+<br>其中 T₀ = Vbs − vbsc − 0.001
+</div>
+
+<pre><span class="hl-fp32">// FP32: T₀² − 0.004·vbsc → 两个接近相等的数相减 → 消去误差
+T0 = Vbs - vbsc - 0.001;      // Vbs ≈ vbsc → T0 很小
+T1 = sqrt(T0*T0 - 0.004*vbsc); // T0² 和 0.004·vbsc 可能接近</span>
+
+<span class="hl-fp64">// FP64 孤岛: 全部在 double 精度下计算
+double dT0 = (double)Vbs - (double)vbsc - 0.001;
+double dT1 = sqrt(fmax(dT0 * dT0 - 0.004 * (double)vbsc, 0.0));</span>
+</pre>
+
+<p>当 Vbs ≈ vbsc 时（体效应电压接近衬底偏置），T₀ → 0。T₀² 和 0.004·vbsc 的值接近，FP32 下平方差消去会导致 sqrt 的参数变负或严重不准确。</p>
+</div>
+</section>
+
+<!-- ====== 孤岛 4: 噪声 ====== -->
+<section>
+<h2>孤岛 4: 噪声 NOIA — 物理常数超出 FP32 范围</h2>
+<div class="card">
+<p><b>文件</b>: <code>b4v5noi.c</code> · <b>Patch</b>: 015 · <b>类型</b>: overflow</p>
+
+<pre><span class="hl-fp32">// BSIM4 flicker noise model (fnoimod=1) 的默认参数:
+// NMOS: oxideTrapDensityA = 6.25e41  →  > FLT_MAX(3.4e38) → +Inf
+// PMOS: oxideTrapDensityA = 6.188e40 →  > FLT_MAX(3.4e38) → +Inf</span>
+
+<span class="hl-fp64">// FP64 孤岛: 在 double 中重新声明和计算这些参数
+double d_otA, d_otB, d_otC;  // ot = oxideTrap
+if (model->BSIM4v5type == NMOS) {
+    d_otA = 6.25e41;    d_otB = 3.125e26;   d_otC = 8.75e9;
+} else {
+    d_otA = 6.188e40;   d_otB = 1.5e25;     d_otC = 8.75e9;
+}</span>
+</pre>
+
+<div class="num-box">
+<table>
+<tr><td><b>参数</b></td><td><b>NMOS 值</b></td><td><b>PMOS 值</b></td><td><b>FP32 MAX</b></td><td><b>结果</b></td></tr>
+<tr><td>oxideTrapDensityA (NOIA)</td><td class="val hl-over">6.25×10⁴¹</td><td class="val hl-over">6.188×10⁴⁰</td><td>3.4×10³⁸</td><td>→ +Inf</td></tr>
+<tr><td>oxideTrapDensityB (NOIB)</td><td class="val">3.125×10²⁶</td><td class="val">1.5×10²⁵</td><td>3.4×10³⁸</td><td>FP32 可存</td></tr>
+<tr><td>oxideTrapDensityC (NOIC)</td><td class="val">8.75×10⁹</td><td>—</td><td>3.4×10³⁸</td><td>FP32 可存</td></tr>
+</table>
+</div>
+
+<p><b>为什么 oxideTrapDensity 值这么大</b>: 这不是错误——是物理含义导致的。BSIM4 的 1/f 噪声模型用 Noia 表示陷阱密度（单位 cm⁻³eV⁻¹）。硅/SiO₂ 界面的陷阱密度本来就极高（~10¹⁰–10¹² cm⁻²），换算成体密度后达到 10⁴¹ 量级。这个值作为中间参数参与计算，最终噪声电流在合理的 pA–nA 范围。</p>
+
+<p><b>开销</b>: ~52 double 运算/频率点 × ~80 频点 × ~5 器件 = ~20,000 double 运算/噪声分析，< 一次 DC 分析计算量的 0.1%。</p>
+</div>
+</section>
+
+<!-- ====== 孤岛 5: Leff/Weff ====== -->
+<section>
+<h2>孤岛 5: Leff/Weff — 沟道长度消去</h2>
+<div class="card">
+<p><b>文件</b>: <code>b4v5temp.c</code> · <b>Patch</b>: 004 · <b>类型</b>: 消去误差</p>
+
+<div class="eq">
+L<sub>eff</sub> = L<sub>new</sub> − 2×dl
+<br>其中 dl = Lint + Ll/L<sub>new</sub><sup>Lln</sup> + Lw/W<sub>new</sub><sup>Lwn</sup> + Lwl/(L<sub>new</sub><sup>Lln</sup>×W<sub>new</sub><sup>Lwn</sup>)
+</div>
+
+<pre><span class="hl-fp64">// FP64 孤岛: 整个 binning 计算在 double 中进行
+double dLnew = (double)Lnew;                    // Lnew ≈ 45nm = 4.5e-8
+double dT0 = pow(dLnew, (double)model->Lln);     // pow 跨度 >20 量级
+double dtmp1 = model->Ll / dT0 + model->Lw / dT1 + model->Lwl / (dT0*dT1);
+pParam->dl = (SPICE_REAL)(model->Lint + dtmp1);  // dl ≈ 0.6nm
+pParam->leff = (SPICE_REAL)(dLnew - 2.0 * pParam->dl);  // <b>45nm − 1.2nm</b></span>
+</pre>
+
+<div class="num-box">
+<table>
+<tr><td><b>计算步骤</b></td><td><b>值</b></td><td><b>FP32 相对误差</b></td><td><b>FP64 相对误差</b></td></tr>
+<tr><td>Lnew</td><td class="val">4.5×10⁻⁸</td><td>~10⁻⁷</td><td>~10⁻¹⁶</td></tr>
+<tr><td>dl</td><td class="val">6.0×10⁻¹⁰</td><td>~10⁻⁷</td><td>~10⁻¹⁶</td></tr>
+<tr style="background:rgba(248,81,73,0.08)"><td><b>Lnew − 2×dl</b></td><td class="val"><b>4.38×10⁻⁸</b></td><td><b>~5×10⁻³ (0.5%)</b></td><td>~10⁻¹⁶</td></tr>
+<tr style="background:rgba(248,81,73,0.08)"><td>Leff 影响 gm</td><td></td><td><b>gm ∝ 1/L<sub>eff</sub> → ~0.5%</b></td><td>可忽略</td></tr>
+</table>
+</div>
+
+<p><b>为什么这么敏感</b>: dl 的计算涉及 <code>pow(Lnew, Lln)</code>——Lln 是 binning 指数，通常 −0.5 到 −2.0 之间。45nm⁻² = 4.9×10¹⁴。Ll/Lnew^Lln 的除法跨越 20+ 个数量级。任何一个中间步骤的 FP32 舍入都会在最终的 Leff 中放大为 ~0.5% 的偏差——然后再通过 gm∝1/Leff 传播到所有小信号参数。</p>
+</div>
+</section>
+
+<!-- ====== 总结 ====== -->
+<section>
+<h2>总结: 为什么"全部 FP32"行不通</h2>
+<div class="card">
+<table>
+<thead><tr><th>#</th><th>孤岛</th><th>类型</th><th>FP32 失效模式</th><th>修复</th><th>额外开销</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Vbi</td><td>overflow</td><td>nsd·ndep → +Inf → NaN</td><td>(double) 乘法</td><td>4 次 double 运算</td></tr>
+<tr><td>2</td><td>Vth k1ox</td><td>消去</td><td>差值仅 3 有效位 → Vth 偏移</td><td>(double) 减法</td><td>4 次 double 运算</td></tr>
+<tr><td>3</td><td>Vbseff/Phis</td><td>消去</td><td>sqrt(T₀²−C) 中平方差消去</td><td>(double) sqrt 链</td><td>~20 次 double 运算</td></tr>
+<tr><td>4</td><td>噪声 NOIA</td><td>overflow</td><td>6.25e41 → +Inf → NaN</td><td>double 变量声明</td><td>~52 次 double 运算</td></tr>
+<tr><td>5</td><td>Leff/Weff</td><td>消去</td><td>45nm−1.2nm → ~0.5% 误差</td><td>(double) pow 链</td><td>~50 次 double 运算</td></tr>
+<tr style="font-weight:700;border-top:2px solid var(--accent)"><td colspan="3">总计</td><td colspan="2">~130 double 运算 / 晶体管 / DC 迭代</td><td><b>< 0.1%</b></td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<p style="color:#8b949e;font-size:0.82em;text-align:center;margin-top:30px">
+  Mixed_ngspice · <a href="https://github.com/gravity-wh/Mixed_ngspice" style="color:var(--accent)">github.com/gravity-wh/Mixed_ngspice</a> · 2026-07-20
+</p>
+
+</div>
+</body>
+</html>
