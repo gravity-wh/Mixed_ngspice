@@ -179,6 +179,29 @@
 
 <hr>
 
+<!-- ============ TRAN SECTION ============ -->
+<section>
+<h2>📊 六、TRAN 瞬态验证</h2>
+<table>
+<thead><tr><th>电路</th><th>TRAN 类型</th><th>工艺</th><th>收敛</th><th>状态</th></tr></thead>
+<tbody>
+<tr><td><b>NMOS 门极阶跃</b></td><td>PULSE 0→0.7V, 100ps沿</td><td>PTM45 LP</td><td>gmin=1e-10 sollim</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
+<tr><td><b>PMOS 门极阶跃</b></td><td>PULSE 1.1→0.4V, 100ps沿</td><td>PTM45 LP</td><td>gmin=1e-10 sollim</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
+<tr><td><b>BGR 启动瞬态</b></td><td>VDD ramp 0→3.3V 10µs</td><td>MS018 v1.6</td><td>默认</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
+<tr><td><b>17级环形振荡器</b></td><td>自由振荡 + 启动注入</td><td>PTM45 LP</td><td>默认 UIC</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
+<tr><td><b>比较器时钟瞬态</b></td><td>1GHz 时钟, 100ps沿, UIC</td><td>PTM45 HP</td><td>gmin=1e-10 sollim</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
+<tr><td>OTA 闭环阶跃</td><td>Unity-gain buffer, 1mV step</td><td>PTM45 LP</td><td>gmin=1e-10 sollim</td><td><span class="tag tag-fail">❌ FP32 TTS</span></td></tr>
+<tr><td>OpAmp 闭环阶跃</td><td>Unity-gain buffer, 100mV step</td><td>PTM45 LP</td><td>gmin=1e-10 sollim</td><td><span class="tag tag-fail">❌ FP32 TTS</span></td></tr>
+</tbody>
+</table>
+<div class="bar-wrap"><span style="min-width:100px">TRAN 通过率</span>
+  <div style="flex:1;background:#21262d;border-radius:4px"><div class="bar bar-pass" style="width:71%"></div></div><span>5/7 = 71%</span>
+</div>
+<div class="footnote">关键发现: 100ps 脉冲边沿在 FP32 可用; 10ps 边沿导致 TTS。闭环反馈电路 (OTA/OpAmp) 的 TRAN 仍是 FP32 硬边界。BGR 启动和环形振荡器在默认参数下收敛。</div>
+</section>
+
+<hr>
+
 <!-- ============ SUMMARY ============ -->
 <section>
 <h2>📋 七、总览</h2>
