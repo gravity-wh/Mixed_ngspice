@@ -31,8 +31,11 @@ jobs:
           build_fp32/src/ngspice --version 2>&1 || true
           build_fp64/src/ngspice --version 2>&1 || true
 
-      - name: Run test suite
+      - name: Run test suite (smoke test)
         run: bash test/run_all.sh --quick
+
+      - name: Precision validation (FP32 vs FP64)
+        run: bash scripts/ci_validate.sh --quick
 
       - name: Archive logs
         if: always()
@@ -40,4 +43,14 @@ jobs:
         with:
           name: test-logs
           path: logs/
+          retention-days: 7
+
+      - name: Archive precision reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: precision-reports
+          path: |
+            logs/*_compare.md
+            logs/ci_summary.json
           retention-days: 7
