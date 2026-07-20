@@ -166,20 +166,114 @@ Layer 5 ─ 求解器      patch 014         Cmin stepping + Solution Limiting
 
 <!-- ====== PATCHES 005-011 ====== -->
 <section>
-<h2>Patch 005–011 — 辅助文件 FP32 化 <span class="tag t-fp32">FP32 转换</span></h2>
+<h2>Patch 005 — b4v5set.c <span class="tag t-fp32">FP32 转换</span></h2>
 <div class="card">
+<h3>文件: <code>src/spicelib/devices/bsim4v5/b4v5set.c</code> (+1/-1, 最小 patch)</h3>
+<pre><span class="diff-rem">- double Rtot, DMCGeff, DMCIeff, DMDGeff;</span>
+<span class="diff-add">+ SPICE_REAL Rtot, DMCGeff, DMCIeff, DMDGeff;</span></pre>
+<p><b>唯一的变更</b>: 4 个局部变量 double→SPICE_REAL。b4v5set.c 是 BSIM4v5 的参数初始化/设置文件，只调用一次（非热路径），但类型必须与 patch 002 的 struct 成员对齐。</p>
+</div>
+</section>
+
+<section>
+<h2>Patch 006 — b4v5noi.c 噪声路径 <span class="tag t-fp32">FP32 转换</span></h2>
+<div class="card">
+<h3>文件: <code>src/spicelib/devices/bsim4v5/b4v5noi.c</code> (+55/-55)</h3>
 <table>
-<thead><tr><th>Patch</th><th>文件</th><th>行数</th><th>变更</th></tr></thead>
+<thead><tr><th>类别</th><th>变更</th></tr></thead>
 <tbody>
-<tr><td>005</td><td><code>b4v5set.c</code></td><td>11</td><td>SPICE_REAL 类型适配</td></tr>
-<tr><td>006</td><td><code>b4v5noi.c</code> (噪声)</td><td>99</td><td>FP32 数学宏块引入</td></tr>
-<tr><td>007</td><td><code>b4v5pzld.c</code> (零极点)</td><td>87</td><td>FP32 数学宏块引入</td></tr>
-<tr><td>008</td><td><code>b4v5acld.c</code> (AC)</td><td>97</td><td>FP32 数学宏块引入</td></tr>
-<tr><td>009</td><td><code>b4v5geo.c</code> (几何)</td><td>302</td><td>显式 float 几何计算 — 所有中间量显式 (float) 转换</td></tr>
-<tr><td>010</td><td><code>devsup.c</code> (器件支持)</td><td>369</td><td>double→SPICE_REAL: DEVlimvds, DEVpnjlim, DEVfetlim 等</td></tr>
-<tr><td>011</td><td><code>spconfig.h</code> (稀疏矩阵)</td><td>18</td><td>include typedefs.h 使 SPICE_REAL 在矩阵层可见</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>B4V5_FP32_MATH 宏块: SPICE_* → expf/logf/sqrtf (25 行)</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td><code>BSIM4v5Eval1ovFNoise()</code>: 返回类型 + 参数 Vds/freq/temp + 12 个局部变量 → SPICE_REAL</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td><code>BSIM4v5noise()</code>: OnDens 指针 + 14 个局部变量 → SPICE_REAL</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td><code>NevalSrc</code> 调用: <code>(double)0.0</code> → <code>(SPICE_REAL)0.0</code></td></tr>
 </tbody>
 </table>
+<p><b>注意</b>: 这是噪声路径的<b>初始 FP32 转换</b>。后续 patch 015 在此基础上增加了两个 FP64 孤岛修复 1/f 噪声 NaN。</p>
+</div>
+</section>
+
+<section>
+<h2>Patch 007 — b4v5pzld.c 零极点路径 <span class="tag t-fp32">FP32 转换</span></h2>
+<div class="card">
+<h3>文件: <code>src/spicelib/devices/bsim4v5/b4v5pzld.c</code> (+80/-70)</h3>
+<table>
+<thead><tr><th>类别</th><th>变更</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>B4V5_FP32_MATH 宏块 (25 行)</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>全部 56 个局部变量 double→SPICE_REAL</td></tr>
+</tbody>
+</table>
+<p>变量覆盖: 结电导 (gjbd/gjbs/geltd), 栅极电流电导 (gcrg/gg/gd/gs/gb), 电容矩阵 (xcg*/xcb*/xcd*/xcs* 实部+虚部), 跨导/输出电导 (gm/gds/gmbs), NQS 瞬态 (dxpart/sxpart/gtg/gtd/gts/gtb), 电荷项 (cqgb/db/sb/bb), 体效应 (gbspsp/gbbdp/gbbsp 等), 交叠电容 (cgso/cgdo/cgbo), 噪声参数 (ggidld/lg/lb, ggislg/lb/ls)。</p>
+</div>
+</section>
+
+<section>
+<h2>Patch 008 — b4v5acld.c AC 路径 <span class="tag t-fp32">FP32 转换</span></h2>
+<div class="card">
+<h3>文件: <code>src/spicelib/devices/bsim4v5/b4v5acld.c</code> (+100/-90)</h3>
+<table>
+<thead><tr><th>类别</th><th>变更</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>B4V5_FP32_MATH 宏块 (25 行)</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>全部 60+ 局部变量 double→SPICE_REAL</td></tr>
+</tbody>
+</table>
+<p>变量覆盖: AC 电容矩阵实部+虚部 (xcggbr/dbr/sbr/bbr + xcggbi/dbi/sbi/bbi 共 16 个), 交叉项 (xcdbdb/xcsbsb/xcgmgmb/xcgmdb/xcgmsb/xcdgmb/xcsgmb/xcgmbb/xcbgmb), omega/T0-T3/ScalingFactor, 输出 C 矩阵共 16 变量, gm/gds/gmbs 实虚部共 6 变量。</p>
+</div>
+</section>
+
+<section>
+<h2>Patch 009 — b4v5geo.c 几何路径 <span class="tag t-fp32">FP32 转换</span></h2>
+<div class="card">
+<h3>文件: <code>src/spicelib/devices/bsim4v5/b4v5geo.c</code> (+120/-105)</h3>
+<table>
+<thead><tr><th>类别</th><th>变更</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>局部 <code>typedef float b4v5_real</code> — 几何计算专用类型</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>所有函数签名 double→SPICE_REAL: BSIM4v5PAeffGeo, BSIM4v5RdseffGeo, BSIM4v5RdsEndIso/Sha, BSIM4v5NumFingerDiff</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>所有局部变量用 b4v5_real: ADiso/sha/mer, ASiso/sha/mer, PDiso/sha/mer, PSiso/sha/mer, nuIntD/EndD/IntS/EndS</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>所有输出赋值显式 (SPICE_REAL) 转换</td></tr>
+</tbody>
+</table>
+<p><b>为什么用局部 b4v5_real 而非 SPICE_REAL</b>: 几何计算是纯加减乘除，只在 setup 时调用一次，FP32 完全够用。局部 typedef 避免了对 SPICE_REAL 的传递依赖，使这个文件的类型选择独立于全局 SINGLE_PRECISION flag。</p>
+</div>
+</section>
+
+<section>
+<h2>Patch 010 — devsup.c 共享器件支持 <span class="tag t-fp32">FP32 转换</span></h2>
+<div class="card">
+<h3>文件: <code>src/spicelib/devices/devsup.c</code> (+200/-200)</h3>
+<p>这是<b>多器件共享</b>的支持函数库，不仅被 BSIM4v5 使用，也被其他器件模型调用。</p>
+<table>
+<thead><tr><th>函数</th><th>变更</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>DEVlimvds</code></td><td>返回值+参数: double→SPICE_REAL</td><td>Vds 限幅</td></tr>
+<tr><td><code>DEVpnjlim</code></td><td>返回值+参数+arg: double→SPICE_REAL</td><td>PN 结限幅</td></tr>
+<tr><td><code>DEVfetlim</code></td><td>返回值+参数+5 locals: double→SPICE_REAL</td><td>FET 限幅</td></tr>
+<tr><td><code>DEVlimitlog</code></td><td>返回值+参数: double→SPICE_REAL</td><td>对数限幅</td></tr>
+<tr><td><code>ACM_SourceDrainResistances</code></td><td>全部 18 参数: double→SPICE_REAL</td><td>源漏电阻计算</td></tr>
+<tr><td><code>ACM_CalcDrainSourceResSatCur</code></td><td>11 参数+4 输出指针: double→SPICE_REAL</td><td>漏源饱和电流</td></tr>
+<tr><td><code>ACM_CalcDrainSourceAreaCap</code></td><td>20 参数+6 输出指针: double→SPICE_REAL</td><td>漏源面积电容</td></tr>
+<tr><td><code>DEVcmeyer</code></td><td>18 参数+6 locals: double→SPICE_REAL</td><td>Meyer 电容模型</td></tr>
+<tr><td><code>DevCapVDMOS</code></td><td>6 参数+2 locals: double→SPICE_REAL</td><td>VDMOS 电容</td></tr>
+<tr><td><code>DEVqmeyer</code></td><td>14 参数+4 locals: double→SPICE_REAL</td><td>Meyer 电荷模型</td></tr>
+<tr><td><code>DEVcap</code></td><td>25 参数+12 locals: double→SPICE_REAL</td><td>通用电容计算</td></tr>
+<tr><td><code>DEVpred</code></td><td>返回值+1 local: double→SPICE_REAL</td><td>预测器</td></tr>
+</tbody>
+</table>
+<p>所有变更均为纯类型替换，无语义修改。</p>
+</div>
+</section>
+
+<section>
+<h2>Patch 011 — spconfig.h 稀疏矩阵层 <span class="tag t-fp32">FP32 转换</span></h2>
+<div class="card">
+<h3>文件: <code>src/maths/sparse/spconfig.h</code> (+3/-2)</h3>
+<pre><span class="diff-add">+ #include "ngspice/typedefs.h"  // 使 SPICE_REAL 在稀疏矩阵层可见</span>
+  ...
+<span class="diff-rem">- double precision</span>
+<span class="diff-add">+ SPICE_REAL precision</span>  (注释更新 ×2)</pre>
+<p>闭合类型系统链: typedefs.h → spconfig.h → 稀疏矩阵子系统。使得整个 ngspice 从器件模型到线性求解器都统一使用 SPICE_REAL。</p>
 </div>
 </section>
 
