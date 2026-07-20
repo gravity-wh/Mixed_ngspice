@@ -195,9 +195,9 @@
 </tbody>
 </table>
 <div class="bar-wrap"><span style="min-width:100px">TRAN 通过率</span>
-  <div style="flex:1;background:#21262d;border-radius:4px"><div class="bar bar-pass" style="width:71%"></div></div><span>5/7 = 71%</span>
+  <div style="flex:1;background:#21262d;border-radius:4px"><div class="bar bar-pass" style="width:8%"></div><div class="bar bar-fail" style="width:67%"></div><div class="bar bar-block" style="width:25%"></div></div><span>1/12 = 8% (FP32 only)</span>
 </div>
-<div class="footnote">关键发现: 100ps 脉冲边沿在 FP32 可用; 10ps 边沿导致 TTS。闭环反馈电路 (OTA/OpAmp) 的 TRAN 仍是 FP32 硬边界。BGR 启动和环形振荡器在默认参数下收敛。</div>
+<div class="footnote">🔴 TRAN 是 FP32 最薄弱的环节。仅 BGR 启动瞬态 (MS018 v1.6, VDD ramp 0→3.3V) 通过。环振和反相器链在 FP64 也 TTS (vdd#branch stiffness)。门极阶跃、OTA/OpAmp 开闭环均在 FP32 下 TTS。</div>
 </section>
 
 <hr>
