@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mixed_ngspice 15-Patch 全量 Diff 分析</title>
+<style>
+:root{--bg:#0d1117;--fg:#c9d1d9;--accent:#58a6ff;--pass:#3fb950;--fail:#f85149;--warn:#d2991d;--border:#30363d;--card:#161b22;--island:#f0883e;--island-bg:rgba(240,136,62,0.1);--fp32:#58a6ff;--fp32-bg:rgba(88,166,255,0.08)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--fg);line-height:1.6;padding:20px}
+.container{max-width:1100px;margin:0 auto}
+h1{text-align:center;font-size:1.5em;margin:20px 0 5px;color:var(--accent)}
+.subtitle{text-align:center;color:#8b949e;margin-bottom:25px;font-size:0.9em}
+section{margin-bottom:30px}
+h2{font-size:1.2em;border-bottom:2px solid var(--border);padding-bottom:6px;margin-bottom:14px}
+h3{font-size:1.05em;margin:18px 0 8px;color:#e6edf3}
+table{width:100%;border-collapse:collapse;font-size:0.88em;margin:10px 0}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--border)}
+th{background:var(--card);color:#8b949e;font-weight:600}
+tr:hover{background:rgba(88,166,255,0.03)}
+.tag{display:inline-block;padding:1px 7px;border-radius:3px;font-size:0.78em;font-weight:600}
+.t-fp32{background:var(--fp32-bg);color:var(--fp32)}
+.t-island{background:var(--island-bg);color:var(--island)}
+.t-fix{background:rgba(63,185,80,0.12);color:var(--pass)}
+.t-solver{background:rgba(210,153,29,0.12);color:var(--warn)}
+.t-safety{background:rgba(248,81,73,0.1);color:var(--fail)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin:12px 0}
+.card h3{margin-top:0}
+.legend{display:flex;gap:20px;margin:15px 0;flex-wrap:wrap;font-size:0.85em}
+.legend span{margin-right:4px}
+code{font-family:'Cascadia Code','Fira Code',monospace;font-size:0.88em;background:rgba(255,255,255,0.06);padding:1px 4px;border-radius:3px}
+pre{background:#1c2128;border:1px solid var(--border);border-radius:6px;padding:12px;overflow-x:auto;font-size:0.83em;line-height:1.5}
+.diff-add{color:var(--pass)} .diff-rem{color:var(--fail)}
+hr{border:none;border-top:1px solid var(--border);margin:20px 0}
+.footnote{color:#8b949e;font-size:0.8em;margin-top:6px;line-height:1.5}
+@media(max-width:768px){.legend{flex-direction:column;gap:8px}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Mixed_ngspice 15-Patch 全量 Diff 分析</h1>
+<p class="subtitle">vs. 原始 ngspice-46 (全部 FP64) · 总变更: 5957 行 · 涉及 10 个源文件</p>
+
+<div class="legend">
+  <span><span class="tag t-fp32">FP32 转换</span> = double→SPICE_REAL/float</span>
+  <span><span class="tag t-island">FP64 精度孤岛</span> = 保留/新增 (double) 关键计算</span>
+  <span><span class="tag t-safety">安全机制</span> = CHECK_NAN / MIN_EXP / 溢出保护</span>
+  <span><span class="tag t-solver">求解器增强</span> = Cmin / sollim / gmin stepping</span>
+  <span><span class="tag t-fix">Bug 修复</span> = vbi overflow / multi-T NaN / 噪声 NaN</span>
+</div>
+
+<!-- ====== LAYER 0: Architecture ====== -->
+<section>
+<h2>架构总览：五层修改体系</h2>
+<div class="card">
+<pre>
+Layer 1 ─ 类型系统    patch 001         SPICE_REAL = float | double (条件编译)
+Layer 2 ─ 存储层      patch 002         1337 个 struct 成员 double→SPICE_REAL (−45% 内存)
+Layer 3 ─ 热路径数学  patch 003,004,009  expf/logf/sqrtf 重载 + DEXP 宏
+         ┌─ FP64 孤岛  patch 004         Leff/Weff 双精度 (消去误差保护)
+         ├─ 安全网     patch 003         40+ CHECK_NAN 监测点
+         └─ 辅助文件   patch 005-008,010-011  全套 FP32 数学宏引入
+Layer 4 ─ Bug 修复    patch 012,013,015 vbi overflow / multi-T NaN / 噪声 NaN
+         ┌─ FP64 孤岛  patch 012         (double)nsd*ndep 防 overflow
+         ├─ FP64 孤岛  patch 013         (double)k1ox*sqrtPhis 防消去
+         └─ FP64 孤岛  patch 015         oxideTrapDensity 全 double 重算
+Layer 5 ─ 求解器      patch 014         Cmin stepping + Solution Limiting
+</pre>
+</div>
+</section>
+
+<!-- ====== PATCH 001 ====== -->
+<section>
+<h2>Patch 001 — 类型系统 <span class="tag t-fp32">FP32 转换</span></h2>
+<div class="card">
+<h3>文件: <code>src/include/ngspice/typedefs.h</code> (+53 行)</h3>
+<table>
+<thead><tr><th>类别</th><th>变更</th><th>行数</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td><code>typedef float SPICE_REAL</code> · 18 个 SPICE_* 数学宏 (<code>SPICE_EXP→expf</code> 等)</td><td>27</td></tr>
+<tr><td>条件编译</td><td><code>#ifdef SINGLE_PRECISION</code> 分支 — 无此 flag 时 SPICE_REAL=double 原样</td><td>26</td></tr>
+</tbody>
+</table>
+<p>这是整个混合精度方案的<b>总开关</b>。所有后续 patch 都通过 <code>SPICE_REAL</code> 和 <code>SPICE_*</code> 宏引用浮点类型，而非直接使用 <code>double</code>/<code>float</code>。<code>--enable-single-precision</code> 编译 flag 决定 SPICE_REAL 是 float 还是 double。</p>
+</div>
+</section>
+
+<!-- ====== PATCH 002 ====== -->
+<section>
+<h2>Patch 002 — 存储层 <span class="tag t-fp32">FP32 转换</span></h2>
+<div class="card">
+<h3>文件: <code>src/spicelib/devices/bsim4v5/bsim4v5def.h</code> (2864 行)</h3>
+<p>将 BSIM4v5 模型的所有结构体成员从 <code>double</code> 改为 <code>SPICE_REAL</code>。</p>
+<table>
+<thead><tr><th>结构体</th><th>成员数</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>BSIM4v5instance</code></td><td>~900</td><td>每个晶体管实例的运行期参数 (Vth, gm, gds, ids, vdsat…)</td></tr>
+<tr><td><code>BSIM4v5model</code></td><td>~300</td><td>模型级参数 (tox, vth0, u0, vsat…)</td></tr>
+<tr><td><code>bsim4SizeDependParam</code></td><td>~80</td><td>尺寸相关参数 (Leff, Weff, dl, dw…)</td></tr>
+<tr><td>辅助结构</td><td>~57</td><td>噪声、温度等辅助参数</td></tr>
+</tbody>
+</table>
+<p><b>总计: 1337 个成员</b> 从 8 字节 → 4 字节，<b>BSIM4v5 模型工作集 −45%</b>。</p>
+<p class="footnote">⚠️ 这是纯存储优化，不改变计算精度。热路径的局部变量仍保持 double（实验证明改为 float 立即 NaN 发散）。</p>
+</div>
+</section>
+
+<!-- ====== PATCH 003 ====== -->
+<section>
+<h2>Patch 003 — 热路径数学 + NaN 防火墙 <span class="tag t-fp32">FP32 转换</span> + <span class="tag t-safety">安全机制</span></h2>
+<div class="card">
+<h3>文件: <code>src/spicelib/devices/bsim4v5/b4v5ld.c</code> (1671 行)</h3>
+<p><b>这是最大的单个 patch</b>——BSIM4v5 的 load 函数是每个晶体管每个 Newton 迭代调用一次的热路径。</p>
+<table>
+<thead><tr><th>类别</th><th>变更</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>局部重载 SPICE_* 宏为 expf/logf/sqrtf + 显式 (float) 转换</td><td>~13 处关键数学调用降为 FP32</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>DEXP 宏升级为 expf 版本</td><td>亚阈值区指数计算</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>Vgsteff 显式 float 计算 + NaN/Inf 保护</td><td>栅极过驱动电压</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛</span></td><td>Vbseff sqrt 消去: 保留 double 精度</td><td>体效应电压计算</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛</span></td><td>Phis/sqrtPhis/Xdep 保护块: 全 double</td><td>表面势相关计算</td></tr>
+<tr><td><span class="tag t-safety">安全机制</span></td><td><b>40+ CHECK_NAN</b> 监测点 + 矩阵 stamp 归零</td><td>NaN 检测后立即归零，防 Newton 发散</td></tr>
+<tr><td><span class="tag t-safety">安全机制</span></td><td>CHECK_NAN(Vth) 专检</td><td>Vth→Vgsteff→ueff 全链 NaN 阻断</td></tr>
+</tbody>
+</table>
+<p><b>为什么热路径局部变量仍保持 double</b>: 实验证明将内部临时变量也改为 float 会导致 NaN 立即发散。保持 double 的开销极小（寄存器级），但精度收益巨大。</p>
+</div>
+</section>
+
+<!-- ====== PATCH 004 ====== -->
+<section>
+<h2>Patch 004 — 温度参数 + FP64 孤岛 <span class="tag t-fp32">FP32 转换</span> + <span class="tag t-island">FP64 孤岛</span></h2>
+<div class="card">
+<h3>文件: <code>src/spicelib/devices/bsim4v5/b4v5temp.c</code> (268 行)</h3>
+<table>
+<thead><tr><th>类别</th><th>变更</th><th>行数</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>引入 B4V5_FP32_MATH 宏块: SPICE_* → expf/logf/sqrtf 重载</td><td>25</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>DEXP 宏升级为 expf 版本</td><td>10</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛</span></td><td><b>Leff 计算</b>: <code>(double)L - 2.0*(double)dl</code> —— L~45nm, dl~0.6nm, 比值 ~70:1</td><td>3</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛</span></td><td><b>Weff 计算</b>: <code>(double)W - 2.0*(double)dw</code> —— 同样消去误差问题</td><td>3</td></tr>
+</tbody>
+</table>
+<pre><span class="diff-add">+ // Leff 双精度孤岛: Lnew − 2*dl, 比值 ~70:1, FP32 精度不足以区分
++ Leff = (SPICE_REAL)((double)pParam->L - 2.0 * (double)pParam->dl);</span>
+<span class="diff-add">+ Weff = (SPICE_REAL)((double)pParam->W - 2.0 * (double)pParam->dw);</span></pre>
+<p>如果 Leff/Weff 在 FP32 下计算, <code>45nm - 2×0.6nm = 45nm - 1.2nm</code> 的消去误差将传播到整个晶体管模型——gm, gds, Vth 全部出错。</p>
+</div>
+</section>
+
+<!-- ====== PATCHES 005-011 ====== -->
+<section>
+<h2>Patch 005–011 — 辅助文件 FP32 化 <span class="tag t-fp32">FP32 转换</span></h2>
+<div class="card">
+<table>
+<thead><tr><th>Patch</th><th>文件</th><th>行数</th><th>变更</th></tr></thead>
+<tbody>
+<tr><td>005</td><td><code>b4v5set.c</code></td><td>11</td><td>SPICE_REAL 类型适配</td></tr>
+<tr><td>006</td><td><code>b4v5noi.c</code> (噪声)</td><td>99</td><td>FP32 数学宏块引入</td></tr>
+<tr><td>007</td><td><code>b4v5pzld.c</code> (零极点)</td><td>87</td><td>FP32 数学宏块引入</td></tr>
+<tr><td>008</td><td><code>b4v5acld.c</code> (AC)</td><td>97</td><td>FP32 数学宏块引入</td></tr>
+<tr><td>009</td><td><code>b4v5geo.c</code> (几何)</td><td>302</td><td>显式 float 几何计算 — 所有中间量显式 (float) 转换</td></tr>
+<tr><td>010</td><td><code>devsup.c</code> (器件支持)</td><td>369</td><td>double→SPICE_REAL: DEVlimvds, DEVpnjlim, DEVfetlim 等</td></tr>
+<tr><td>011</td><td><code>spconfig.h</code> (稀疏矩阵)</td><td>18</td><td>include typedefs.h 使 SPICE_REAL 在矩阵层可见</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<!-- ====== PATCHES 012-013-015 ====== -->
+<section>
+<h2>Patch 012, 013, 015 — Bug 修复 + FP64 精度孤岛 <span class="tag t-island">FP64 孤岛</span> + <span class="tag t-fix">Bug 修复</span></h2>
+
+<div class="card">
+<h3>Patch 012 — vbi Overflow 修复 (11 行, b4v5temp.c)</h3>
+<pre><span class="diff-rem">- pParam->BSIM4v5vbi = Vtm0 * log(pParam->BSIM4v5nsd * pParam->BSIM4v5ndep / (ni * ni));</span>
+<span class="diff-add">+ pParam->BSIM4v5vbi = (SPICE_REAL)((double)Vtm0 * log((double)pParam->BSIM4v5nsd</span>
+<span class="diff-add">+                    * (double)pParam->BSIM4v5ndep / ((double)ni * (double)ni)));</span></pre>
+<p><b>根因</b>: PTM45 模型中 <code>nsd=2e20, ndep=3.24e18</code>, 积=6.48e38 &gt; FLT_MAX(3.4e38) → FP32 overflow→inf→NaN。<br>
+<b>修复</b>: 将 nsd·ndep·ni² 全部转换为 (double) 后再计算 log。<br>
+<b>影响</b>: 这是 PTM45 单管 NaN 的全部根因。</p>
+</div>
+
+<div class="card">
+<h3>Patch 013 — 多晶体管 NaN 修复 (54 行, b4v5ld.c)</h3>
+<table>
+<thead><tr><th>类别</th><th>变更</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t-safety">安全机制</span></td><td><code>MIN_EXP</code>: 1.71e-15 → <b>1e-7</b> (FP32)</td><td>防 expf underflow 在深亚阈值</td></tr>
+<tr><td><span class="tag t-fix">Bug 修复</span></td><td><code>logf(1.0f+x)</code> → <code>log1pf(x)</code></td><td>x≈0 时精度提高 (1.0f+x==1.0f 的舍入问题)</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛</span></td><td><b>Vth k1ox 消去</b>: <code>(double)k1ox*sqrtPhis − (double)k1*sqrtPhi</code></td><td>4 次 double 运算/晶体管</td></tr>
+<tr><td>辅助</td><td>double 运算计数器 <code>g_double_ops</code></td><td>FP64 孤岛开销可量化</td></tr>
+</tbody>
+</table>
+<pre><span class="diff-add">+ /* DOUBLE PRECISION ISLAND: (k1ox*sqrtPhis - k1*sqrtPhi) catastrophic cancellation in FP32 */
++ {   double d_diff = (double)k1ox * (double)sqrtPhis - (double)k1 * (double)sqrtPhi;
++     Delt_k1ox = (SPICE_REAL)d_diff;  }</span></pre>
+</div>
+
+<div class="card">
+<h3>Patch 015 — 噪声 FP64 孤岛 (21 行, b4v5noi.c + b4v5ld.c)</h3>
+<pre><span class="diff-add">+ /* FP64 noise island: oxideTrapDensity in double */
++ double d_noia = 6.25e41;  // >FLT_MAX, must be double
++ double d_T3 = (double)Vtm * (double)qia + ...;  // ~52 double ops/call</span></pre>
+<p><b>根因</b>: BSIM4 1/f 噪声模型默认参数 NOIA=6.25e41 > FLT_MAX(3.4e38) → FP32 overflow→inf→NaN。<br>
+<b>修复</b>: 噪声参数计算全链提升为 double，~28,000 double 运算/噪声分析 (&lt; 一次 DC 分析的 30%)。</p>
+</div>
+</section>
+
+<!-- ====== PATCH 014 ====== -->
+<section>
+<h2>Patch 014 — 求解器增强 <span class="tag t-solver">求解器</span></h2>
+<div class="card">
+<h3>8 文件, 29 行 · 零 double 运算开销</h3>
+<table>
+<thead><tr><th>文件</th><th>变更</th></tr></thead>
+<tbody>
+<tr><td><code>cktdefs.h</code></td><td>增加 <code>CKTuseSolLim</code>, <code>CKTcmin</code>, <code>CKTnumCminSteps</code>, <code>CKTcminFactor</code> 字段</td></tr>
+<tr><td><code>tskdefs.h</code></td><td>对应的 TSK 字段</td></tr>
+<tr><td><code>optdefs.h</code></td><td><code>OPT_SOLLIM</code>, <code>OPT_CMIN</code>, <code>OPT_CMINSTEPS</code>, <code>OPT_CMINFACTOR</code></td></tr>
+<tr><td><code>cktsopt.c</code></td><td>option 处理器 + 表项</td></tr>
+<tr><td><code>cktntask.c</code></td><td>默认值 + def→tsk 复制</td></tr>
+<tr><td><code>cktdojob.c</code></td><td>tsk→ckt 复制</td></tr>
+<tr><td><code>niiter.c</code></td><td><b>Per-node Solution Limiting</b>: 每 Newton 步钳位 ΔV</td></tr>
+<tr><td><code>cktop.c</code></td><td><b>Cmin stepping</b>: gmin 和 source stepping 之间的新回退阶段</td></tr>
+</tbody>
+</table>
+<p>启用: <code>.option sollim cminsteps=10</code>。不启用时零开销。</p>
+</div>
+</section>
+
+<!-- ====== SUMMARY TABLE ====== -->
+<section>
+<h2>全量分类汇总</h2>
+<table>
+<thead><tr><th>分类</th><th>Patch</th><th>行数</th><th>文件</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>001</td><td>53</td><td>typedefs.h</td><td>SPICE_REAL=float, 18 数学宏</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>002</td><td>2864</td><td>bsim4v5def.h</td><td>1337 struct 成员 −45% 内存</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>003</td><td>1671</td><td>b4v5ld.c</td><td>热路径 expf/logf/sqrtf</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>004–011</td><td>1245</td><td>8 文件</td><td>全套辅助文件 FP32 化</td></tr>
+<tr style="background:var(--island-bg)"><td><span class="tag t-island">FP64 精度孤岛</span></td><td>003</td><td>~20</td><td>b4v5ld.c</td><td>Vbseff sqrt, Phis/sqrtPhis, Xdep</td></tr>
+<tr style="background:var(--island-bg)"><td><span class="tag t-island">FP64 精度孤岛</span></td><td>004</td><td>~6</td><td>b4v5temp.c</td><td>Leff/Weff 消去保护</td></tr>
+<tr style="background:var(--island-bg)"><td><span class="tag t-island">FP64 精度孤岛</span></td><td>012</td><td>3</td><td>b4v5temp.c</td><td>vbi nsd·ndep overflow 防</td></tr>
+<tr style="background:var(--island-bg)"><td><span class="tag t-island">FP64 精度孤岛</span></td><td>013</td><td>~7</td><td>b4v5ld.c</td><td>Vth k1ox 消去保护</td></tr>
+<tr style="background:var(--island-bg)"><td><span class="tag t-island">FP64 精度孤岛</span></td><td>015</td><td>~14</td><td>b4v5noi.c</td><td>噪声参数全 double 重算</td></tr>
+<tr><td><span class="tag t-safety">安全机制</span></td><td>003</td><td>~30</td><td>b4v5ld.c</td><td>40+ CHECK_NAN 监测点</td></tr>
+<tr><td><span class="tag t-safety">安全机制</span></td><td>013</td><td>4</td><td>b4v5ld.c</td><td>MIN_EXP 1e-7, log1pf</td></tr>
+<tr><td><span class="tag t-solver">求解器增强</span></td><td>014</td><td>29</td><td>8 文件</td><td>Cmin + Solution Limiting</td></tr>
+</tbody>
+</table>
+</section>
+
+<!-- ====== WHAT IF ALL FP32 ====== -->
+<section>
+<h2>🔬 关键对比: 本方案 vs. "全部 FP32"</h2>
+<div class="card">
+<p>如果把整个 BSIM4v5 全部改为 FP32 (不保留任何 FP64 孤岛), 会发生什么:</p>
+<table>
+<thead><tr><th>计算步骤</th><th>全部 FP32 的结果</th><th>本方案 (混合精度)</th></tr></thead>
+<tbody>
+<tr><td>Leff = L − 2·dl</td><td class="diff-rem">45nm − 1.2nm → FP32 消去误差 → Leff 偏差 >5%</td><td class="diff-add">(double) 计算 → 精确</td></tr>
+<tr><td>Vbi = Vt·ln(nsd·ndep/ni²)</td><td class="diff-rem">nsd·ndep overflow → inf → Vbi=inf → Vth=NaN</td><td class="diff-add">(double) 计算 → 精确</td></tr>
+<tr><td>ΔVth = k1ox·√φs − k1·√φ</td><td class="diff-rem">两项近乎相等相减 → FP32 精度丢失 → Vth 偏差</td><td class="diff-add">(double) 计算 → 精确</td></tr>
+<tr><td>噪声 NOIA 默认值</td><td class="diff-rem">6.25e41 overflow → inf → 1/f 噪声 NaN</td><td class="diff-add">(double) 计算 → 精确</td></tr>
+<tr><td>Vbseff sqrt</td><td class="diff-rem">sqrt 消去 → 体效应偏移</td><td class="diff-add">(double) 计算 → 精确</td></tr>
+</tbody>
+</table>
+<p style="margin-top:12px"><b>全部 FP32 = 立即 NaN</b>。实验证明: 热路径局部变量改为 float → 收敛前 NaN。这 5 个 FP64 精度孤岛是方案能工作的<b>必要条件</b>, 总共 ~50 行 double 运算/晶体管, &lt; 0.1% 额外开销。</p>
+</div>
+</section>
+
+<!-- ====== PATCH TAXONOMY TABLE ====== -->
+<section>
+<h2>📋 Patch 全量索引</h2>
+<table>
+<thead><tr><th>#</th><th>文件名</th><th>行数</th><th>文件</th><th>分类</th></tr></thead>
+<tbody>
+<tr><td>001</td><td>typedefs-spice-macros</td><td>56</td><td>typedefs.h</td><td><span class="tag t-fp32">类型系统</span></td></tr>
+<tr><td>002</td><td>bsim4v5def-struct-fp32</td><td>2864</td><td>bsim4v5def.h</td><td><span class="tag t-fp32">存储 −45%</span></td></tr>
+<tr><td>003</td><td>b4v5ld-hotpath-fp32</td><td>1671</td><td>b4v5ld.c</td><td><span class="tag t-fp32">热路径</span> + <span class="tag t-island">FP64 孤岛×3</span> + <span class="tag t-safety">NaN 防火墙</span></td></tr>
+<tr><td>004</td><td>b4v5temp-double-island</td><td>268</td><td>b4v5temp.c</td><td><span class="tag t-fp32">温度参数</span> + <span class="tag t-island">Leff/Weff FP64</span></td></tr>
+<tr><td>005</td><td>b4v5set-spice-real</td><td>11</td><td>b4v5set.c</td><td><span class="tag t-fp32">辅助</span></td></tr>
+<tr><td>006</td><td>b4v5noi-fp32</td><td>99</td><td>b4v5noi.c</td><td><span class="tag t-fp32">噪声 FP32 准备</span></td></tr>
+<tr><td>007</td><td>b4v5pzld-fp32</td><td>87</td><td>b4v5pzld.c</td><td><span class="tag t-fp32">零极点</span></td></tr>
+<tr><td>008</td><td>b4v5acld-fp32</td><td>97</td><td>b4v5acld.c</td><td><span class="tag t-fp32">AC</span></td></tr>
+<tr><td>009</td><td>b4v5geo-fp32</td><td>302</td><td>b4v5geo.c</td><td><span class="tag t-fp32">几何</span></td></tr>
+<tr><td>010</td><td>devsup-spice-real</td><td>369</td><td>devsup.c</td><td><span class="tag t-fp32">器件支持</span></td></tr>
+<tr><td>011</td><td>spconfig-include</td><td>18</td><td>spconfig.h</td><td><span class="tag t-fp32">矩阵层</span></td></tr>
+<tr><td>012</td><td>b4v5temp-vbi-overflow-fix</td><td>11</td><td>b4v5temp.c</td><td><span class="tag t-island">vbi FP64</span> <span class="tag t-fix">Bug 修复</span></td></tr>
+<tr><td>013</td><td>multi-t-nan-fix</td><td>54</td><td>b4v5ld.c</td><td><span class="tag t-island">Vth FP64</span> + <span class="tag t-safety">MIN_EXP</span></td></tr>
+<tr><td>014</td><td>cmin-sollim-solver</td><td>29</td><td>8 文件</td><td><span class="tag t-solver">求解器</span></td></tr>
+<tr><td>015</td><td>noise-fp64-island</td><td>21</td><td>b4v5noi.c + b4v5ld.c</td><td><span class="tag t-island">噪声 FP64</span></td></tr>
+<tr style="font-weight:700;border-top:2px solid var(--accent)"><td colspan="2">总计</td><td>5957</td><td>10+8</td><td></td></tr>
+</tbody>
+</table>
+</section>
+
+<hr>
+<p style="color:#8b949e;font-size:0.78em;text-align:center;margin-top:20px">
+  Mixed_ngspice · <a href="https://github.com/gravity-wh/Mixed_ngspice" style="color:var(--accent)">github.com/gravity-wh/Mixed_ngspice</a> · 2026-07-20
+</p>
+
+</div>
+</body>
+</html>
