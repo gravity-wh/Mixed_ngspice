@@ -1,0 +1,369 @@
+--- /dev/fd/63	2026-07-16 23:07:48.275743277 +0800
++++ /mnt/e/MyResearch/Ngspice/ngspice-46_fp32/src/spicelib/devices/devsup.c	2026-07-13 15:04:06.000000000 +0800
+@@ -17,8 +17,8 @@
+ /* 
+  * Limit the per-iteration change of VDS 
+  */
+-double
+-DEVlimvds(double vnew, double vold)
++SPICE_REAL
++DEVlimvds(SPICE_REAL vnew, SPICE_REAL vold)
+ {
+ 
+     if(vold >= 3.5) {
+@@ -46,10 +46,10 @@
+  * This code has been fixed by Alan Gillespie adding limiting
+  * for negative voltages.
+  */
+-double
+-DEVpnjlim(double vnew, double vold, double vt, double vcrit, int *icheck)
++SPICE_REAL
++DEVpnjlim(SPICE_REAL vnew, SPICE_REAL vold, SPICE_REAL vt, SPICE_REAL vcrit, int *icheck)
+ {
+-    double arg;
++    SPICE_REAL arg;
+ 
+     if((vnew > vcrit) && (fabs(vnew - vold) > (vt + vt))) {
+         if(vold > 0) {
+@@ -89,14 +89,14 @@
+  * This code has been fixed by Alan Gillespie: a new
+  * definition for vtstlo. 
+  */
+-double
+-DEVfetlim(double vnew, double vold, double vto)
++SPICE_REAL
++DEVfetlim(SPICE_REAL vnew, SPICE_REAL vold, SPICE_REAL vto)
+ {
+-    double vtsthi;
+-    double vtstlo;
+-    double vtox;
+-    double delv;
+-    double vtemp;
++    SPICE_REAL vtsthi;
++    SPICE_REAL vtstlo;
++    SPICE_REAL vtox;
++    SPICE_REAL delv;
++    SPICE_REAL vtemp;
+ 
+     vtsthi = fabs(2*(vold-vto))+2;
+     vtstlo = fabs(vold-vto)+1;
+@@ -153,11 +153,11 @@
+ /* DEVlimitlog(deltemp, deltemp_old, LIM_TOL, check)
+  * Logarithmic damping the per-iteration change of deltemp beyond LIM_TOL.
+  */
+-double
++SPICE_REAL
+ DEVlimitlog(
+-    double deltemp,
+-    double deltemp_old,
+-    double LIM_TOL,
++    SPICE_REAL deltemp,
++    SPICE_REAL deltemp_old,
++    SPICE_REAL LIM_TOL,
+     int *check)
+ {
+     static bool shown = FALSE;
+@@ -186,23 +186,23 @@
+ int
+ ACM_SourceDrainResistances(
+ int ACM,
+-double LD,
+-double LDIF,
+-double HDIF,
+-double WMLT,
+-double w,
+-double XW,
+-double RSH,
++SPICE_REAL LD,
++SPICE_REAL LDIF,
++SPICE_REAL HDIF,
++SPICE_REAL WMLT,
++SPICE_REAL w,
++SPICE_REAL XW,
++SPICE_REAL RSH,
+ int drainSquaresGiven,
+-double RD,
+-double RDC,
+-double drainSquares,
++SPICE_REAL RD,
++SPICE_REAL RDC,
++SPICE_REAL drainSquares,
+ int sourceSquaresGiven,
+-double RS,
+-double RSC,
+-double sourceSquares,
+-double *drainResistance,
+-double *sourceResistance
++SPICE_REAL RS,
++SPICE_REAL RSC,
++SPICE_REAL sourceSquares,
++SPICE_REAL *drainResistance,
++SPICE_REAL *sourceResistance
+ )
+ {
+     switch (ACM)
+@@ -242,22 +242,22 @@
+ int ACM,
+ int CALCACM,
+ int GEO,
+-double HDIF,
+-double WMLT,
+-double w,
+-double XW,
+-double jctTempSatCurDensity,
+-double jctSidewallTempSatCurDensity,
++SPICE_REAL HDIF,
++SPICE_REAL WMLT,
++SPICE_REAL w,
++SPICE_REAL XW,
++SPICE_REAL jctTempSatCurDensity,
++SPICE_REAL jctSidewallTempSatCurDensity,
+ int drainAreaGiven,
+-double drainArea,
++SPICE_REAL drainArea,
+ int drainPerimeterGiven,
+-double drainPerimeter,
++SPICE_REAL drainPerimeter,
+ int sourceAreaGiven,
+-double sourceArea,
++SPICE_REAL sourceArea,
+ int sourcePerimeterGiven,
+-double sourcePerimeter,
+-double *DrainSatCurrent,
+-double *SourceSatCurrent
++SPICE_REAL sourcePerimeter,
++SPICE_REAL *DrainSatCurrent,
++SPICE_REAL *SourceSatCurrent
+ )
+ {
+     switch (ACM)
+@@ -356,27 +356,27 @@
+ int ACM,
+ int CALCACM,
+ int GEO,
+-double HDIF,
+-double WMLT,
+-double w,
+-double XW,
++SPICE_REAL HDIF,
++SPICE_REAL WMLT,
++SPICE_REAL w,
++SPICE_REAL XW,
+ int drainAreaGiven,
+-double drainArea,
++SPICE_REAL drainArea,
+ int drainPerimeterGiven,
+-double drainPerimeter,
++SPICE_REAL drainPerimeter,
+ int sourceAreaGiven,
+-double sourceArea,
++SPICE_REAL sourceArea,
+ int sourcePerimeterGiven,
+-double sourcePerimeter,
+-double CJ,
+-double CJSW,
+-double CJGATE,
+-double *areaDrainBulkCapacitance,
+-double *periDrainBulkCapacitance,
+-double *gateDrainBulkCapacitance,
+-double *areaSourceBulkCapacitance,
+-double *periSourceBulkCapacitance,
+-double *gateSourceBulkCapacitance
++SPICE_REAL sourcePerimeter,
++SPICE_REAL CJ,
++SPICE_REAL CJSW,
++SPICE_REAL CJGATE,
++SPICE_REAL *areaDrainBulkCapacitance,
++SPICE_REAL *periDrainBulkCapacitance,
++SPICE_REAL *gateDrainBulkCapacitance,
++SPICE_REAL *areaSourceBulkCapacitance,
++SPICE_REAL *periSourceBulkCapacitance,
++SPICE_REAL *gateSourceBulkCapacitance
+ )
+ {
+     switch (ACM)
+@@ -566,33 +566,33 @@
+  * PN 2002: As of ngspice this code is not used by any device. 
+  */
+ void
+-DEVcmeyer(double vgs0,		/* initial voltage gate-source */
+-	  double vgd0,		/* initial voltage gate-drain */
+-	  double vgb0,		/* initial voltage gate-bulk */
+-	  double von0,
+-	  double vdsat0,
+-	  double vgs1,		/* final voltage gate-source */
+-	  double vgd1,		/* final voltage gate-drain */
+-	  double vgb1,		/* final voltage gate-bulk */
+-	  double covlgs,	/* overlap capacitance gate-source */
+-	  double covlgd,	/* overlap capacitance gate-drain */
+-	  double covlgb,	/* overlap capacitance gate-bulk */
+-	  double *cgs,
+-	  double *cgd,
+-	  double *cgb,
+-	  double phi,
+-	  double cox,
+-	  double von,
+-	  double vdsat)
++DEVcmeyer(SPICE_REAL vgs0,		/* initial voltage gate-source */
++	  SPICE_REAL vgd0,		/* initial voltage gate-drain */
++	  SPICE_REAL vgb0,		/* initial voltage gate-bulk */
++	  SPICE_REAL von0,
++	  SPICE_REAL vdsat0,
++	  SPICE_REAL vgs1,		/* final voltage gate-source */
++	  SPICE_REAL vgd1,		/* final voltage gate-drain */
++	  SPICE_REAL vgb1,		/* final voltage gate-bulk */
++	  SPICE_REAL covlgs,	/* overlap capacitance gate-source */
++	  SPICE_REAL covlgd,	/* overlap capacitance gate-drain */
++	  SPICE_REAL covlgb,	/* overlap capacitance gate-bulk */
++	  SPICE_REAL *cgs,
++	  SPICE_REAL *cgd,
++	  SPICE_REAL *cgb,
++	  SPICE_REAL phi,
++	  SPICE_REAL cox,
++	  SPICE_REAL von,
++	  SPICE_REAL vdsat)
+ {
+ 
+ 
+-    double vdb;
+-    double vdbsat;
+-    double vddif;
+-    double vddif1;
+-    double vddif2;
+-    double vgbt;
++    SPICE_REAL vdb;
++    SPICE_REAL vdbsat;
++    SPICE_REAL vddif;
++    SPICE_REAL vddif1;
++    SPICE_REAL vddif2;
++    SPICE_REAL vgbt;
+ 
+     *cgs = 0;
+     *cgd = 0;
+@@ -651,12 +651,12 @@
+ http://ltwiki.org/index.php5?title=Undocumented_LTspice#VDMOS:_Breakdown_and_Sub-threshold_Enhancements
+ */
+ void
+-DevCapVDMOS(double vgd, double cgdmin,
+-            double cgdmax, double a, double cgs,
+-            double *capgs, double *capgd)
++DevCapVDMOS(SPICE_REAL vgd, SPICE_REAL cgdmin,
++            SPICE_REAL cgdmax, SPICE_REAL a, SPICE_REAL cgs,
++            SPICE_REAL *capgs, SPICE_REAL *capgd)
+ {
+-    double s = (cgdmax - cgdmin) / (1 + M_PI / 2);
+-    double y = cgdmax - s;
++    SPICE_REAL s = (cgdmax - cgdmin) / (1 + M_PI / 2);
++    SPICE_REAL y = cgdmax - s;
+     if (vgd > 0)
+         *capgd = 0.5 * (s * tanh(a * vgd) + y);
+     else
+@@ -671,25 +671,25 @@
+  *          device models.
+  */
+ void
+-DEVqmeyer(double vgs,		/* initial voltage gate-source */
+-	  double vgd,		/* initial voltage gate-drain */
+-	  double vgb,		/* initial voltage gate-bulk */
+-	  double von,
+-	  double vdsat,
+-	  double *capgs,	/* non-constant portion of g-s overlap
++DEVqmeyer(SPICE_REAL vgs,		/* initial voltage gate-source */
++	  SPICE_REAL vgd,		/* initial voltage gate-drain */
++	  SPICE_REAL vgb,		/* initial voltage gate-bulk */
++	  SPICE_REAL von,
++	  SPICE_REAL vdsat,
++	  SPICE_REAL *capgs,	/* non-constant portion of g-s overlap
+                                    capacitance */
+-	  double *capgd,	/* non-constant portion of g-d overlap
++	  SPICE_REAL *capgd,	/* non-constant portion of g-d overlap
+                                    capacitance */
+-	  double *capgb,	/* non-constant portion of g-b overlap
++	  SPICE_REAL *capgb,	/* non-constant portion of g-b overlap
+                                    capacitance */
+-	  double phi,
+-	  double cox)		/* oxide capactiance */
++	  SPICE_REAL phi,
++	  SPICE_REAL cox)		/* oxide capactiance */
+ {
+-    double vds;
+-    double vddif;
+-    double vddif1;
+-    double vddif2;
+-    double vgst;
++    SPICE_REAL vds;
++    SPICE_REAL vddif;
++    SPICE_REAL vddif1;
++    SPICE_REAL vddif2;
++    SPICE_REAL vgst;
+ 
+     NG_IGNORE(vgb);
+ 
+@@ -743,14 +743,14 @@
+  * PN 2002: This is industrial archaelology
+  */
+ void
+-DEVcap(CKTcircuit *ckt, double vgd, double vgs, double vgb, double covlgd,
+-       double covlgs, double covlgb, double capbd, double capbs, double cggb,
+-       double cgdb, double cgsb, double cbgb, double cbdb, double cbsb,
+-       double *gcggb, double *gcgdb, double *gcgsb, double *gcbgb, 
+-       double *gcbdb, double *gcbsb, double *gcdgb, double *gcddb, 
+-       double *gcdsb, double *gcsgb, double *gcsdb, double *gcssb,
+-       double qgate, double qchan, double qbulk, double *qdrn, double *qsrc,
+-       double xqc)
++DEVcap(CKTcircuit *ckt, SPICE_REAL vgd, SPICE_REAL vgs, SPICE_REAL vgb, SPICE_REAL covlgd,
++       SPICE_REAL covlgs, SPICE_REAL covlgb, SPICE_REAL capbd, SPICE_REAL capbs, SPICE_REAL cggb,
++       SPICE_REAL cgdb, SPICE_REAL cgsb, SPICE_REAL cbgb, SPICE_REAL cbdb, SPICE_REAL cbsb,
++       SPICE_REAL *gcggb, SPICE_REAL *gcgdb, SPICE_REAL *gcgsb, SPICE_REAL *gcbgb, 
++       SPICE_REAL *gcbdb, SPICE_REAL *gcbsb, SPICE_REAL *gcdgb, SPICE_REAL *gcddb, 
++       SPICE_REAL *gcdsb, SPICE_REAL *gcsgb, SPICE_REAL *gcsdb, SPICE_REAL *gcssb,
++       SPICE_REAL qgate, SPICE_REAL qchan, SPICE_REAL qbulk, SPICE_REAL *qdrn, SPICE_REAL *qsrc,
++       SPICE_REAL xqc)
+ 
+     /*
+      *     compute equivalent conductances
+@@ -758,18 +758,18 @@
+      */
+ {
+ 
+-    double gcd;
+-    double gcdxd;
+-    double gcdxs;
+-    double gcg;
+-    double gcgxd;
+-    double gcgxs;
+-    double gcs;
+-    double gcsxd;
+-    double gcsxs;
+-    double qgb;
+-    double qgd;
+-    double qgs;
++    SPICE_REAL gcd;
++    SPICE_REAL gcdxd;
++    SPICE_REAL gcdxs;
++    SPICE_REAL gcg;
++    SPICE_REAL gcgxd;
++    SPICE_REAL gcgxs;
++    SPICE_REAL gcs;
++    SPICE_REAL gcsxd;
++    SPICE_REAL gcsxs;
++    SPICE_REAL qgb;
++    SPICE_REAL qgd;
++    SPICE_REAL qgs;
+ 
+     gcg = (cggb+cbgb)*ckt->CKTag[1];
+     gcd = (cgdb+cbdb)*ckt->CKTag[1];
+@@ -811,11 +811,11 @@
+ 
+ /* Predict a value for the capacitor at loct by extrapolating from
+  * previous values */
+-double
++SPICE_REAL
+ DEVpred(CKTcircuit *ckt, int loct)
+ {
+     if (!ckt->CKTnewtrunc) {
+-        double xfact;
++        SPICE_REAL xfact;
+ 
+         xfact = ckt->CKTdelta / ckt->CKTdeltaOld[1];
+         return(((1 + xfact) * *(ckt->CKTstate1 + loct)) -

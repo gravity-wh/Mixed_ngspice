@@ -1,0 +1,56 @@
+--- /dev/fd/63	2026-07-16 23:07:43.568388098 +0800
++++ /mnt/e/MyResearch/Ngspice/ngspice-46_fp32/src/include/ngspice/typedefs.h	2026-07-13 14:55:07.000000000 +0800
+@@ -6,6 +6,53 @@
+ #ifndef ngspice_TYPEDEFS_H
+ #define ngspice_TYPEDEFS_H
+ 
++#include "ngspice/config.h"
++
++/* Global floating-point type: float under --enable-single-precision, else SPICE_REAL */
++#ifdef SINGLE_PRECISION
++typedef float SPICE_REAL;
++#define SPICE_SIN(x)  sinf(x)
++#define SPICE_COS(x)  cosf(x)
++#define SPICE_EXP(x)  expf(x)
++#define SPICE_LOG(x)  logf(x)
++#define SPICE_SQRT(x) sqrtf(x)
++#define SPICE_POW(x,y) powf(x,y)
++#define SPICE_FABS(x) fabsf(x)
++#define SPICE_ATAN(x) atanf(x)
++#define SPICE_TAN(x)  tanf(x)
++#define SPICE_TANH(x) tanhf(x)
++#define SPICE_ASINH(x) asinhf(x)
++#define SPICE_FMOD(x,y) fmodf(x,y)
++#define SPICE_HYPOT(x,y) hypotf(x,y)
++#define SPICE_LOG10(x) log10f(x)
++#define SPICE_COSH(x) coshf(x)
++#define SPICE_SINH(x) sinhf(x)
++#define SPICE_ACOSH(x) acoshf(x)
++#define SPICE_CEIL(x) ceilf(x)
++#define SPICE_FLOOR(x) floorf(x)
++#else
++typedef double SPICE_REAL;
++#define SPICE_SIN(x)  sin(x)
++#define SPICE_COS(x)  cos(x)
++#define SPICE_EXP(x)  exp(x)
++#define SPICE_LOG(x)  log(x)
++#define SPICE_SQRT(x) sqrt(x)
++#define SPICE_POW(x,y) pow(x,y)
++#define SPICE_FABS(x) fabs(x)
++#define SPICE_ATAN(x) atan(x)
++#define SPICE_TAN(x)  tan(x)
++#define SPICE_TANH(x) tanh(x)
++#define SPICE_ASINH(x) asinh(x)
++#define SPICE_FMOD(x,y) fmod(x,y)
++#define SPICE_HYPOT(x,y) hypot(x,y)
++#define SPICE_LOG10(x) log10(x)
++#define SPICE_COSH(x) cosh(x)
++#define SPICE_SINH(x) sinh(x)
++#define SPICE_ACOSH(x) acosh(x)
++#define SPICE_CEIL(x) ceil(x)
++#define SPICE_FLOOR(x) floor(x)
++#endif
++
+ 
+ typedef struct CKTcircuit CKTcircuit;
+ typedef struct CKTnode CKTnode;

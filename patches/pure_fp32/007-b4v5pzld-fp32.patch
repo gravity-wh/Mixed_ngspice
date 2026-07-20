@@ -1,0 +1,87 @@
+--- /dev/fd/63	2026-07-16 23:07:46.833430033 +0800
++++ /mnt/e/MyResearch/Ngspice/ngspice-46_fp32/src/spicelib/devices/bsim4v5/b4v5pzld.c	2026-07-14 13:15:47.240075800 +0800
+@@ -16,6 +16,31 @@
+ #include "bsim4v5def.h"
+ #include "ngspice/suffix.h"
+ 
++// MIXED-PRECISION: fp32 transcendental math
++#define B4V5_FP32_MATH
++#ifdef B4V5_FP32_MATH
++#undef SPICE_EXP
++#undef SPICE_LOG
++#undef SPICE_SQRT
++#undef SPICE_POW
++#undef SPICE_SIN
++#undef SPICE_COS
++#undef SPICE_FABS
++#undef SPICE_ATAN
++#undef SPICE_TAN
++#undef SPICE_TANH
++#define SPICE_EXP(x)  expf((float)(x))
++#define SPICE_LOG(x)  logf((float)(x))
++#define SPICE_SQRT(x) sqrtf((float)(x))
++#define SPICE_POW(x,y) powf((float)(x),(float)(y))
++#define SPICE_SIN(x)  sinf((float)(x))
++#define SPICE_COS(x)  cosf((float)(x))
++#define SPICE_FABS(x) fabsf((float)(x))
++#define SPICE_ATAN(x) atanf((float)(x))
++#define SPICE_TAN(x)  tanf((float)(x))
++#define SPICE_TANH(x) tanhf((float)(x))
++#endif
++
+ int
+ BSIM4v5pzLoad(
+ GENmodel *inModel,
+@@ -25,30 +50,30 @@
+ BSIM4v5model *model = (BSIM4v5model*)inModel;
+ BSIM4v5instance *here;
+ 
+-double gjbd, gjbs, geltd, gcrg, gcrgg, gcrgd, gcrgs, gcrgb;
+-double xcggb, xcgdb, xcgsb, xcgbb, xcbgb, xcbdb, xcbsb, xcbbb;
+-double xcdgb, xcddb, xcdsb, xcdbb, xcsgb, xcsdb, xcssb, xcsbb;
+-double gds, capbd, capbs, FwdSum, RevSum, Gm, Gmbs;
+-double gstot, gstotd, gstotg, gstots, gstotb, gspr;
+-double gdtot, gdtotd, gdtotg, gdtots, gdtotb, gdpr;
+-double gIstotg, gIstotd, gIstots, gIstotb;
+-double gIdtotg, gIdtotd, gIdtots, gIdtotb;
+-double gIbtotg, gIbtotd, gIbtots, gIbtotb;
+-double gIgtotg, gIgtotd, gIgtots, gIgtotb;
+-double cgso, cgdo, cgbo;
+-double xcdbdb=0.0, xcsbsb=0.0, xcgmgmb=0.0, xcgmdb=0.0, xcgmsb=0.0, xcdgmb=0.0, xcsgmb=0.0;
+-double xcgmbb=0.0, xcbgmb=0.0;
+-double dxpart, sxpart, xgtg, xgtd, xgts, xgtb, xcqgb=0.0, xcqdb=0.0, xcqsb=0.0, xcqbb=0.0;
+-double gbspsp, gbbdp, gbbsp, gbspg, gbspb;
+-double gbspdp, gbdpdp, gbdpg, gbdpb, gbdpsp;
+-double ddxpart_dVd, ddxpart_dVg, ddxpart_dVb, ddxpart_dVs;
+-double dsxpart_dVd, dsxpart_dVg, dsxpart_dVb, dsxpart_dVs;
+-double T0=0.0, T1, CoxWL, qcheq, Cdg, Cdd, Cds, Csg, Csd, Css;
+-double ScalingFactor = 1.0e-9;
++SPICE_REAL gjbd, gjbs, geltd, gcrg, gcrgg, gcrgd, gcrgs, gcrgb;
++SPICE_REAL xcggb, xcgdb, xcgsb, xcgbb, xcbgb, xcbdb, xcbsb, xcbbb;
++SPICE_REAL xcdgb, xcddb, xcdsb, xcdbb, xcsgb, xcsdb, xcssb, xcsbb;
++SPICE_REAL gds, capbd, capbs, FwdSum, RevSum, Gm, Gmbs;
++SPICE_REAL gstot, gstotd, gstotg, gstots, gstotb, gspr;
++SPICE_REAL gdtot, gdtotd, gdtotg, gdtots, gdtotb, gdpr;
++SPICE_REAL gIstotg, gIstotd, gIstots, gIstotb;
++SPICE_REAL gIdtotg, gIdtotd, gIdtots, gIdtotb;
++SPICE_REAL gIbtotg, gIbtotd, gIbtots, gIbtotb;
++SPICE_REAL gIgtotg, gIgtotd, gIgtots, gIgtotb;
++SPICE_REAL cgso, cgdo, cgbo;
++SPICE_REAL xcdbdb=0.0, xcsbsb=0.0, xcgmgmb=0.0, xcgmdb=0.0, xcgmsb=0.0, xcdgmb=0.0, xcsgmb=0.0;
++SPICE_REAL xcgmbb=0.0, xcbgmb=0.0;
++SPICE_REAL dxpart, sxpart, xgtg, xgtd, xgts, xgtb, xcqgb=0.0, xcqdb=0.0, xcqsb=0.0, xcqbb=0.0;
++SPICE_REAL gbspsp, gbbdp, gbbsp, gbspg, gbspb;
++SPICE_REAL gbspdp, gbdpdp, gbdpg, gbdpb, gbdpsp;
++SPICE_REAL ddxpart_dVd, ddxpart_dVg, ddxpart_dVb, ddxpart_dVs;
++SPICE_REAL dsxpart_dVd, dsxpart_dVg, dsxpart_dVb, dsxpart_dVs;
++SPICE_REAL T0=0.0, T1, CoxWL, qcheq, Cdg, Cdd, Cds, Csg, Csd, Css;
++SPICE_REAL ScalingFactor = 1.0e-9;
+ struct bsim4v5SizeDependParam *pParam;
+-double ggidld, ggidlg, ggidlb, ggislg, ggislb, ggisls;
++SPICE_REAL ggidld, ggidlg, ggidlb, ggislg, ggislb, ggisls;
+ 
+-double m;
++SPICE_REAL m;
+ 
+     for (; model != NULL; model = BSIM4v5nextModel(model)) 
+     {    for (here = BSIM4v5instances(model); here!= NULL;

@@ -1,0 +1,29 @@
+From: Mixed_ngspice
+Subject: Add Cmin stepping and per-node Solution Limiting to DC solver
+
+Two solver-side convergence enhancements with zero double overhead:
+
+Part A — Solution Limiting (sollim):
+  Adds per-node delta-V clamping after each Newton solve step,
+  preventing the first iteration from overshooting into FP32
+  subthreshold NaN regions. Reuses existing CKTabsDv/CKTrelDv
+  fields. Enable with: .option sollim
+
+Part B — Cmin stepping:
+  Adds a new fallback stage between gmin and source stepping.
+  Steps a large diagonal conductance (1e-2) down to zero over
+  N iterations, providing numerical damping without altering
+  the final DC solution (unlike gmin). Enable with:
+    .option cminsteps=10
+
+Files modified:
+  src/include/ngspice/cktdefs.h     — CKTuseSolLim, CKTcmin, CKTnumCminSteps, CKTcminFactor
+  src/include/ngspice/tskdefs.h     — corresponding TSK fields
+  src/include/ngspice/optdefs.h     — OPT_SOLLIM, OPT_CMIN, OPT_CMINSTEPS, OPT_CMINFACTOR
+  src/spicelib/analysis/cktsopt.c   — option handlers + table entries
+  src/spicelib/analysis/cktntask.c  — defaults + def→tsk copy
+  src/spicelib/analysis/cktdojob.c  — tsk→ckt copy
+  src/maths/ni/niiter.c            — per-node solution limiting logic
+  src/spicelib/analysis/cktop.c     — Cmin stepping function
+
+Verified: 8/8 PTM 45nm open tests pass (DC+AC+TRAN), no regression.

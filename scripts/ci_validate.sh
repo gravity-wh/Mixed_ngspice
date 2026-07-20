@@ -20,8 +20,10 @@ cd "$(dirname "$0")/.."
 
 FP32_BIN="${FP32_BIN:-build_fp32/src/ngspice}"
 FP64_BIN="${FP64_BIN:-build_fp64/src/ngspice}"
+FP32_PURE_BIN="${FP32_PURE_BIN:-build_pure_fp32/src/ngspice}"
 TIMEOUT="${TIMEOUT:-120}"
 COMPARE_SCRIPT="scripts/compare_fp.py"
+THREE_WAY=0
 LOGDIR="logs"
 SUMMARY_JSON="$LOGDIR/ci_summary.json"
 QUICK=0
@@ -31,6 +33,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --quick) QUICK=1; shift ;;
         --verbose) VERBOSE=1; shift ;;
+        --three-way) THREE_WAY=1; shift ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
@@ -71,6 +74,10 @@ declare -a MANIFEST=(
     # === AC Tests (skipped in --quick mode) ===
     "04_ota_ac|test/circuits/04_ota_5transistor_45nm/test_ac.sp|ac|PASS|--warn-ac 0.05 --fail-ac 0.10"
     "05_opamp_ac|test/circuits/05_opamp_2stage_miller_45nm/test_ac.sp|ac|PASS|--warn-ac 0.05 --fail-ac 0.10"
+
+    # === Noise Analysis (NEW: three-way validation) ===
+    "04_ota_noise|test/circuits/04_ota_5transistor_45nm/test_noise.sp|noise|WARN|--warn-dc 0.01 --fail-dc 0.10"
+    "05_opamp_noise|test/circuits/05_opamp_2stage_miller_45nm/test_noise.sp|noise|WARN|--warn-dc 0.01 --fail-dc 0.10"
 
     # === TRAN Validation Testbenches ===
     "T1_ring_osc_tran|test/circuits_tran/T1_ring_osc_tran.sp|tran|SKIP|--warn-tran 0.005 --fail-tran 0.02"
@@ -153,7 +160,9 @@ for entry in "${MANIFEST[@]}"; do
     TOTAL=$((TOTAL + 1))
     local_log_fp32="$LOGDIR/${label}_fp32.log"
     local_log_fp64="$LOGDIR/${label}_fp64.log"
+    local_log_fp32pure="$LOGDIR/${label}_fp32pure.log"
     local_report="$LOGDIR/${label}_compare.md"
+    local_report_pure="$LOGDIR/${label}_compare_pure.md"
 
     echo -n "  [$TOTAL] $label ... "
 
@@ -175,7 +184,18 @@ for entry in "${MANIFEST[@]}"; do
         fp32_ok=0
     fi
 
-    # --- Decide verdict ---
+    # --- Run Pure FP32 (all-float, no double islands) ---
+    fp32pure_ok=1
+    if [[ $THREE_WAY -eq 1 ]] && [[ -x "$FP32_PURE_BIN" ]]; then
+        if ! run_ngspice "$FP32_PURE_BIN" "$spice_file" "$local_log_fp32pure" "$TIMEOUT"; then
+            fp32pure_ok=0
+        fi
+        if ! check_log_errors "$local_log_fp32pure"; then
+            fp32pure_ok=0
+        fi
+    fi
+
+    # --- Decide verdict (mixed FP32 vs FP64) ---
     if [[ "$expected" == "SKIP" ]]; then
         if [[ $fp64_ok -eq 0 ]]; then
             echo -e "${CYAN}SKIP${NC} (FP64 also fails — known issue)"
@@ -258,6 +278,33 @@ for entry in "${MANIFEST[@]}"; do
     esac
 
     RESULTS_JSON+=("{\"label\":\"$label\",\"verdict\":\"$verdict\",\"compare_exit\":$compare_ec}")
+
+    # --- Pure FP32 vs FP64 comparison (relaxed thresholds) ---
+    if [[ $THREE_WAY -eq 1 ]] && [[ $fp32pure_ok -eq 1 ]] && [[ $fp64_ok -eq 1 ]]; then
+        # Relaxed thresholds: 10x wider than mixed FP32
+        # DC: WARN 1%, FAIL 10%; AC: WARN 5%, FAIL 20%; TRAN: WARN 1%, FAIL 10%
+        python3 "$COMPARE_SCRIPT" "$local_log_fp32pure" "$local_log_fp64" \
+            --ci --json-summary \
+            --warn-dc 0.01 --fail-dc 0.10 \
+            --warn-ac 0.05 --fail-ac 0.20 \
+            --warn-tran 0.01 --fail-tran 0.10 \
+            $extra_args -o "$local_report_pure" > /dev/null 2>&1
+        pure_ec=$?
+
+        case $pure_ec in
+            0) pure_verdict="PASS" ;;
+            1) pure_verdict="FAIL" ;;
+            2) pure_verdict="WARN" ;;
+            *) pure_verdict="NODATA" ;;
+        esac
+
+        # Log pure-fp32 result to JSON
+        RESULTS_JSON+=("{\"label\":\"$label\",\"variant\":\"pure-fp32\",\"verdict\":\"$pure_verdict\",\"compare_exit\":$pure_ec}")
+
+        if [[ $VERBOSE -eq 1 ]]; then
+            echo -e "    ${CYAN}[pure-fp32 vs fp64]${NC} $pure_verdict"
+        fi
+    fi
 
     if [[ $VERBOSE -eq 1 ]] && [[ -f "$local_report" ]]; then
         echo "    ---"

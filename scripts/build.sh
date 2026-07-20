@@ -12,6 +12,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --fp32-only) MODE="fp32"; shift ;;
     --fp64-only) MODE="fp64"; shift ;;
+    --pure-fp32) MODE="pure-fp32"; shift ;;
     -j) JOBS="$2"; shift 2 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
@@ -21,6 +22,7 @@ NGSPICE_URL="https://sourceforge.net/projects/ngspice/files/ng-spice-rework/46/n
 NGSPICE_TAR="ngspice-46.tar.gz"
 NGSPICE_DIR="ngspice-46"
 PATCH_DIR="patches"
+PURE_FP32_PATCH_DIR="patches/pure_fp32"
 
 # --- Download ngspice-46 if needed ---
 if [[ ! -f "$NGSPICE_TAR" ]]; then
@@ -88,6 +90,41 @@ if [[ "$MODE" == "both" || "$MODE" == "fp64" ]]; then
   echo "  FP64 binary: $FP64_BUILD/src/ngspice"
 fi
 
-echo "[5/5] Build complete!"
+echo "[5/6] Build complete!"
 echo "  FP32: build_fp32/src/ngspice"
 echo "  FP64: build_fp64/src/ngspice"
+
+# --- Build Pure FP32 (all float, no double-precision islands) ---
+if [[ "$MODE" == "pure-fp32" ]]; then
+  echo "[1/3] Building Pure FP32 (all-float, no double islands)..."
+  PURE_FP32_BUILD="build_pure_fp32"
+  rm -rf "$PURE_FP32_BUILD"
+  cp -r "$NGSPICE_DIR" "$PURE_FP32_BUILD"
+
+  if [[ -d "$PURE_FP32_PATCH_DIR" ]]; then
+    echo "  Applying pure FP32 patches (no double-precision islands)..."
+    for patch in "$PURE_FP32_PATCH_DIR"/*.patch; do
+      pname=$(basename "$patch")
+      echo "    - $pname"
+      patch -d "$PURE_FP32_BUILD" -p1 < "$patch" || {
+        echo "ERROR: Pure FP32 patch $pname failed to apply!"
+        exit 1
+      }
+    done
+  else
+    echo "ERROR: Pure FP32 patch directory not found: $PURE_FP32_PATCH_DIR"
+    echo "Run: python scripts/gen_pure_fp32_patches.py"
+    exit 1
+  fi
+
+  cd "$PURE_FP32_BUILD"
+  ./configure --enable-single-precision --disable-klu --disable-xspice \
+    --disable-osdi --disable-cider --prefix="$PWD/install-pure-fp32" \
+    CFLAGS="-O2 -fopenmp -Wno-conversion" 2>&1 | tail -5
+  make -j"$JOBS" 2>&1 | tail -5
+  make install 2>&1 | tail -3
+  cd ..
+  echo "  Pure FP32 binary: $PURE_FP32_BUILD/src/ngspice"
+fi
+
+echo "[Done] Build complete!"

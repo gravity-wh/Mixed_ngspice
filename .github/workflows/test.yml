@@ -37,6 +37,42 @@ jobs:
       - name: Precision validation (FP32 vs FP64)
         run: bash scripts/ci_validate.sh --quick
 
+      # --- Pure FP32 (all-float, no islands) strawman build ---
+      - name: Build Pure FP32 (no double islands)
+        id: build-pure
+        continue-on-error: true
+        run: |
+          python scripts/gen_pure_fp32_patches.py
+          bash scripts/build.sh --pure-fp32 -j 2
+
+      - name: Verify Pure FP32 binary
+        continue-on-error: true
+        run: |
+          file build_pure_fp32/src/ngspice || echo "Pure FP32 binary not found (expected if build failed)"
+          build_pure_fp32/src/ngspice --version 2>&1 || true
+
+      - name: Three-way smoke test
+        continue-on-error: true
+        run: |
+          FP32_PURE_BIN=build_pure_fp32/src/ngspice \
+            bash test/run_all.sh --quick --all-three || echo "Pure FP32 smoke test had failures (expected)"
+
+      - name: Three-way precision validation
+        continue-on-error: true
+        run: |
+          bash scripts/ci_validate.sh --quick --three-way || echo "Pure FP32 validation had failures (expected for strawman)"
+
+      - name: Generate three-way comparison report
+        continue-on-error: true
+        run: |
+          LATEST=$(ls -t logs/*_fp32pure.log 2>/dev/null | head -1)
+          if [ -n "$LATEST" ]; then
+            MIXED="${LATEST/_fp32pure/_fp32}"
+            FP64="${LATEST/_fp32pure/_fp64}"
+            python scripts/compare_three.py "$MIXED" "$LATEST" "$FP64" \
+              -o logs/three_way_report.md --json logs/three_way_summary.json || true
+          fi
+
       - name: Archive logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -52,5 +88,8 @@ jobs:
           name: precision-reports
           path: |
             logs/*_compare.md
+            logs/*_compare_pure.md
+            logs/three_way_report.md
+            logs/three_way_summary.json
             logs/ci_summary.json
           retention-days: 7
