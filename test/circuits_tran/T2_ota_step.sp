@@ -34,7 +34,7 @@ CL OUT 0 1p
 * Step input: from mid-rail 0.55V to 0.551V (1mV small-signal step)
 VIN INP 0 PWL(0 0.55 10n 0.55 10.01n 0.551 100n 0.551)
 
-.options gmin=1e-12 reltol=1e-5 method=gear
+.options gmin=1e-10 sollim reltol=1e-5 method=gear
 .tran 0.1n 100n
 
 * Measure settling time to 1% of final value

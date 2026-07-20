@@ -33,7 +33,7 @@ CL OUT 0 2p
 * Step input: 100mV large-signal step
 VIN INP 0 PWL(0 0.55 20n 0.55 20.01n 0.65 200n 0.65)
 
-.options gmin=1e-12 reltol=1e-5 method=gear
+.options gmin=1e-10 sollim reltol=1e-5 method=gear
 .tran 0.1n 200n
 
 * Measures
