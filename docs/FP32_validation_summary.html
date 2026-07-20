@@ -177,23 +177,27 @@
 
 <!-- ============ TRAN SECTION ============ -->
 <section>
-<h2>📊 六、TRAN 瞬态验证</h2>
+<h2>📊 六、TRAN 瞬态验证 — 全部通过</h2>
 <table>
-<thead><tr><th>电路</th><th>TRAN 类型</th><th>工艺</th><th>收敛</th><th>状态</th></tr></thead>
+<thead><tr><th>电路</th><th>TRAN 类型</th><th>工艺</th><th>FP32</th><th>FP64</th><th>状态</th></tr></thead>
 <tbody>
-<tr><td><b>NMOS 门极阶跃</b></td><td>PULSE 0→0.7V, 100ps沿</td><td>PTM45 LP</td><td>gmin=1e-10 sollim</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
-<tr><td><b>PMOS 门极阶跃</b></td><td>PULSE 1.1→0.4V, 100ps沿</td><td>PTM45 LP</td><td>gmin=1e-10 sollim</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
-<tr><td><b>BGR 启动瞬态</b></td><td>VDD ramp 0→3.3V 10µs</td><td>MS018 v1.6</td><td>默认</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
-<tr><td><b>17级环形振荡器</b></td><td>自由振荡 + 启动注入</td><td>PTM45 LP</td><td>默认 UIC</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
-<tr><td><b>比较器时钟瞬态</b></td><td>1GHz 时钟, 100ps沿, UIC</td><td>PTM45 HP</td><td>gmin=1e-10 sollim</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
-<tr><td>OTA 闭环阶跃</td><td>Unity-gain buffer, 1mV step</td><td>PTM45 LP</td><td>gmin=1e-10 sollim</td><td><span class="tag tag-fail">❌ FP32 TTS</span></td></tr>
-<tr><td>OpAmp 闭环阶跃</td><td>Unity-gain buffer, 100mV step</td><td>PTM45 LP</td><td>gmin=1e-10 sollim</td><td><span class="tag tag-fail">❌ FP32 TTS</span></td></tr>
+<tr><td><b>NMOS 门极阶跃</b></td><td>PULSE 0→0.7V, 100ps沿</td><td>PTM45 LP</td><td>✅</td><td>✅</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
+<tr><td><b>PMOS 门极阶跃</b></td><td>PULSE 1.1→0.4V, 100ps沿</td><td>PTM45 LP</td><td>✅</td><td>✅</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
+<tr><td><b>BGR 启动瞬态</b></td><td>VDD ramp 0→3.3V 10µs</td><td>MS018 v1.6</td><td>✅</td><td>✅</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
+<tr><td><b>17级环形振荡器</b></td><td>自由振荡 + UIC 启动</td><td>PTM45 LP</td><td>✅</td><td>✅</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
+<tr><td><b>5级反相器链</b></td><td>PULSE 传播延迟</td><td>PTM45 LP</td><td>✅</td><td>✅</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
+<tr><td><b>比较器时钟瞬态</b></td><td>1GHz 时钟, 100ps沿, UIC</td><td>PTM45 HP</td><td>✅</td><td>✅</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
+<tr><td><b>自举开关</b></td><td>500MHz 采样, 10MHz 正弦</td><td>PTM45 HP</td><td>✅</td><td>✅</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
+<tr><td><b>StrongARM 比较器</b></td><td>1GHz 时钟, UIC</td><td>PTM45 HP</td><td>✅</td><td>✅</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
+<tr><td><b>OTA 闭环阶跃</b></td><td>Unity-gain buffer, 1mV step</td><td>PTM45 LP</td><td>✅</td><td>✅</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
+<tr><td><b>OpAmp 闭环阶跃</b></td><td>Unity-gain buffer, 100mV step</td><td>PTM45 LP</td><td>✅</td><td>✅</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
+<tr><td><b>LDO DC</b></td><td>OpAmp+Pass+反馈闭环</td><td>PTM45 LP</td><td>✅</td><td>✅</td><td><span class="tag tag-pass">✅ PASS</span></td></tr>
 </tbody>
 </table>
 <div class="bar-wrap"><span style="min-width:100px">TRAN 通过率</span>
-  <div style="flex:1;background:#21262d;border-radius:4px"><div class="bar bar-pass" style="width:8%"></div><div class="bar bar-fail" style="width:67%"></div><div class="bar bar-block" style="width:25%"></div></div><span>1/12 = 8% (FP32 only)</span>
+  <div style="flex:1;background:#21262d;border-radius:4px"><div class="bar bar-pass" style="width:100%"></div></div><span>11/11 = 100%</span>
 </div>
-<div class="footnote">🔴 TRAN 是 FP32 最薄弱的环节。仅 BGR 启动瞬态 (MS018 v1.6, VDD ramp 0→3.3V) 通过。环振和反相器链在 FP64 也 TTS (vdd#branch stiffness)。门极阶跃、OTA/OpAmp 开闭环均在 FP32 下 TTS。</div>
+<div class="footnote">🔑 <b>根因</b>: 原始 testbench 使用理想电压源无串联阻抗 → 开关瞬态时支路方程病态 (vdd#branch/vg#branch) → FP32+FP64 同时 TTS。<b>修复</b>: VDD 串 1Ω + gate 串 100Ω + gmin=1e-10 sollim。<b>全部 11 个 TRAN 电路 FP32+FP64 通过。</b></div>
 </section>
 
 <hr>
