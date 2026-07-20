@@ -108,20 +108,35 @@ Layer 5 ─ 求解器      patch 014         Cmin stepping + Solution Limiting
 
 <!-- ====== PATCH 003 ====== -->
 <section>
-<h2>Patch 003 — 热路径数学 + NaN 防火墙 <span class="tag t-fp32">FP32 转换</span> + <span class="tag t-safety">安全机制</span></h2>
+<h2>Patch 003 — 热路径数学 + NaN 防火墙 <span class="tag t-fp32">FP32 转换</span> + <span class="tag t-island">FP64 孤岛</span> + <span class="tag t-safety">安全机制</span></h2>
 <div class="card">
-<h3>文件: <code>src/spicelib/devices/bsim4v5/b4v5ld.c</code> (1671 行)</h3>
+<h3>文件: <code>src/spicelib/devices/bsim4v5/b4v5ld.c</code> (1671 行, +920/-750)</h3>
 <p><b>这是最大的单个 patch</b>——BSIM4v5 的 load 函数是每个晶体管每个 Newton 迭代调用一次的热路径。</p>
+<p>包含 <b>16 个 FP64 精度孤岛</b>，是最复杂的混合精度实现。</p>
 <table>
-<thead><tr><th>类别</th><th>变更</th><th>说明</th></tr></thead>
+<thead><tr><th>类别</th><th>变更</th><th>行数</th></tr></thead>
 <tbody>
-<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>局部重载 SPICE_* 宏为 expf/logf/sqrtf + 显式 (float) 转换</td><td>~13 处关键数学调用降为 FP32</td></tr>
-<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>DEXP 宏升级为 expf 版本</td><td>亚阈值区指数计算</td></tr>
-<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>Vgsteff 显式 float 计算 + NaN/Inf 保护</td><td>栅极过驱动电压</td></tr>
-<tr><td><span class="tag t-island">FP64 孤岛</span></td><td>Vbseff sqrt 消去: 保留 double 精度</td><td>体效应电压计算</td></tr>
-<tr><td><span class="tag t-island">FP64 孤岛</span></td><td>Phis/sqrtPhis/Xdep 保护块: 全 double</td><td>表面势相关计算</td></tr>
-<tr><td><span class="tag t-safety">安全机制</span></td><td><b>40+ CHECK_NAN</b> 监测点 + 矩阵 stamp 归零</td><td>NaN 检测后立即归零，防 Newton 发散</td></tr>
-<tr><td><span class="tag t-safety">安全机制</span></td><td>CHECK_NAN(Vth) 专检</td><td>Vth→Vgsteff→ueff 全链 NaN 阻断</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>B4V5_FP32_MATH 宏块: SPICE_* → expf/logf/sqrtf + 显式 (float) 转换</td><td>~47</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>全部 150+ 局部变量 double → SPICE_REAL</td><td>~150</td></tr>
+<tr><td><span class="tag t-fp32">FP32 转换</span></td><td>DEXP 宏升级为 expf 版本</td><td>~10</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛 1</span></td><td><b>Vbseff</b>: T0=Vbs−vbsc−0.001; sqrt(T0²−0.004·vbsc) — 全 double</td><td>~20</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛 2</span></td><td><b>体效应正向修正</b>: JX 修正 sqrt — 全 double</td><td>~8</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛 3</span></td><td><b>sqrtPhis</b>: sqrt(Phis), dsqrtPhis_dVb — 全 double</td><td>~12</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛 4</span></td><td><b>Xdep</b>: Xdep0·sqrtPhis/sqrtPhi + isinf/==0 诊断 — 全 double</td><td>~15</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛 5</span></td><td><b>Vth</b> 全链重写为 const float 块 (~35 行) — 输入显式 (float) 转换</td><td>~35</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛 6</span></td><td><b>Vgsteff</b> 重写为 float 块 (~70 行) + log1pf — 输入显式 (float) 转换</td><td>~70</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛 7</span></td><td><b>Weff</b> 重写为 float 块 (~20 行)</td><td>~20</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛 8</span></td><td><b>Rds</b> 重写为 float 块 (~25 行)</td><td>~25</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛 9</span></td><td><b>Abulk</b> 全链重写为 const double 块 (~85 行) — <b>最大孤岛</b></td><td>~85</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛 10</span></td><td><b>迁移率</b> (mobMod 0/1/2) 重写为 double 块 (~50 行)</td><td>~50</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛 11</span></td><td><b>Vdsat</b> 重写为 float 块 + /0 防护</td><td>~55</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛 12</span></td><td><b>Vdseff</b> 重写为 float 块</td><td>~35</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛 13</span></td><td><b>Idl</b> 全链 (Coxeff/Tcen/beta/fgche/gche/Idl+导数) 重写为 float 块</td><td>~65</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛 14</span></td><td><b>VADIBL</b> 重写为 float 块</td><td>~25</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛 15</span></td><td><b>VASCBE</b> 重写为 float 块</td><td>~25</td></tr>
+<tr><td><span class="tag t-island">FP64 孤岛 16</span></td><td><b>源端速度极限</b> 重写为 float 块</td><td>~30</td></tr>
+<tr><td><span class="tag t-safety">安全机制</span></td><td><b>25+ CHECK_NAN</b> 监测点: Vbseff, Phis, Xdep, Vth, Vgsteff, Abulk, ueff, Vdsat, Vdseff, Idsa, Ids/Gm/Gds/Gmb, cdrain, qgate/qbulk/qdrn</td><td>~30</td></tr>
+<tr><td><span class="tag t-safety">安全机制</span></td><td><b>NaN 防火墙</b>: 矩阵 stamp 前检查 cd/gm/gds/gmbs — 任一 NaN 则 12 个输出字段全部归零</td><td>~12</td></tr>
 </tbody>
 </table>
 <p><b>为什么热路径局部变量仍保持 double</b>: 实验证明将内部临时变量也改为 float 会导致 NaN 立即发散。保持 double 的开销极小（寄存器级），但精度收益巨大。</p>
@@ -210,9 +225,10 @@ Layer 5 ─ 求解器      patch 014         Cmin stepping + Solution Limiting
 
 <!-- ====== PATCH 014 ====== -->
 <section>
-<h2>Patch 014 — 求解器增强 <span class="tag t-solver">求解器</span></h2>
+<h2>Patch 014 — 求解器增强 <span class="tag t-solver">求解器</span> <span class="tag t-warn">无 diff hunks</span></h2>
 <div class="card">
-<h3>8 文件, 29 行 · 零 double 运算开销</h3>
+<h3>8 文件 · 零 double 运算开销 · 仅 commit message（diff 直接应用于源码树）</h3>
+<p><b>注意</b>: <code>014-cmin-sollim-solver.patch</code> 文件仅包含 commit message，<b>不含 diff hunks</b>。实际代码修改直接应用于 <code>Ngspice/ngspice-46_mixed/</code> 源码树。以下来自 commit message 描述:</p>
 <table>
 <thead><tr><th>文件</th><th>变更</th></tr></thead>
 <tbody>
@@ -292,7 +308,7 @@ Layer 5 ─ 求解器      patch 014         Cmin stepping + Solution Limiting
 <tr><td>013</td><td>multi-t-nan-fix</td><td>54</td><td>b4v5ld.c</td><td><span class="tag t-island">Vth FP64</span> + <span class="tag t-safety">MIN_EXP</span></td></tr>
 <tr><td>014</td><td>cmin-sollim-solver</td><td>29</td><td>8 文件</td><td><span class="tag t-solver">求解器</span></td></tr>
 <tr><td>015</td><td>noise-fp64-island</td><td>21</td><td>b4v5noi.c + b4v5ld.c</td><td><span class="tag t-island">噪声 FP64</span></td></tr>
-<tr style="font-weight:700;border-top:2px solid var(--accent)"><td colspan="2">总计</td><td>5957</td><td>10+8</td><td></td></tr>
+<tr style="font-weight:700;border-top:2px solid var(--accent)"><td colspan="2">总计 (14 diff + 1 commit-msg)</td><td>5957</td><td>10+8</td><td>FP32 转换 ~80% · FP64 孤岛 ~15% · 安全/求解器 ~5%</td></tr>
 </tbody>
 </table>
 </section>
