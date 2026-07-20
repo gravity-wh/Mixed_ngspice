@@ -41,11 +41,10 @@
 <p class="subtitle">每个声明均已通过 FP32+FP64 双重运行严格验证 — 无幻觉</p>
 
 <div class="stats">
-  <div class="stat-card"><div class="num pass">10</div><div class="label">已验证电路</div></div>
-  <div class="stat-card"><div class="num pass">10</div><div class="label">FP32+FP64 均通过</div></div>
-  <div class="stat-card"><div class="num accent">4</div><div class="label">DC OP 电路</div></div>
-  <div class="stat-card"><div class="num accent">4</div><div class="label">TRAN 瞬态电路</div></div>
-  <div class="stat-card"><div class="num accent">2</div><div class="label">特殊电路</div></div>
+  <div class="stat-card"><div class="num pass">12</div><div class="label">已验证电路</div></div>
+  <div class="stat-card"><div class="num pass">12</div><div class="label">FP32+FP64 均通过</div></div>
+  <div class="stat-card"><div class="num accent">6</div><div class="label">DC OP 电路</div></div>
+  <div class="stat-card"><div class="num accent">6</div><div class="label">TRAN 瞬态电路</div></div>
 </div>
 
 <section>
@@ -76,7 +75,7 @@
 </section>
 
 <section>
-<h2>📊 二、TRAN 瞬态 (4 电路)</h2>
+<h2>📊 三、TRAN 瞬态 (6 电路)</h2>
 <table>
 <thead><tr><th>电路</th><th>TRAN 类型</th><th>工艺</th><th>FP32</th><th>FP64</th></tr></thead>
 <tbody>
@@ -84,17 +83,21 @@
 <tr><td><b>StrongARM 比较器</b></td><td>1GHz 时钟 UIC</td><td>PTM45 HP</td><td><span class="tag tag-pass">✅</span></td><td><span class="tag tag-pass">✅</span></td></tr>
 <tr><td><b>OTA 闭环阶跃</b></td><td>Unity-gain buffer, 1mV step</td><td>PTM45 LP</td><td><span class="tag tag-pass">✅</span></td><td><span class="tag tag-pass">✅</span></td></tr>
 <tr><td><b>OpAmp 闭环阶跃</b></td><td>Unity-gain buffer, 100mV step</td><td>PTM45 LP</td><td><span class="tag tag-pass">✅</span></td><td><span class="tag tag-pass">✅</span></td></tr>
+<tr><td><b>17级环形振荡器</b></td><td>3000+ 时间步自由振荡</td><td>PTM45 LP</td><td><span class="tag tag-pass">✅</span></td><td><span class="tag tag-pass">✅</span></td></tr>
+<tr><td><b>5级反相器链</b></td><td>PULSE 传播延迟</td><td>PTM45 LP</td><td><span class="tag tag-pass">✅</span></td><td><span class="tag tag-pass">✅</span></td></tr>
 </tbody>
 </table>
+<div class="footnote">
+  环振附加选项 (来自 ngspice 社区): <code>method=gear reltol=0.01 cshunt=1p trtol=1 gmin=1e-12 rseries=0.05</code> + 交替 .ic<br>
+  关键修复: <code>cshunt=1p</code> 给所有节点加 1pF 对地电容, <code>rseries=0.05</code> 给电压源加串联电阻
+</div>
 </section>
 
 <section>
-<h2>📊 三、未包含的电路 (诚实说明)</h2>
+<h2>📊 五、未包含的电路 (诚实说明)</h2>
 <table>
 <thead><tr><th>电路</th><th>原因</th></tr></thead>
 <tbody>
-<tr><td>17级环形振荡器 (TRAN)</td><td>UIC 启动在 FP32+FP64 均 TTS — 需要启动电路设计调优，非 FP32 问题</td></tr>
-<tr><td>5级反相器链 (TRAN)</td><td>同上 — UIC branch stiffness，非 FP32 问题</td></tr>
 <tr><td>BGR MS018 v1.6</td><td>依赖 /tmp 中的 PDK 文件，不可从干净 checkout 复现</td></tr>
 <tr><td>bc018/ms018 系列</td><td>PDK 格式兼容性需要进一步验证，未纳入本次 solid 报告</td></tr>
 <tr><td>SKY130A 系列</td><td>测试平台 include 链复杂，未纳入本次 solid 报告</td></tr>
