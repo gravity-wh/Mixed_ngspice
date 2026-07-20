@@ -199,10 +199,13 @@ TRAN_CIRCUITS = [
 def run_ngspice(ngspice_path, circuit_path, timeout=120):
     """Run ngspice in batch mode and capture output."""
     try:
+        cwd = str(Path(circuit_path).parent.resolve())
+        # Use basename so include paths resolve correctly relative to cwd
+        spice_file = Path(circuit_path).name
         result = subprocess.run(
-            [ngspice_path, "--batch", circuit_path],
+            [ngspice_path, "--batch", spice_file],
             capture_output=True, text=True, timeout=timeout,
-            cwd=str(Path(circuit_path).parent)
+            cwd=cwd
         )
         return result.stdout + result.stderr
     except subprocess.TimeoutExpired:

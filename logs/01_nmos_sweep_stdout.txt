@@ -1,0 +1,4 @@
+Report written to logs/01_nmos_sweep_compare.md
+
+--- JSON SUMMARY ---
+{"verdict": "PASS", "max_error": 7.664723013131629e-05, "worst_metric": "vth0", "worst_category": "dc", "n_metrics": 1, "n_pass": 1, "n_warn": 0, "n_fail": 0, "nan_detected": false, "errors_detected": false, "dc_errors": [{"metric": "vth0", "error": 7.664723013131629e-05, "status": "PASS"}], "ac_errors": [], "tran_errors": []}

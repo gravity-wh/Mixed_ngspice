@@ -191,10 +191,12 @@ def generate_report(fp32_path_or_text, fp64_path_or_text, text_mode=False,
     errors_detected = False
 
     for text, label in [(text32, "FP32"), (text64, "FP64")]:
-        if "nan" in text.lower() or "NaN" in text: nan_detected = True
+        # Filter out model parameter listings that contain <<NAN for unused params
+        text_clean = re.sub(r'<<NAN[^\n]*\n?', '', text)
+        if "nan" in text_clean.lower() or "NaN" in text_clean: nan_detected = True
         if re.search(r"error|fatal|timestep too small|singular matrix|iteration limit",
-                     text, re.IGNORECASE):
-            if not re.search(r"(Node\s+Voltage|Index\s+time|gain_max|period|freq)", text):
+                     text_clean, re.IGNORECASE):
+            if not re.search(r"(Node\s+Voltage|Index\s+time|gain_max|period|freq)", text_clean):
                 errors_detected = True
 
     lines = [f"# FP32 vs FP64 Accuracy Report", "",
