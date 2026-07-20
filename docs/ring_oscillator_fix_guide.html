@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>17级环振 ngspice 仿真修复指南</title>
+<style>
+:root{--bg:#0d1117;--fg:#c9d1d9;--accent:#58a6ff;--pass:#3fb950;--fail:#f85149;--warn:#d2991d;--border:#30363d;--card:#161b22;--code-bg:#1c2128}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--fg);line-height:1.7;padding:20px}
+.container{max-width:960px;margin:0 auto}
+h1{text-align:center;font-size:1.6em;margin:20px 0 5px;color:var(--accent)}
+.subtitle{text-align:center;color:#8b949e;margin-bottom:25px;font-size:0.9em}
+section{margin-bottom:30px}
+h2{font-size:1.2em;border-bottom:2px solid var(--border);padding-bottom:6px;margin-bottom:15px;color:var(--accent)}
+h3{font-size:1.05em;margin:18px 0 8px;color:#e6edf3}
+p{margin:8px 0}
+.fix-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:18px;margin:15px 0}
+.fix-card .num{display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;background:var(--accent);color:#fff;border-radius:50%;font-weight:700;font-size:0.9em;margin-right:8px}
+.fix-card h3{display:inline;margin:0}
+.fix-card .verdict{float:right;padding:2px 10px;border-radius:4px;font-size:0.85em;font-weight:600}
+.v-good{background:rgba(63,185,80,0.15);color:var(--pass)}
+.v-bad{background:rgba(248,81,73,0.15);color:var(--fail)}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:15px;overflow-x:auto;font-size:0.85em;line-height:1.5;margin:10px 0}
+code{font-family:'Cascadia Code','Fira Code',Consolas,monospace;font-size:0.9em}
+.err{color:var(--fail)} .ok{color:var(--pass)} .hl{color:var(--accent)}
+table{width:100%;border-collapse:collapse;font-size:0.9em;margin:10px 0}
+th,td{padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)}
+th{background:var(--card);color:#8b949e}
+.ascii-art{font-family:monospace;background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:15px;line-height:1.3;font-size:0.82em;white-space:pre;overflow-x:auto}
+.checklist li{margin:6px 0;list-style:none}
+.checklist li::before{content:"☐ ";margin-right:6px}
+.checklist li.done::before{content:"☑ ";color:var(--pass)}
+hr{border:none;border-top:1px solid var(--border);margin:20px 0}
+@media(max-width:768px){pre{font-size:0.75em}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>17 级环振 ngspice 仿真修复指南</h1>
+<p class="subtitle">工艺: PTM 45nm LP · BSIM4 Level 54 · VDD=1.1V · FP32+FP64 均验证通过</p>
+
+<section>
+<h2>问题诊断</h2>
+<p>17 级 CMOS 反相器环振在 ngspice 中仿真会遇到两类失败，<b>均非 FP32 精度问题</b>（FP64 同样失败）：</p>
+
+<table>
+<thead><tr><th>#</th><th>错误信息</th><th>根因</th><th>类型</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><code class="err">doAnalyses: TRAN: Timestep too small; trouble with node "vdd#branch"</code></td>
+<td>理想电压源 VDD 无串联阻抗，34 个晶体管同时开关时支路方程奇异</td>
+<td>testbench 设计</td></tr>
+<tr><td>2</td><td><code class="err">doAnalyses: TRAN: Timestep too small; trouble with node "n2"</code></td>
+<td>UIC 初始条件设置不当，所有节点处于亚稳态平衡，无法起振</td>
+<td>testbench 设计</td></tr>
+</table>
+</section>
+
+<section>
+<h2>四项必要修复</h2>
+
+<!-- Fix 1 -->
+<div class="fix-card">
+<span class="num">1</span><h3>VDD 串联 1Ω 电阻</h3><span class="verdict v-good">物理合理</span>
+<p>理想电压源 VDD 输出阻抗为零。34 个晶体管开关时，瞬态电流通过 VDD 支路方程 <code>I = (V_node − V_VDD) / 0</code> → 除零奇异。</p>
+<p>真实芯片中 bond wire 寄生电阻 ~0.1Ω，PCB trace ~10mΩ。加 1Ω 是保守但完全合理的仿真实践。</p>
+<pre><span class="err">修复前:</span>  VDD VDD 0 DC 1.1
+
+<span class="ok">修复后:</span>  VRAW vraw 0 DC 1.1
+         RVDD vraw VDD 1    <span class="hl">← 1Ω 串联电阻</span></pre>
+</div>
+
+<!-- Fix 2 -->
+<div class="fix-card">
+<span class="num">2</span><h3>交替初始条件 — 打破亚稳态</h3><span class="verdict v-good">物理合理</span>
+<p>17 个反相器环是一个正反馈环路。如果所有节点 .ic 设为相同的 VDD/2，系统处于不稳定平衡——理论上会因数值噪声起振，实际上数值噪声不够大。</p>
+<p>交替设置 0 / 1.1V 模拟工艺失配或热噪声打破对称性。真实芯片上电后必然有不对称性。</p>
+<pre><span class="err">修复前 (亚稳态):</span>  .ic v(n1)=0.55 v(n2)=0.55 ... v(n17)=0.55
+
+<span class="ok">修复后 (交替):</span>   .ic v(n1)=0    v(n2)=1.1  v(n3)=0    v(n4)=1.1
+         .ic v(n5)=0    v(n6)=1.1  v(n7)=0    v(n8)=1.1
+         .ic v(n9)=0    v(n10)=1.1 v(n11)=0   v(n12)=1.1
+         .ic v(n13)=0   v(n14)=1.1 v(n15)=0   v(n16)=1.1
+         .ic v(n17)=0</pre>
+</div>
+
+<!-- Fix 3 -->
+<div class="fix-card">
+<span class="num">3</span><h3>启动 NMOS 脉冲 — 钳位释放</h3><span class="verdict v-good">物理合理</span>
+<p>交替 IC 给了初始方向，但需要短暂将 n1 强制拉到 GND（通过启动 NMOS），然后释放，边沿才开始绕环传播。</p>
+<p>这模拟了真实环振中的启动电路（通常用反相器或 NAND 门打破 DC 平衡）。</p>
+<pre><span class="ok">启动电路:</span>  Mstart n1 start 0 0 nmos W=0.5u L=45n
+         Vpulse start 0 PULSE(1.1 0 0 50p 50p <span class="hl">200p</span> 5n)
+
+         <span class="hl">↑ start=1.1V 持续 200ps，强制 n1=0V，然后释放</span></pre>
+</div>
+
+<!-- Fix 4 -->
+<div class="fix-card">
+<span class="num">4</span><h3>使用 UIC — 跳过 DC 工作点</h3><span class="verdict v-good">标准做法</span>
+<p>17 个反相器环的 DC 工作点是亚稳态——ngspice 的 DC 求解器无法收敛（或不收敛到有意义的值）。<code>uic</code> 告诉 ngspice 直接使用 .ic 的值开始瞬态，不先求解 DC。</p>
+<pre><span class="ok">.tran 1p 3n <span class="hl">uic</span></span></pre>
+</div>
+</section>
+
+<section>
+<h2>完整工作网表</h2>
+<pre>* 17-Stage Ring Oscillator — Verified with FP32 + FP64
+.include /path/to/ptm45lp.lib
+
+* VDD with 1 ohm series resistance (Fix 1)
+VRAW vraw 0 DC 1.1
+RVDD vraw VDD 1
+
+* CMOS inverter subcircuit
+.subckt inv in out vdd
+Mp out in vdd vdd pmos W=2u L=45n
+Mn out in 0   0   nmos W=1u L=45n
+.ends inv
+
+* 17-stage chain
+X1  n1  n2  VDD inv    X2  n2  n3  VDD inv
+X3  n3  n4  VDD inv    X4  n4  n5  VDD inv
+X5  n5  n6  VDD inv    X6  n6  n7  VDD inv
+X7  n7  n8  VDD inv    X8  n8  n9  VDD inv
+X9  n9  n10 VDD inv    X10 n10 n11 VDD inv
+X11 n11 n12 VDD inv    X12 n12 n13 VDD inv
+X13 n13 n14 VDD inv    X14 n14 n15 VDD inv
+X15 n15 n16 VDD inv    X16 n16 n17 VDD inv
+X17 n17 n1  VDD inv
+
+* Alternating initial conditions (Fix 2)
+.ic v(n1)=0    v(n2)=1.1  v(n3)=0    v(n4)=1.1
+.ic v(n5)=0    v(n6)=1.1  v(n7)=0    v(n8)=1.1
+.ic v(n9)=0    v(n10)=1.1 v(n11)=0   v(n12)=1.1
+.ic v(n13)=0   v(n14)=1.1 v(n15)=0   v(n16)=1.1
+.ic v(n17)=0
+
+* Startup NMOS (Fix 3)
+Mstart n1 start 0 0 nmos W=0.5u L=45n
+Vpulse start 0 PULSE(1.1 0 0 50p 50p 200p 5n)
+
+* TRAN with UIC (Fix 4)
+.tran 1p 3n uic
+
+.control
+run
+.endc
+.end</pre>
+</section>
+
+<section>
+<h2>修复效果对比</h2>
+<table>
+<thead><tr><th>配置</th><th>VDD R</th><th>交替 IC</th><th>启动 NMOS</th><th>UIC</th><th>FP64</th><th>FP32</th></tr></thead>
+<tbody>
+<tr><td>原始 (错误)</td><td>❌</td><td>❌ 统一 0.55V</td><td>❌</td><td>✅</td><td><span class="err">TTS</span></td><td><span class="err">TTS</span></td></tr>
+<tr><td>仅加 VDD R</td><td>✅</td><td>❌ 统一 0.55V</td><td>❌</td><td>✅</td><td><span class="err">TTS</span></td><td><span class="err">TTS</span></td></tr>
+<tr><td>VDD R + 交替 IC</td><td>✅</td><td>✅</td><td>❌</td><td>✅</td><td><span class="err">TTS</span></td><td><span class="err">TTS</span></td></tr>
+<tr style="background:rgba(63,185,80,0.06)"><td><b>完整修复</b></td><td><b>✅</b></td><td><b>✅</b></td><td><b>✅</b></td><td><b>✅</b></td><td><b class="ok">3000+ 步</b></td><td><b class="ok">3000+ 步</b></td></tr>
+</tbody>
+</table>
+<p style="color:var(--warn)">注意：四项修复缺一不可。单独加 VDD R 或单独加交替 IC 都无法通过。</p>
+</section>
+
+<section>
+<h2>不需要的"修复" (已验证无效或多余)</h2>
+<table>
+<thead><tr><th>选项</th><th>是否需要</th><th>原因</th></tr></thead>
+<tbody>
+<tr><td><code>cshunt=1p</code></td><td>❌ 不需要</td><td>给所有节点加 1pF 假电容，改变电路特性，属于作弊</td></tr>
+<tr><td><code>rseries=0.05</code></td><td>❌ 不需要</td><td>手动 VDD 串 1Ω 已解决 branch stiffness</td></tr>
+<tr><td><code>method=gear</code></td><td>❌ 不需要</td><td>默认 trap 法即可，无需 Gear 阻尼</td></tr>
+<tr><td><code>reltol=0.01</code></td><td>❌ 不需要</td><td>默认 0.001 精度足够</td></tr>
+<tr><td><code>gmin=1e-10 sollim</code></td><td>❌ 不需要</td><td>UIC 跳过 DC，这些 DC 收敛选项不参与</td></tr>
+<tr><td>额外 FP32 patch</td><td>❌ 不需要</td><td>WSL 默认 ngspice (FP64, 零 patch) 也能跑通</td></tr>
+</tbody>
+</table>
+</section>
+
+<section>
+<h2>验证结果</h2>
+<table>
+<thead><tr><th>验证项</th><th>FP64 (WSL vanilla)</th><th>FP64 (patched)</th><th>FP32 (patched)</th></tr></thead>
+<tbody>
+<tr><td>是否 TTS</td><td><span class="ok">否</span></td><td><span class="ok">否</span></td><td><span class="ok">否</span></td></tr>
+<tr><td>时间步数</td><td>3000+</td><td>3000+</td><td>3000+</td></tr>
+<tr><td>收敛</td><td><span class="ok">✅</span></td><td><span class="ok">✅</span></td><td><span class="ok">✅</span></td></tr>
+</tbody>
+</table>
+</section>
+
+<hr>
+<p style="color:#8b949e;font-size:0.8em;text-align:center">
+  Mixed_ngspice · <a href="https://github.com/gravity-wh/Mixed_ngspice" style="color:var(--accent)">github.com/gravity-wh/Mixed_ngspice</a>
+</p>
+
+</div>
+</body>
+</html>
