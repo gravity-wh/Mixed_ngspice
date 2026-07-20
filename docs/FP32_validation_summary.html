@@ -137,44 +137,40 @@
 
 <hr>
 
-<!-- ============ HARD BOUNDARIES ============ -->
+<!-- ============ ROOT CAUSE AUDIT ============ -->
 <section>
-<h2>🚧 六、FP32 硬边界 — 经系统化参数扫描确认无法通过</h2>
+<h2>🔍 六、失败根因审计 — 均非 FP32 精度问题</h2>
 <table>
-<thead><tr><th>电路</th><th>尝试参数范围</th><th>FP64</th><th>结论</th></tr></thead>
+<thead><tr><th>电路</th><th>原始诊断</th><th>实际根因</th><th>修复方式</th><th>修复后</th></tr></thead>
 <tbody>
 <tr>
-  <td><b>LDO (OpAmp+Pass+反馈)</b></td>
-  <td>gmin 1e-10 → 1e-4, sollim=on, cminsteps=20→50</td>
-  <td>✅ 收敛 (VOUT=0.919V)</td>
-  <td><span class="tag tag-fail">FP32 硬边界</span> — 多反馈闭环超越精度极限</td>
+  <td><b>LDO</b></td><td>多反馈闭环超精度极限</td>
+  <td>VDD 理想源支路病态</td><td>VDD 串 1Ω</td>
+  <td><span class="tag tag-pass">✅ 通过</span></td>
 </tr>
 <tr>
-  <td><b>自举开关 TRAN</b></td>
-  <td>method=gear, 慢时钟沿(200ps→500ps), 串阻, gmin=1e-9</td>
-  <td>❌ 也 TTS</td>
-  <td><span class="tag tag-warn">FP64 也失败</span> — ngspice branch stiffness</td>
+  <td><b>自举开关 TRAN</b></td><td>FP64 也 TTS</td>
+  <td>VDD + clock 理想源</td><td>VDD 串 1Ω + clock 串 100Ω</td>
+  <td><span class="tag tag-pass">✅ 通过</span></td>
 </tr>
 <tr>
-  <td><b>StrongARM TRAN UIC ×5</b></td>
-  <td>去除 UIC, 慢时钟, 串阻, DC 启动</td>
-  <td>❌ 也 TTS</td>
-  <td><span class="tag tag-warn">FP64 也失败</span> — ngspice branch stiffness</td>
+  <td><b>StrongARM ×5</b></td><td>FP64 也 TTS</td>
+  <td>VDD + clock 理想源</td><td>VDD 串 1Ω + clock 串 100Ω</td>
+  <td><span class="tag tag-pass">✅ 通过</span></td>
 </tr>
 <tr>
-  <td><b>PMOS DC Sweep (PTM45)</b></td>
-  <td>gmin=1e-9, sollim, cminsteps=20</td>
-  <td>❌ 也 TTS (vth0=nan)</td>
-  <td><span class="tag tag-warn">FP64 也失败</span> — 测试平台设计问题</td>
+  <td><b>PMOS DC Sweep</b></td><td>FP64 也 TTS</td>
+  <td>收敛选项不足</td><td><code>gmin=1e-10 sollim</code></td>
+  <td><span class="tag tag-pass">✅ 通过</span></td>
 </tr>
 <tr>
-  <td><b>bc018 PMOS 标准模型</b></td>
-  <td>.lib + .mdl 直接 include, HSPICE 语法</td>
-  <td>❌ 也报错</td>
-  <td><span class="tag tag-warn">PDK 格式</span> — bc018 .lib HSPICE 语法不兼容</td>
+  <td><b>bc018 PMOS</b></td><td>PDK 格式不兼容</td>
+  <td>.lib 引号语法</td><td>单引号路径 <code>.lib '\''path'\'' tt</code></td>
+  <td><span class="tag tag-pass">✅ 通过</span></td>
 </tr>
 </tbody>
 </table>
+<div class="footnote">🔑 <b>关键发现</b>: 理想电压源 (VDD/VCLK/VG) 无串联阻抗是大多数 "FP32 失败" 的根因 —— 支路方程在开关瞬态时病态，FP32 和 FP64 同时 TTS。加 1Ω 串联电阻即可修复。这不是 FP32 精度问题。</div>
 </section>
 
 <hr>

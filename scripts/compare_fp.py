@@ -186,7 +186,7 @@ def generate_report(fp32_path_or_text, fp64_path_or_text, text_mode=False,
         fp64_label = os.path.basename(fp64_path_or_text)
 
     all_errors = []
-    worst_overall = (0.0, "N/A", "N/A")
+    worst_overall = ("N/A", 0.0, "N/A")  # (metric_name, error_value, category)
     nan_detected = False
     errors_detected = False
 
@@ -317,15 +317,15 @@ def generate_report(fp32_path_or_text, fp64_path_or_text, text_mode=False,
     lines.extend(["## Summary", "",
                   f"- **Metrics compared**: {len(all_errors)}",
                   f"- **PASS**: {n_pass} | **WARN**: {n_warn} | **FAIL**: {n_fail}"])
-    if worst_overall[1] != "N/A":
-        lines.append(f"- **Worst error**: {worst_overall[0]:.2e} on `{worst_overall[1]}` ({worst_overall[2]})")
+    if worst_overall[0] != "N/A":
+        lines.append(f"- **Worst error**: {worst_overall[1]:.2e} on `{worst_overall[0]}` ({worst_overall[2]})")
     if nan_detected: lines.append("- :warning: **NaN detected** in output")
     if errors_detected: lines.append("- :warning: **Convergence errors** detected")
     lines.extend(["", f"**Overall Verdict: {overall}**", ""])
 
     summary = {
-        "verdict": overall, "max_error": worst_overall[0],
-        "worst_metric": worst_overall[1], "worst_category": worst_overall[2],
+        "verdict": overall, "max_error": worst_overall[1],
+        "worst_metric": worst_overall[0], "worst_category": worst_overall[2],
         "n_metrics": len(all_errors), "n_pass": n_pass, "n_warn": n_warn, "n_fail": n_fail,
         "nan_detected": nan_detected, "errors_detected": errors_detected,
         "dc_errors": [{"metric": m, "error": e, "status": s} for m, e, c, s in all_errors if c == "dc"],
