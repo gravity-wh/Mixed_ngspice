@@ -5,9 +5,10 @@
 
 .include ../models/45nm_LP_BSIM4/ptm45lp.lib
 
-.param VDD = 1.1
+.param VSUP = 1.1
 
-VDD VDD 0 DC {VDD}
+VRAW vraw 0 DC {VSUP}
+RVDD vraw VDD 1
 
 * 17-stage inverter chain
 .subckt inv in out vdd

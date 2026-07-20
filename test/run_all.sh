@@ -151,6 +151,79 @@ if [[ "$MODE" != "fp32" ]]; then
 fi
 
 echo ""
+# =============================================================================
+# DC SWEEP TESTS (not run in --quick mode)
+# =============================================================================
+if [[ "$QUICK" -eq 0 ]]; then
+  echo "=== DC SWEEP TESTS ==="
+
+  echo "--- 01_nmos_sweep ---"
+  if [[ "$MODE" != "fp64" ]]; then
+    run_test "01_nmos_sweep" "test/circuits/01_single_nmos_45nm/test_dc_sweep.sp" "$FP32_BIN" "logs/01_nmos_sweep_fp32.log"
+  fi
+  if [[ "$MODE" != "fp32" ]]; then
+    run_test "01_nmos_sweep" "test/circuits/01_single_nmos_45nm/test_dc_sweep.sp" "$FP64_BIN" "logs/01_nmos_sweep_fp64.log"
+  fi
+
+  echo "--- 02_pmos_sweep ---"
+  if [[ "$MODE" != "fp64" ]]; then
+    run_test "02_pmos_sweep" "test/circuits/02_single_pmos_45nm/test_dc_sweep.sp" "$FP32_BIN" "logs/02_pmos_sweep_fp32.log"
+  fi
+  if [[ "$MODE" != "fp32" ]]; then
+    run_test "02_pmos_sweep" "test/circuits/02_single_pmos_45nm/test_dc_sweep.sp" "$FP64_BIN" "logs/02_pmos_sweep_fp64.log"
+  fi
+fi
+
+# =============================================================================
+# TRAN VALIDATION TESTBENCHES (circuits_tran/)
+# Enhanced TRAN tests with .meas and .save for waveform comparison.
+# Not run in --quick mode (heavier simulations).
+# =============================================================================
+if [[ "$QUICK" -eq 0 ]]; then
+  echo "=== TRAN VALIDATION TESTBENCHES (T1-T5) ==="
+
+  echo "--- T1_ring_osc_tran ---"
+  if [[ "$MODE" != "fp64" ]]; then
+    run_test "T1_ring_osc" "test/circuits_tran/T1_ring_osc_tran.sp" "$FP32_BIN" "logs/T1_ring_osc_fp32.log"
+  fi
+  if [[ "$MODE" != "fp32" ]]; then
+    run_test "T1_ring_osc" "test/circuits_tran/T1_ring_osc_tran.sp" "$FP64_BIN" "logs/T1_ring_osc_fp64.log"
+  fi
+
+  echo "--- T2_ota_step ---"
+  if [[ "$MODE" != "fp64" ]]; then
+    run_test "T2_ota_step" "test/circuits_tran/T2_ota_step.sp" "$FP32_BIN" "logs/T2_ota_step_fp32.log"
+  fi
+  if [[ "$MODE" != "fp32" ]]; then
+    run_test "T2_ota_step" "test/circuits_tran/T2_ota_step.sp" "$FP64_BIN" "logs/T2_ota_step_fp64.log"
+  fi
+
+  echo "--- T3_opamp_step ---"
+  if [[ "$MODE" != "fp64" ]]; then
+    run_test "T3_opamp_step" "test/circuits_tran/T3_opamp_step.sp" "$FP32_BIN" "logs/T3_opamp_step_fp32.log"
+  fi
+  if [[ "$MODE" != "fp32" ]]; then
+    run_test "T3_opamp_step" "test/circuits_tran/T3_opamp_step.sp" "$FP64_BIN" "logs/T3_opamp_step_fp64.log"
+  fi
+
+  echo "--- T4_comparator_clock ---"
+  if [[ "$MODE" != "fp64" ]]; then
+    run_test "T4_comparator_clock" "test/circuits_tran/T4_comparator_clock.sp" "$FP32_BIN" "logs/T4_comparator_clock_fp32.log"
+  fi
+  if [[ "$MODE" != "fp32" ]]; then
+    run_test "T4_comparator_clock" "test/circuits_tran/T4_comparator_clock.sp" "$FP64_BIN" "logs/T4_comparator_clock_fp64.log"
+  fi
+
+  echo "--- T5_bootstrap_switch ---"
+  if [[ "$MODE" != "fp64" ]]; then
+    run_test "T5_bootstrap" "test/circuits_tran/T5_bootstrap_switch.sp" "$FP32_BIN" "logs/T5_bootstrap_fp32.log"
+  fi
+  if [[ "$MODE" != "fp32" ]]; then
+    run_test "T5_bootstrap" "test/circuits_tran/T5_bootstrap_switch.sp" "$FP64_BIN" "logs/T5_bootstrap_fp64.log"
+  fi
+fi
+
+echo ""
 echo "============================================"
 echo -e "  Results: ${GREEN}$PASS passed${NC}, ${RED}$FAIL failed${NC}, $TOTAL total"
 echo "============================================"
