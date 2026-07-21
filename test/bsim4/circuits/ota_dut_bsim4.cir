@@ -1,0 +1,19 @@
+* Five-Transistor OTA DUT — BSIM4v5 (PTM 130nm)
+* Adapted from PTM 180nm BSIM3v3 version
+* Vdd=1.3V, Vth_n≈0.39V, Vth_p≈-0.34V
+* W/L scaled ~0.7× from 180nm version
+
+.subckt ota_bsim4 INP INN OUT VDD VSS VBIAS
+
+* NMOS differential pair (scaled: W 20u→14u, L 1u→0.13u)
+M0 OUT  INP TAIL VSS nmos L=0.13u W=14.0u m=1
+M1 NETD INN TAIL VSS nmos L=0.13u W=14.0u m=1
+
+* PMOS current-mirror active load (scaled: W 16u→11u)
+M3 OUT  NETD VDD VDD pmos L=0.13u W=11.0u m=1
+M4 NETD NETD VDD VDD pmos L=0.13u W=11.0u m=1
+
+* NMOS tail current source (scaled: W 12u→8u)
+M5 TAIL VBIAS VSS VSS nmos L=0.13u W=8.0u m=1
+
+.ends ota_bsim4

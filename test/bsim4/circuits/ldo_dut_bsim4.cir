@@ -1,0 +1,40 @@
+* LDO DUT — BSIM4v5 (PTM 130nm)
+* Adapted from PTM 180nm BSIM3v3 version
+* Vin=1.8V, Vout=1.3V, VREF=0.65V
+* Transistor W/L scaled ~0.7× from 180nm
+
+.subckt ldo_bsim4 VIN VOUT VSS VREF
+
+* Bias current source (scaled: 100uA → 50uA)
+I1 VIN ibias DC 50u
+
+* Bias bypass cap
+C1 ibias VSS 0.5
+
+* Current mirror: NMOS bias reference + tail
+M6 ibias ibias VSS VSS nmos L=1u W=80.0u m=1
+M5 net16 ibias VSS VSS nmos L=1u W=80.0u m=5
+
+* Differential pair (error amp)
+M0 net3 VREF net16 VSS nmos L=2u W=120.0u m=5
+M1 net4 net30 net16 VSS nmos L=2u W=120.0u m=5
+
+* PMOS active load
+M4 net4 net4 VIN VIN pmos L=1u W=16.0u m=5
+M3 net3 net4 VIN VIN pmos L=1u W=16.0u m=5
+
+* Pass transistor (large PMOS)
+M2 VOUT net3 VIN VIN pmos L=0.13u W=80.0u m=50
+
+* Compensation zero: R2 + C0
+R2 net3 net34 2000
+C0 net34 VOUT 80p
+
+* Feedback divider: V_fb = VOUT * R1/(R0+R1) = VREF
+R0 VOUT net30 600
+R1 net30 VSS  600
+
+* Output cap
+C2 VOUT VSS 0.5u
+
+.ends ldo_bsim4

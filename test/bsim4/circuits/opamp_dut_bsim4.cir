@@ -1,0 +1,33 @@
+* Two-Stage Op Amp DUT — BSIM4v5 (PTM 130nm)
+* Adapted from PTM 180nm BSIM3v3 version
+* Vdd=1.3V, ibias=20uA (scaled from 50uA)
+
+.subckt opamp_bsim4 INP INN OUT VDD VSS
+
+* Bias current source
+IBIAS_SRC PBIAS VSS DC 20u
+
+* PMOS bias mirror (diode-connected)
+M7 PBIAS PBIAS VDD VDD pmos L=0.13u W=8.0u m=1
+
+* PMOS tail current source for diff pair
+M5 C PBIAS VDD VDD pmos L=0.13u W=8.0u m=1
+
+* PMOS differential pair (scaled: W 40u→28u)
+M0 A INN C VDD pmos L=0.13u W=28.0u m=1
+M1 B INP C VDD pmos L=0.13u W=28.0u m=1
+
+* NMOS current-mirror load (scaled: W 10u→7u)
+M3 A A VSS VSS nmos L=0.13u W=7.0u m=1
+M4 B A VSS VSS nmos L=0.13u W=7.0u m=1
+
+* Second stage: NMOS CS amplifier (scaled: W 20u→14u)
+M2 OUT B VSS VSS nmos L=0.13u W=14.0u m=1
+
+* Second stage: PMOS current-source load (scaled: W 16u→11u)
+M6 OUT PBIAS VDD VDD pmos L=0.13u W=11.0u m=1
+
+* Miller compensation (scaled: 2pF → 1pF)
+CCOMP B OUT 1p
+
+.ends opamp_bsim4

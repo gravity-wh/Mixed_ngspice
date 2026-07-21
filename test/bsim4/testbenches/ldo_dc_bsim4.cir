@@ -1,0 +1,19 @@
+* LDO — DC Operating Point (BSIM4v5 / PTM 130nm)
+
+VIN_SRC  vin  0 DC 1.8
+VREF_SRC vref 0 DC 0.65
+VVSS     vss  0 DC 0
+
+.include /mnt/e/MyResearch/Mixed_ngspice/test/bsim4/circuits/ldo_dut_bsim4.cir
+XLDO vin vout vss vref ldo_bsim4
+
+RLOAD vout vss 26
+
+.include /mnt/e/MyResearch/Mixed_ngspice/test/models/ptm130.lib
+.options RELTOL=1e-4 ABSTOL=1e-12 VNTOL=1e-7 ITL4=80
+
+.control
+op
+print v(vout) v(vref) i(VIN_SRC)
+.endc
+.end
