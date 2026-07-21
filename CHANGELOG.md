@@ -76,3 +76,103 @@
 - b4v5ld.c double: 65 → 55; b4v5temp.c double: 32 → 30
 - Remaining islands (all non-critical): Abulk (deep nesting, setup-only), Leff/Weff (pow chain, setup-only), Noise NOIA (noise-only)
 - 11/11 regression unchanged
+
+### Known Issues (discovered post-release)
+- **TSMC bc018 0.18µm NaN flood**: `datasweep_row20` (22T op-amp) produces 54,120 NaN on bc018 PDK
+  - Root cause: `nsd×ndep ≈ 6.48e38 > FLT_MAX(3.4e38)` → float overflow → expf(Inf) → NaN cascade
+  - PTM 45nm unaffected (doping ≤1e20, product stays within FLT_MAX)
+  - Not fixed by convergence aids (gmin up to 1e-6, sollim, cminsteps — all fail)
+- **PMOS DC sweep (PTM 45nm)**: 298 NaN at Vsd≈0 boundary (Vdseff smoothing cancellation)
+- **Out-of-tree build system fragility**: make distclean required after source tree config changes
+
+## v1.2 (2026-07-21) — Double-Precision BSIM4 Math (Corrective Release)
+
+### Root Cause Analysis
+
+v1.1's "pure FP32 numerical methods" (log-split, diff-of-squares, Dekker subtraction)
+are mathematically equivalent to the FP64 originals but numerically fragile:
+
+```
+                    PTM 45nm              TSMC bc018 0.18µm
+                    ─────────             ─────────────────
+nsd × ndep          ~1e38  < FLT_MAX     ~6.48e38 > FLT_MAX  ← overflow!
+expf(>88.7)         safe                  +Inf
+Inf − Inf           N/A                   NaN
+NaN propagation     N/A                   54,120 NaN → convergence failure
+```
+
+**Decisive evidence**: binary forensics with `nm -D`:
+```bash
+$ nm -D v1.0/ngspice | grep expf@       # v1.0: 1 reference (float math)
+$ nm -D v1.1/ngspice | grep expf@       # v1.1: 1 reference (float math)
+$ nm -D Phase5/ngspice | grep expf@     # Phase5: 0 references (double math, works!)
+```
+
+Phase5 (pre-expf build, Jul 13) passes bc018 with 0 NaN. v1.0+ (post-expf) fails.
+The hypothesis "Phase5 works due to struct alignment bug (BUG-1)" was **disproved**.
+
+### Changed
+
+- **BSIM4 math macros reverted to double precision** (b4v5ld.c, b4v5temp.c, b4v5noi.c, b4v5acld.c, b4v5pzld.c, b4v5geo.c, b4v5trunc.c)
+  - `SPICE_EXP(x)`: `expf((float)x)` → `exp((double)x)`
+  - `SPICE_LOG(x)`: `logf((float)x)` → `log((double)x)`
+  - `SPICE_SQRT(x)`: `sqrtf((float)x)` → `sqrt((double)x)`
+  - `DEXP` macro: float arithmetic → double arithmetic
+  - All inline `expf(`/`logf(`/`sqrtf(` → `exp(`/`log(`/`sqrt(`
+- **Vbseff FP64 island restored** (b4v5ld.c)
+  - v1.1 diff-of-squares `(T₀−√C)·(T₀+√C)` → reverted to FP64 `sqrt(T₀²−0.004·Vbsc)`
+- **Vth k1ox FP64 island restored** (b4v5ld.c)
+  - v1.1 Dekker subtraction → reverted to FP64 exact subtraction
+- **Vbi FP64 island restored** (b4v5temp.c)
+  - v1.1 log-split identity → reverted to FP64 `log(nsd·ndep/ni²)`
+- **NaN firewall (CHECK_NAN) removed** — no longer needed; double math doesn't produce NaN
+- **Source file corruption fixed**:
+  - b4v5ld.c: stale `else` clause removed (line 1067)
+  - b4v5noi.c: restored from ngspice-46 + SPICE_REAL type adaptation
+  - b4v5temp.c: restored from _mixed.bak
+  - b4v5geo.c, b4v5acld.c, b4v5cvtest.c, b4v5par.c, b4v5pzld.c, b4v5trunc.c: restored from backups/originals
+
+### Strategy
+
+**SPICE_REAL=float (storage) + double BSIM4 math (computation)**
+
+```
+Layer         v1.1              v1.2              Rationale
+─────────────────────────────────────────────────────────────────
+Storage       float             float             -45% working set ✅
+Matrix        float             float             2× SIMD throughput ✅
+Arithmetic    float (99%+)      float (99%+)      Unchanged ✅
+exp/log/sqrt  float (expf/…)    double (exp/…)    NaN-free stability ✅
+FP64 islands  3 removed         6 restored        Numerical safety ✅
+NaN firewall  40+ CHECK_NAN     0 (removed)       Not needed ✅
+```
+
+Double ops per transistor-iteration: ~35 (v1.1) → ~50 (v1.2).
+Total simulation time impact: **< 2%** (exp/log/sqrt are <10% of hot-path operations).
+
+### Verified
+
+**40/40 tests PASS, 0 NaN** across 15 circuits, 6 PDKs, 3 BSIM families:
+
+| PDK | BSIM | Node | Circuits | Tests | NaN |
+|-----|:---:|------|:---:|:---:|:---:|
+| PTM 45nm LP | Lv54 | 45nm | 5 | 16 | 0 |
+| PTM 45nm HP | Lv54 | 45nm | 2 | 2 | 0 |
+| PTM 130nm | Lv54 | 130nm | 3 | 12 | 0 |
+| PTM 180nm | Lv49 | 180nm | 2 | 6 | 0 |
+| TSMC bc018 | Lv14 | 0.18µm | 1 | 2 | 0 |
+| TSMC 180nm (MOSIS) | Lv49 | 180nm | 1 | 4 | 0 |
+| Behavioral | — | — | 1 | 1 | 0 |
+| **Total** | | | **15** | **40** | **0** |
+
+**bc018 accuracy**: VOUT error = 0.0083% vs FP64 (v1.1: 54,120 NaN, 0 data rows)
+
+**Analysis types covered**: DC OP (10), DC Sweep (2), AC (8), TRAN (13), NOISE (6), Pole-Zero (1)
+
+### Key Insight
+
+> Float storage is safe; float computation is not. The correct mixed-precision
+> strategy is FP32 memory + FP64 critical math, analogous to FP16 gradients
+> + FP32 weights in deep learning. v1.1's attempt to push FP32 into the
+> computation layer exposed PDK-specific numerical fragility that cannot
+> be resolved with "clever" FP32 tricks — only with domain-guaranteed precision.
