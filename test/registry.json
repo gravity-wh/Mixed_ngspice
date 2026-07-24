@@ -1,0 +1,66 @@
+{
+  "version": "1.0",
+  "generated": "2026-07-25",
+  "total_circuits": 121,
+  "datasets": {
+    "Mixed_ngspice": {
+      "path": "test/circuits",
+      "count": 38,
+      "pdk": ["PTM45LP", "PTM45HP", "TSMC_bc018", "Behavioral"],
+      "ready": true
+    },
+    "Analog_blocks": {
+      "path": "../Analog_blocks/Analog_Blocks",
+      "count": 23,
+      "pdk": ["SKY130A"],
+      "ready": true
+    },
+    "hybridCHIPS": {
+      "path": "../datasets/hybridCHIPS2022",
+      "count": 21,
+      "pdk": ["SKY130"],
+      "ready": true
+    },
+    "SKY130_complete": {
+      "path": "../datasets/avsdbgp_3v3_sky130_v2",
+      "count": 18,
+      "pdk": ["SKY130"],
+      "ready": true
+    },
+    "Eyantra_BGR": {
+      "path": "../datasets/Bandgap-IP-Design-using-Sky130-technology-node/Prelayout",
+      "count": 7,
+      "pdk": ["SKY130"],
+      "ready": true
+    },
+    "OpenFASOC": {
+      "path": "../datasets/OpenFASOC/openfasoc/generators",
+      "count": 6,
+      "pdk": ["SKY130"],
+      "ready": true
+    },
+    "AnalogGym_sp": {
+      "path": "../AnalogGym/AnalogGym",
+      "count": 6,
+      "pdk": ["SMIC180", "TSMC180", "SKY130"],
+      "ready": true
+    },
+    "caravel_analog": {
+      "path": "../datasets/caravel_analog",
+      "count": 2,
+      "pdk": ["SKY130"],
+      "ready": true
+    }
+  },
+  "categories": {
+    "BGR": {"count": 19, "label": "Bandgap Reference", "ready": "green"},
+    "OP":  {"count": 28, "label": "Operational Amplifier / OTA", "ready": "green"},
+    "LDO": {"count": 22, "label": "Low-Dropout Regulator", "ready": "green"},
+    "CMP": {"count": 16, "label": "Comparator", "ready": "green"},
+    "FDA": {"count": 26, "label": "Fully-Differential Amplifier / OTA variants", "ready": "green"},
+    "RCO": {"count": 4,  "label": "Ring Oscillator / Clock Generator", "ready": "yellow"},
+    "SAH": {"count": 2,  "label": "Sample-and-Hold / Bootstrap Switch", "ready": "yellow"},
+    "ADC": {"count": 2,  "label": "Analog-to-Digital Converter", "ready": "yellow"},
+    "FGEN":{"count": 1,  "label": "Function Generator / Behavioral", "ready": "yellow"}
+  }
+}

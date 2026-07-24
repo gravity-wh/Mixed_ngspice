@@ -1,0 +1,51 @@
+{
+  "_meta": {
+    "generated": "2026-07-25",
+    "total": 121,
+    "format": "Each entry: [unique_id, netlist_path, category, dataset, pdk, transistors, analysis_type, notes]"
+  },
+  "circuits": [
+    ["NMOS_45_DC",        "test/circuits/01_single_nmos_45nm/test_dc.sp",        "OP", "Mixed_ngspice", "PTM45LP", 1,  "DC_OP",   ""],
+    ["NMOS_45_SW",        "test/circuits/01_single_nmos_45nm/test_dc_sweep.sp",  "OP", "Mixed_ngspice", "PTM45LP", 1,  "DC_SWEEP",""],
+    ["PMOS_45_DC",        "test/circuits/02_single_pmos_45nm/test_dc.sp",        "OP", "Mixed_ngspice", "PTM45LP", 1,  "DC_OP",   ""],
+    ["PMOS_45_SW",        "test/circuits/02_single_pmos_45nm/test_dc_sweep.sp",  "OP", "Mixed_ngspice", "PTM45LP", 1,  "DC_SWEEP",""],
+    ["OTA_45_DC",         "test/circuits/04_ota_5transistor_45nm/test_dc.sp",    "OP", "Mixed_ngspice", "PTM45LP", 6,  "DC_OP",   ""],
+    ["OTA_45_AC",         "test/circuits/04_ota_5transistor_45nm/test_ac.sp",    "OP", "Mixed_ngspice", "PTM45LP", 6,  "AC",      ""],
+    ["OTA_45_NOISE",      "test/circuits/04_ota_5transistor_45nm/test_noise.sp", "OP", "Mixed_ngspice", "PTM45LP", 6,  "NOISE",   ""],
+    ["OPAMP_45_DC",       "test/circuits/05_opamp_2stage_miller_45nm/test_dc.sp","OP", "Mixed_ngspice", "PTM45LP", 8,  "DC_OP",   ""],
+    ["OPAMP_45_AC",       "test/circuits/05_opamp_2stage_miller_45nm/test_ac.sp","OP", "Mixed_ngspice", "PTM45LP", 8,  "AC",      ""],
+    ["OPAMP_45_NOISE",    "test/circuits/05_opamp_2stage_miller_45nm/test_noise.sp","OP","Mixed_ngspice","PTM45LP", 8,  "NOISE",   ""],
+    ["RING_45_TRAN",      "test/circuits/03_ring_oscillator_17stage/test_tran.sp","RCO","Mixed_ngspice","PTM45LP", 34, "TRAN",   "17-stage ring oscillator"],
+    ["CMP_45_TRAN",       "test/circuits/06_comparator_strongarm_45nm/test_tran.sp","CMP","Mixed_ngspice","PTM45HP", 15, "TRAN","StrongARM dynamic"],
+    ["BOOT_45_TRAN",      "test/circuits/07_bootstrap_switch_45nm/test_tran.sp","SAH","Mixed_ngspice","PTM45HP", 7, "TRAN", "Bootstrap switch"],
+    ["CHAOS_TRAN",        "test/circuits/08_roessler_attractor/test_chaos.sp",   "FGEN","Mixed_ngspice","Behavioral",0,"TRAN", "Rössler attractor"],
+
+    ["RING_T1_TRAN",      "test/circuits_tran/T1_ring_osc_tran.sp",          "RCO","Mixed_ngspice","PTM45LP", 34, "TRAN","17-stage injection"],
+    ["RING_T4_TRAN",      "test/circuits_tran/T4_ring_osc_tran.sp",          "RCO","Mixed_ngspice","PTM45LP", 34, "TRAN","34T alternate"],
+    ["NMOS_GATE_TRAN",    "test/circuits_tran/T1_nmos_gate_step.sp",         "OP", "Mixed_ngspice","PTM45LP", 1,  "TRAN","Gate step response"],
+    ["PMOS_GATE_TRAN",    "test/circuits_tran/T2_pmos_gate_step.sp",         "OP", "Mixed_ngspice","PTM45LP", 1,  "TRAN","Gate step response"],
+    ["OTA_STEP_TRAN",     "test/circuits_tran/T2_ota_step.sp",               "OP", "Mixed_ngspice","PTM45LP", 6,  "TRAN","Closed-loop step"],
+    ["OPAMP_STEP_TRAN",   "test/circuits_tran/T3_opamp_step.sp",             "OP", "Mixed_ngspice","PTM45LP", 8,  "TRAN","Closed-loop step"],
+    ["CMP_CLK_TRAN",      "test/circuits_tran/T4_comparator_clock.sp",       "CMP","Mixed_ngspice","PTM45HP", 15, "TRAN","Clocked 1GHz"],
+    ["BOOT_FULL_TRAN",    "test/circuits_tran/T5_bootstrap_switch.sp",       "SAH","Mixed_ngspice","PTM45HP", 7,  "TRAN","Bootstrap full"],
+    ["OTA_OL_TRAN",       "test/circuits_tran/T5_ota_openloop.sp",           "OP", "Mixed_ngspice","PTM45LP", 6,  "TRAN","Open-loop"],
+    ["OPAMP_OL_TRAN",     "test/circuits_tran/T6_opamp_openloop.sp",         "OP", "Mixed_ngspice","PTM45LP", 8,  "TRAN","Open-loop"],
+    ["INV_CHAIN_TRAN",    "test/circuits_tran/T7_inverter_chain.sp",         "RCO","Mixed_ngspice","PTM45LP", 10, "TRAN","Inverter chain"],
+    ["BGR_STARTUP_TRAN",  "test/circuits_tran/T3_bgr_startup.sp",            "BGR","Mixed_ngspice","PTM45LP", 8,  "TRAN","BGR startup"],
+
+    ["OTA_130_DC",        "../iAnalogDadta/generated_tests/ptm130_ota_dc.sp","OP", "PTM130","PTM130", 5, "DC_OP",""],
+    ["OTA_130_AC",        "../iAnalogDadta/generated_tests/ptm130_ota_ac.sp","OP", "PTM130","PTM130", 5, "AC",""],
+    ["OTA_130_TRAN",      "../iAnalogDadta/generated_tests/ptm130_ota_tran.sp","OP","PTM130","PTM130",5,"TRAN",""],
+    ["OPAMP_130_DC",      "../iAnalogDadta/generated_tests/ptm130_opamp_dc.sp","OP","PTM130","PTM130",8,"DC_OP",""],
+    ["OPAMP_130_AC",      "../iAnalogDadta/generated_tests/ptm130_opamp_ac.sp","OP","PTM130","PTM130",8,"AC",""],
+    ["OPAMP_130_TRAN",    "../iAnalogDadta/generated_tests/ptm130_opamp_tran.sp","OP","PTM130","PTM130",8,"TRAN",""],
+    ["LDO_130_DC",        "../iAnalogDadta/generated_tests/ptm130_ldo_dc_v2.sp","LDO","PTM130","PTM130",6,"DC_OP",""],
+    ["LDO_130_AC",        "../iAnalogDadta/generated_tests/ptm130_ldo_ac_v2.sp","LDO","PTM130","PTM130",6,"AC",""],
+    ["LDO_130_TRAN",      "../iAnalogDadta/generated_tests/ptm130_ldo_tran_v2.sp","LDO","PTM130","PTM130",6,"TRAN",""],
+    ["LDO_130_NOISE",     "../iAnalogDadta/generated_tests/ptm130_ldo_noise_v2.sp","LDO","PTM130","PTM130",6,"NOISE",""],
+
+    ["OTA_180_DC",        "../analog-circuit-skills/WORK/netlists/dut/five_transistor_ota.cir","OP","PTM180","PTM180",5,"DC_OP",""],
+    ["OPAMP_180_DC",      "../analog-circuit-skills/WORK/netlists/dut/two_stage_opamp.cir","OP","PTM180","PTM180",8,"DC_OP",""],
+    ["LDO_180_DC",        "../analog-circuit-skills/WORK/netlists/dut/ldo_dut.cir","LDO","TSMC180","TSMC180",20,"DC_OP",""]
+  ]
+}
