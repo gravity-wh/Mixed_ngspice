@@ -138,7 +138,7 @@ These were discovered during a line-by-line audit of float_spice.c against the r
 | Feature | Status |
 |---------|:------|
 | Gmin stepping (1e-2 → 1e-12) | ✅ 3-stage (1e-9/1e-10/1e-12) |
-| Source stepping (ramp from 0) | 🔄 agent4 @ 2026-07-24 (P2.1) |
+| Source stepping (ramp from 0) | ✅ 4-stage (1e-3→1e-2→1e-1→1.0) agent4 |
 | Solution limiting (per-node) | ❌ ±1.0V hard clamp |
 | Cmin stepping (diagonal damping) | ❌ |
 | Pseudo-transient fallback | ❌ |
@@ -168,9 +168,9 @@ These were discovered during a line-by-line audit of float_spice.c against the r
 | # | Task | Est. |
 |---|------|:--:|
 | P1.1 | ✅ Expand BSIM4Param from 16→51 fields (agent5 @ 2026-07-24) | 2h |
-| P1.2 | Implement full Vth (dvt0/1/2, dsub, k3, w0) | 2h |
-| P1.3 | Implement Rds (rdsw/rsw/rdw/prwg) | 1.5h |
-| P1.4 | Implement full Early voltage stack (VACLM+VADIBL) | 3h |
+| P1.2 | 🔄 Implement full Vth: dvt0/1/2, dsub, k3, w0, nlx (agent3 @ 2026-07-24) | 2h |
+| P1.3 | ✅ Implement Rds: rdsw/prwg — source/drain resistance (agent1 @ 2026-07-24) | 1.5h |
+| P1.4 | 🔄 Implement full Early voltage stack: VACLM+VADIBL+VADITS+VASCBE (agent5 @ 2026-07-24) | 3h |
 | P1.5 | Implement mobMod=0/1/2 + Coulomb scattering | 2h |
 | P1.6 | Implement proper subthreshold (mstar, voffcv, minv) | 2h |
 | **P1 Subtot** | | **~12.5h** |
@@ -179,11 +179,11 @@ These were discovered during a line-by-line audit of float_spice.c against the r
 
 | # | Task | Est. |
 |---|------|:--:|
-| P2.1 | 🔄 Source stepping (4 ramp stages) (agent4 @ 2026-07-24) | 2h |
-| P2.2 | Adaptive voltage limiting | 1.5h |
+| P2.1 | ✅ Source stepping (4 ramp stages) (agent4 @ 2026-07-24) | 2h |
+| P2.2 | 🔄 Adaptive voltage limiting (agent4 @ 2026-07-24) | 1.5h |
 | P2.3 | Cmin stepping + pseudo-transient fallback | 3h |
 | P2.4 | ✅ Floating Vsrc MNA branch variables (B8 fix, agent2 @ 2026-07-24) | 2h |
-| P2.5 | 🔄 Current source support (agent2 @ 2026-07-24) | 1h |
+| P2.5 | ✅ Current source support (agent2 @ 2026-07-24) | 1h |
 | **P2 Subtot** | | **~9.5h** |
 
 ### Phase 3: SPICE Compatibility
