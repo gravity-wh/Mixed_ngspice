@@ -37,3 +37,8 @@ test/models_private_tsmc/
 .DS_Store
 Thumbs.db
 build_fp32/
+patches/003-b4v5ld-hotpath-fp32.patch.bak
+*.log
+test_results/*/202*
+!test_results/schema.json
+!test_results/README.md

@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/gravity-wh/Mixed_ngspice/test_results/schema.json",
+  "title": "Mixed_ngspice Test Run Result",
+  "type": "object",
+  "required": ["run_id", "timestamp", "version", "git_commit", "circuits", "summary"],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "description": "Unique identifier: YYYYMMDD_HHMMSS_version"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "version": {
+      "type": "string",
+      "enum": ["fp64", "v1.2", "v1.6"],
+      "description": "Binary version identifier"
+    },
+    "binary": {
+      "type": "string",
+      "description": "Path to ngspice binary used"
+    },
+    "git_commit": {
+      "type": "string",
+      "description": "Full SHA of the commit that produced this binary"
+    },
+    "circuits": {
+      "type": "object",
+      "description": "Per-circuit results keyed by circuit name",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["status", "nan_count"],
+        "properties": {
+          "status": {"type": "string", "enum": ["PASS", "FAIL", "SKIP"]},
+          "nan_count": {"type": "integer"},
+          "rows": {"type": "integer"},
+          "analysis_time_s": {"type": "number"},
+          "error_messages": {"type": "array", "items": {"type": "string"}},
+          "metrics": {
+            "type": "object",
+            "description": "Key measurement values for accuracy comparison",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "fp32": {"type": "number"},
+                "fp64": {"type": "number"},
+                "error_pct": {"type": "number"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "description": "Coverage statistics",
+      "properties": {
+        "pdk_count": {"type": "integer"},
+        "circuit_count": {"type": "integer"},
+        "dc_op_count": {"type": "integer"},
+        "ac_count": {"type": "integer"},
+        "tran_count": {"type": "integer"},
+        "noise_count": {"type": "integer"},
+        "pz_count": {"type": "integer"},
+        "bsim_families": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total", "passed", "failed", "total_nan"],
+      "properties": {
+        "total": {"type": "integer"},
+        "passed": {"type": "integer"},
+        "failed": {"type": "integer"},
+        "skipped": {"type": "integer"},
+        "total_nan": {"type": "integer"}
+      }
+    }
+  }
+}
