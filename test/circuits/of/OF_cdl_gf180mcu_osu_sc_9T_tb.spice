@@ -1,3 +1,5 @@
+.include /mnt/e/MyResearch/datasets/hybridCHIPS2022/gf180mcuC/libs.tech/ngspice/design.ngspice
+.include /mnt/e/MyResearch/datasets/OpenFASOC/openfasoc/common/platforms/gf180osu9t/cdl/gf180mcu_osu_sc_9T.spice
 * Auto TB for gf180mcu_osu_sc_9T_addf_1
 .include /mnt/e/MyResearch/Mixed_ngspice/test/models/45nm_LP_BSIM4/ptm45lp.lib
 .option gmin=1e-12
