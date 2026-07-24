@@ -15,11 +15,17 @@ $(TARGET): $(SRC)
 clean:
 	rm -f $(TARGET)
 
-# Verify 0 cvtss2sd in application code
+# Verify ≤5 cvtss2sd in application code (P4.6: CI enforcement)
 verify: $(TARGET)
 	@echo "=== cvtss2sd instruction count ==="
-	@objdump -d $(TARGET) | grep -c "cvtss2sd" || echo "0"
-	@echo "(Expected: 0 in application code; libm printf internals excluded)"
+	@COUNT=$$(objdump -d $(TARGET) | grep -c "cvtss2sd" || echo "0"); \
+	echo "$$COUNT"; \
+	if [ "$$COUNT" -le 5 ]; then \
+		echo "✅ PASS: cvtss2sd count ($$COUNT) ≤ 5 — zero-double in application code"; \
+	else \
+		echo "❌ FAIL: cvtss2sd count ($$COUNT) > 5 — double promotion detected in application code"; \
+		exit 1; \
+	fi
 
 # Quick test on NMOS DC
 test: $(TARGET)

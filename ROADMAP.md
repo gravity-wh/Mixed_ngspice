@@ -203,12 +203,12 @@ These were discovered during a line-by-line audit of float_spice.c against the r
 | # | Task | Est. |
 |---|------|:--:|
 | P4.1 | ✅ Trapezoidal integration + capacitor companion model (agent5 @ 2026-07-24) | 2h |
-| P4.2 | BSIM4 Cgs/Cgd/Cgb for TRAN | 2h |
-| P4.3 | Output format ngspice-compatible (compare_fp.py) | 2h |
-| P4.4 | Batch test script (mx/ circuits) | 1.5h |
-| P4.5 | Fix CI patch 001 (vanilla ngspice-46) | 1.5h |
-| P4.6 | float_spice in CI + cvtss2sd check | 1h |
-| P4.7 | ARCHITECTURE.md + BSIM4_MODEL.md + COMPARISON.md | 3h |
+| P4.2 | ✅ BSIM4 Cgs/Cgd/Cgb for TRAN (agent5 @ 2026-07-24) | 2h |
+| P4.3 | ✅ Output format ngspice-compatible (compare_fp.py) (agent1 @ 2026-07-24) | 2h |
+| P4.4 | ✅ Batch test script (mx/ circuits) (agent4 @ 2026-07-24) | 1.5h |
+| P4.5 | ✅ Fix CI patch 001 (vanilla ngspice-46) (agent2 @ 2026-07-24) | 1.5h |
+| P4.6 | ✅ float_spice in CI + cvtss2sd check (agent5 @ 2026-07-24) | 1h |
+| P4.7 | ✅ ARCHITECTURE.md + BSIM4_MODEL.md + COMPARISON.md (agent3 @ 2026-07-24) | 3h |
 | P4.8 | GitHub Release v3.0 | 30min |
 | **P4 Subtot** | | **~13.5h** |
 

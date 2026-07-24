@@ -91,6 +91,12 @@ typedef struct {
     REAL tran_dt;
     REAL *tran_v_prev;   /* node voltages at previous time step  [nn] */
     REAL *tran_cap_i;    /* capacitor currents at previous step  [nc] */
+    /* P4.2: MOSFET intrinsic capacitance TRAN history.
+     * Stored as [nm*3] arrays: (gs,gd,gb) per MOSFET.
+     * mos_v_prev: V(g)-V(x) at previous step for Cgs/Cgd/Cgb.
+     * mos_cap_i:  capacitor currents at previous step. */
+    REAL *tran_mos_v_prev;  /* [nm*3] gate-source/drain/body voltages */
+    REAL *tran_mos_cap_i;   /* [nm*3] Cgs/Cgd/Cgb currents */
 } Circuit;
 
 /* ===== Dense Matrix + Float LU ===== */
@@ -140,6 +146,8 @@ typedef struct {
 
 typedef struct {
     REAL ids,gm,gds,gmbs,vth,vdsat,vdseff,vgsteff,Abulk,ueff,EsatL,beta;
+    /* P4.2: Intrinsic capacitances for TRAN (Meyer model + overlap) */
+    REAL cgs,cgd,cgb;
 } BSIM4Out;
 
 static BSIM4Param bsim4_default(void) {
@@ -249,6 +257,7 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
         if(vth<R(0.02))vth=R(0.02);
         o.vth=vth;
     }
+    REAL vth=o.vth;  /* lift out of Vth block for use in Vgsteff calc */
 
     REAL vgsteff;
     /* === BSIM4v5 Effective Vgs with subthreshold (P1.6) ===
@@ -475,6 +484,37 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
         REAL ids_corr=R(1.0)+o.ids*rout/(vdseff+R(1e-15));
         o.ids/=ids_corr;
         if(o.ids<R(0.0)) o.ids=R(0.0);
+    }
+
+    /* ===== P4.2: BSIM4 intrinsic capacitances (Meyer model + overlap) =====
+     * Cox = εox/toxe * Weff * Leff  (already have coxe from above).
+     * Region-based piecewise model:
+     *   Cutoff    (vgsteff≤0):        Cgs≈0,       Cgd≈0,      Cgb≈Cox
+     *   Linear    (vgsteff>0,Vds<Vdsat): Cgs≈Cox/2, Cgd≈Cox/2, Cgb≈0
+     *   Saturation(vgsteff>0,Vds≥Vdsat): Cgs≈2Cox/3, Cgd≈0,    Cgb≈0
+     * Overlap: Cgs+=cgso*Weff, Cgd+=cgdo*Weff, Cgb+=cgbo*Leff
+     * Clamped to >=0 for physical consistency. */
+    {
+        REAL Cox=coxe*weff*leff;
+        if(Cox<R(0.0)) Cox=R(0.0);
+        if(vgsteff<=R(0.0)){
+            /* Cutoff: gate couples to body */
+            o.cgs=R(0.0); o.cgd=R(0.0); o.cgb=Cox;
+        }else if(vds<vdsat){
+            /* Linear/triode: gate couples equally to source and drain */
+            o.cgs=Cox*R(0.5); o.cgd=Cox*R(0.5); o.cgb=R(0.0);
+        }else{
+            /* Saturation: channel pinched off near drain */
+            o.cgs=Cox*R(0.6666667); o.cgd=R(0.0); o.cgb=R(0.0);
+        }
+        /* Overlap/fringing capacitances */
+        o.cgs+=pp->cgso*weff;
+        o.cgd+=pp->cgdo*weff;
+        o.cgb+=pp->cgbo*leff;
+        /* Clamp */
+        if(o.cgs<R(0.0)) o.cgs=R(0.0);
+        if(o.cgd<R(0.0)) o.cgd=R(0.0);
+        if(o.cgb<R(0.0)) o.cgb=R(0.0);
     }
 
     /* NaN firewall: divergent Newton step → return safe off-state */
@@ -716,9 +756,9 @@ static void parse_option(Circuit *c, const char *s) {
     while(*s){
         while(*s==' '||*s=='\t') s++;
         if(sscanf(s,"%63[^=]=%f",name,&val)==2){
-            if(!strcmp(name,"gmin")) c->opt_gmin=R(val);
-            else if(!strcmp(name,"abstol")) c->opt_abstol=R(val);
-            else if(!strcmp(name,"reltol")) c->opt_reltol=R(val);
+            if(!strcmp(name,"gmin")) c->opt_gmin=val;
+            else if(!strcmp(name,"abstol")) c->opt_abstol=val;
+            else if(!strcmp(name,"reltol")) c->opt_reltol=val;
             else if(!strcmp(name,"maxiter")||!strcmp(name,"itl1")) c->opt_maxiter=(int)val;
             const char *eq=strchr(s,'='); if(eq) s=eq+1;
             while(*s && *s!=' ') s++;
@@ -746,7 +786,6 @@ static void parse_param(Circuit *c, const char *s) {
 static void parse_temp(Circuit *c, const char *s) {
     REAL tc; if(sscanf(s,".temp %f",&tc)==1) c->temp=R(tc+273.15);
 }
-static void parse_netlist(Circuit *c, const char *filename) {
 /* ===== P3.3: .subckt parser — capture body lines until .ends ===== */
 static void parse_subckt(Circuit *c, const char *filename, const char *first_line) {
     if(c->nsubckt>=MAX_SUBCKT) return;
@@ -825,6 +864,7 @@ static int expand_subckt(Circuit *c, const char *s) {
     }
     return 1;
 }
+static void parse_netlist(Circuit *c, const char *filename) {
     char dir[1024]="."; const char *sl=strrchr(filename,'/');
     if(sl){int len=(int)(sl-filename);if(len>1023)len=1023;
            strncpy(dir,filename,len);dir[len]=0;}
@@ -902,7 +942,6 @@ static int expand_subckt(Circuit *c, const char *s) {
                 c->prints[c->nprint].name[n]=0;c->nprint++;}
                 if(*p==')')p++;}}
             }
-        }
         else if(!strncmp(s,".end",4)) break;
         else if(*s=='X'||*s=='x'){ if(expand_subckt(c,s)){} else {strncpy(cont,s,MAX_LINE-1);cont[MAX_LINE-1]=0;} }
         else if(*s=='.'){}
@@ -933,6 +972,35 @@ static void compute_nc(REAL *v, Circuit *c, BSIM4Param *const *pp_arr,
         if(weff<R(1e-8)) weff=R(1e-8);if(leff<R(1e-9)) leff=R(1e-9);
         BSIM4Out o=bsim4_eval(vgs,vds,vbs,weff,leff,pp);
         nc[m->d]-=o.ids; nc[m->s]+=o.ids;
+        /* P4.2: MOSFET intrinsic capacitance currents (TRAN companion model) */
+        if(c->tran_dt>R(0.0) && c->tran_mos_v_prev && c->tran_mos_cap_i){
+            REAL inv_dt=R(1.0)/c->tran_dt;
+            int j3=j*3;
+            /* Cgs: gate↔source */
+            if(o.cgs>R(1e-18)){
+                REAL Geq=R(2.0)*o.cgs*inv_dt;
+                REAL v_old_v=c->tran_mos_v_prev[j3+0];
+                REAL Ieq=-Geq*v_old_v-c->tran_mos_cap_i[j3+0];
+                REAL ic=Geq*(v[m->g]-v[m->s])+Ieq;
+                nc[m->g]-=ic; nc[m->s]+=ic;
+            }
+            /* Cgd: gate↔drain */
+            if(o.cgd>R(1e-18)){
+                REAL Geq=R(2.0)*o.cgd*inv_dt;
+                REAL v_old_v=c->tran_mos_v_prev[j3+1];
+                REAL Ieq=-Geq*v_old_v-c->tran_mos_cap_i[j3+1];
+                REAL ic=Geq*(v[m->g]-v[m->d])+Ieq;
+                nc[m->g]-=ic; nc[m->d]+=ic;
+            }
+            /* Cgb: gate↔body */
+            if(o.cgb>R(1e-18)){
+                REAL Geq=R(2.0)*o.cgb*inv_dt;
+                REAL v_old_v=c->tran_mos_v_prev[j3+2];
+                REAL Ieq=-Geq*v_old_v-c->tran_mos_cap_i[j3+2];
+                REAL ic=Geq*(v[m->g]-v[m->b])+Ieq;
+                nc[m->g]-=ic; nc[m->b]+=ic;
+            }
+        }
     }
     /* Current sources: I flows from p to n through source.
      * INTO p: -I (source pulls current from p). INTO n: +I. */
@@ -964,7 +1032,7 @@ static REAL vsrc_waveform(const Vsource *vs, REAL t) {
     switch(vs->wf_type){
     case WF_SIN: {
         if(t<vs->td_sin) return vs->vo;
-        REAL arg=R(2.0)*R(3.141592653589793f)*vs->freq*(t-vs->td_sin);
+        REAL arg=R(2.0)*R(3.141592653589793)*(vs->freq)*(t-vs->td_sin);
         return vs->vo+vs->va*sinf(arg)*expf(-(t-vs->td_sin)*vs->theta);
     }
     case WF_PULSE: {
@@ -1142,6 +1210,47 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
                     }
                 }
 
+                /* --- P4.2: MOSFET intrinsic capacitance companion models ---
+                 * Each MOSFET has 3 voltage-dependent caps: Cgs(g↔s), Cgd(g↔d), Cgb(g↔b).
+                 * Companion model: Geq=2C/dt, Ieq=-Geq*V_prev - I_prev.
+                 * Stamped inside Newton loop because Cgs/Cgd/Cgb change with bias. */
+                if(c->tran_dt>R(0.0) && c->tran_mos_v_prev && c->tran_mos_cap_i){
+                    REAL inv_dt=R(1.0)/c->tran_dt;
+                    for(int j=0;j<c->nm;j++){
+                        Mosfet *m=&c->mos[j];
+                        const BSIM4Param *pp=pp_arr[j];
+                        REAL vgs=v[m->g]-v[m->s], vds=v[m->d]-v[m->s], vbs=v[m->b]-v[m->s];
+                        REAL weff=m->w-R(2.0)*pp->wint, leff=m->l-R(2.0)*pp->lint;
+                        if(weff<R(1e-8)) weff=R(1e-8); if(leff<R(1e-9)) leff=R(1e-9);
+                        BSIM4Out ocap=bsim4_eval(vgs,vds,vbs,weff,leff,pp);
+                        int j3=j*3;
+                        /* Helper: stamp companion for cap between nodes na and nb */
+                        #define STAMP_MOSCAP(na,nb,cap_val,idx) do { \
+                            if(cap_val>R(1e-18)){ \
+                                REAL Geq=R(2.0)*cap_val*inv_dt; \
+                                REAL v_old_v=c->tran_mos_v_prev[idx]; \
+                                REAL Ieq=-Geq*v_old_v-c->tran_mos_cap_i[idx]; \
+                                if(!vfixed[na]&&!vfixed[nb]){ \
+                                    a[na+na*N]+=Geq; a[nb+nb*N]+=Geq; \
+                                    a[na+nb*N]-=Geq; a[nb+na*N]-=Geq; \
+                                    rhs[na]-=Geq*(v[na]-v[nb])+Ieq; \
+                                    rhs[nb]-=Geq*(v[nb]-v[na])-Ieq; \
+                                }else if(!vfixed[na]){ \
+                                    a[na+na*N]+=Geq; \
+                                    rhs[na]-=Geq*(v[na]-v[nb])+Ieq; \
+                                }else if(!vfixed[nb]){ \
+                                    a[nb+nb*N]+=Geq; \
+                                    rhs[nb]-=Geq*(v[nb]-v[na])-Ieq; \
+                                } \
+                            } \
+                        } while(0)
+                        STAMP_MOSCAP(m->g, m->s, ocap.cgs, j3+0);
+                        STAMP_MOSCAP(m->g, m->d, ocap.cgd, j3+1);
+                        STAMP_MOSCAP(m->g, m->b, ocap.cgb, j3+2);
+                        #undef STAMP_MOSCAP
+                    }
+                }
+
                 /* --- MNA stamp for floating voltage sources (B8 fix) ---
                  * For each floating Vsrc between nodes p and n with voltage E:
                  *   KCL row p: +I  (branch current flows from p into source)
@@ -1248,7 +1357,6 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
                     goto dc_cleanup;
                 }
             }
-            }
 
             /* --- Update: node voltages (0..n-1) + branch currents (n..N-1) --- */
             REAL max_dv=R(0.0);
@@ -1256,7 +1364,7 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
             for(int j=0;j<n;j++){
                 if(!vfixed[j] && j!=gnd){
                     REAL dv=dx[j];
-                    if(dv>vlim) dv=vlim; if(dv<R(-vlim)) dv=R(-vlim);
+                    if(dv>vlim) dv=vlim; if(dv<-vlim) dv=-vlim;
                     REAL v_new=v[j]+dv;
                     if(IS_NAN(v_new)){
                         v[j]=R(0.0); had_nan=1;
@@ -1342,18 +1450,44 @@ static void tran_solve(Circuit *c, BSIM4Param *const *pp_arr, REAL tstop, REAL t
     REAL *v=calloc(c->nn,sizeof(REAL)), *iv=calloc(c->nv,sizeof(REAL));
     REAL *v_prev=calloc(c->nn,sizeof(REAL));
     REAL *cap_i=calloc(c->nc>0?c->nc:1,sizeof(REAL));
+    /* P4.2: MOSFET intrinsic capacitance TRAN history [nm*3] */
+    int nm3=c->nm*3;
+    REAL *mos_v_prev=calloc(nm3>0?nm3:1,sizeof(REAL));
+    REAL *mos_cap_i=calloc(nm3>0?nm3:1,sizeof(REAL));
 
-    /* DC operating point (tran_dt=0 disables capacitor companions) */
-    c->tran_dt=R(0.0); c->tran_v_prev=NULL; c->tran_cap_i=NULL;
+    /* DC operating point (tran_dt=0 disables all companion models) */
+    c->tran_dt=R(0.0);
+    c->tran_v_prev=NULL; c->tran_cap_i=NULL;
+    c->tran_mos_v_prev=NULL; c->tran_mos_cap_i=NULL;
     int dc_iters=dc_solve(v,iv,c,pp_arr,c->opt_maxiter,c->opt_abstol);
     printf("# DC OP: %d iterations\n",dc_iters);
 
-    /* Save DC state as previous-step history */
+    /* Save DC state as previous-step history for fixed capacitors */
     memcpy(v_prev,v,c->nn*sizeof(REAL));
     for(int j=0;j<c->nc;j++){
         Capacitor *cap=&c->cap[j];
         REAL Geq=R(2.0)*cap->c/tstep;
         cap_i[j]=Geq*(v[cap->p]-v[cap->n]);  /* cap current at t=0 */
+    }
+    /* P4.2: Initialize MOSFET capacitance history at DC operating point */
+    for(int j=0;j<c->nm;j++){
+        Mosfet *m=&c->mos[j];
+        const BSIM4Param *pp=pp_arr[j];
+        REAL vgs=v[m->g]-v[m->s], vds=v[m->d]-v[m->s], vbs=v[m->b]-v[m->s];
+        REAL weff=m->w-R(2.0)*pp->wint, leff=m->l-R(2.0)*pp->lint;
+        if(weff<R(1e-8)) weff=R(1e-8); if(leff<R(1e-9)) leff=R(1e-9);
+        BSIM4Out o=bsim4_eval(vgs,vds,vbs,weff,leff,pp);
+        int j3=j*3;
+        REAL inv_dt=R(1.0)/tstep;
+        /* Cgs: gate↔source */
+        mos_v_prev[j3+0]=vgs;
+        mos_cap_i[j3+0]=R(2.0)*o.cgs*inv_dt*vgs;
+        /* Cgd: gate↔drain */
+        mos_v_prev[j3+1]=v[m->g]-v[m->d];
+        mos_cap_i[j3+1]=R(2.0)*o.cgd*inv_dt*(v[m->g]-v[m->d]);
+        /* Cgb: gate↔body */
+        mos_v_prev[j3+2]=v[m->g]-v[m->b];
+        mos_cap_i[j3+2]=R(2.0)*o.cgb*inv_dt*(v[m->g]-v[m->b]);
     }
 
     printf("\nIndex   time       ");
@@ -1362,12 +1496,16 @@ static void tran_solve(Circuit *c, BSIM4Param *const *pp_arr, REAL tstop, REAL t
 
     for(int step=0;step<MAX_TRAN && step*tstep<=tstop+R(1e-9);step++){
         REAL t_now=(REAL)(step+1)*tstep;
-        c->tran_dt=tstep; c->tran_v_prev=v_prev; c->tran_cap_i=cap_i;
-        /* TODO P3.4: update time-varying Vsrc waveforms here */
+        c->tran_dt=tstep;
+        c->tran_v_prev=v_prev; c->tran_cap_i=cap_i;
+        c->tran_mos_v_prev=mos_v_prev; c->tran_mos_cap_i=mos_cap_i;
+        /* P3.4: update time-varying Vsrc waveforms (SIN/PULSE/PWL) */
+        for(int j=0;j<c->nv;j++) if(c->vsrc[j].wf_type!=WF_DC)
+            c->vsrc[j].dc=vsrc_waveform(&c->vsrc[j], t_now);
 
         int iters=dc_solve(v,iv,c,pp_arr,c->opt_maxiter,c->opt_abstol);
 
-        /* Update capacitor current history for next step */
+        /* Update fixed capacitor current history for next step */
         if(c->nc>0){
             REAL inv_dt=R(1.0)/tstep;
             for(int j=0;j<c->nc;j++){
@@ -1378,6 +1516,46 @@ static void tran_solve(Circuit *c, BSIM4Param *const *pp_arr, REAL tstop, REAL t
                 cap_i[j]=Geq*(v[cap->p]-v[cap->n])+Ieq;
             }
         }
+        /* P4.2: Update MOSFET capacitance history for next step */
+        {
+            REAL inv_dt=R(1.0)/tstep;
+            for(int j=0;j<c->nm;j++){
+                Mosfet *m=&c->mos[j];
+                const BSIM4Param *pp=pp_arr[j];
+                REAL vgs=v[m->g]-v[m->s], vds=v[m->d]-v[m->s], vbs=v[m->b]-v[m->s];
+                REAL weff=m->w-R(2.0)*pp->wint, leff=m->l-R(2.0)*pp->lint;
+                if(weff<R(1e-8)) weff=R(1e-8); if(leff<R(1e-9)) leff=R(1e-9);
+                BSIM4Out o=bsim4_eval(vgs,vds,vbs,weff,leff,pp);
+                int j3=j*3;
+                /* Cgs: gate↔source */
+                {
+                    REAL v_new=vgs, v_old=mos_v_prev[j3+0];
+                    REAL i_old=mos_cap_i[j3+0];
+                    REAL Geq=R(2.0)*o.cgs*inv_dt;
+                    REAL Ieq=-Geq*v_old-i_old;
+                    mos_cap_i[j3+0]=Geq*v_new+Ieq;
+                    mos_v_prev[j3+0]=v_new;
+                }
+                /* Cgd: gate↔drain */
+                {
+                    REAL v_new=v[m->g]-v[m->d], v_old=mos_v_prev[j3+1];
+                    REAL i_old=mos_cap_i[j3+1];
+                    REAL Geq=R(2.0)*o.cgd*inv_dt;
+                    REAL Ieq=-Geq*v_old-i_old;
+                    mos_cap_i[j3+1]=Geq*v_new+Ieq;
+                    mos_v_prev[j3+1]=v_new;
+                }
+                /* Cgb: gate↔body */
+                {
+                    REAL v_new=v[m->g]-v[m->b], v_old=mos_v_prev[j3+2];
+                    REAL i_old=mos_cap_i[j3+2];
+                    REAL Geq=R(2.0)*o.cgb*inv_dt;
+                    REAL Ieq=-Geq*v_old-i_old;
+                    mos_cap_i[j3+2]=Geq*v_new+Ieq;
+                    mos_v_prev[j3+2]=v_new;
+                }
+            }
+        }
         memcpy(v_prev,v,c->nn*sizeof(REAL));
 
         printf("%-5d   %-10s ",step+1,real_to_str(t_now,'e',4));
@@ -1385,8 +1563,11 @@ static void tran_solve(Circuit *c, BSIM4Param *const *pp_arr, REAL tstop, REAL t
         printf(" # %d iters\n",iters);
     }
 
-    c->tran_dt=R(0.0); c->tran_v_prev=NULL; c->tran_cap_i=NULL;
+    c->tran_dt=R(0.0);
+    c->tran_v_prev=NULL; c->tran_cap_i=NULL;
+    c->tran_mos_v_prev=NULL; c->tran_mos_cap_i=NULL;
     free(v);free(iv);free(v_prev);free(cap_i);
+    free(mos_v_prev);free(mos_cap_i);
 }
 
 /* ===== Float printer (P0.7: zero cvtss2sd) =====
@@ -1566,11 +1747,15 @@ int main(int argc, char **argv) {
                 }
             }
         }
-        printf("\n  Node Voltages:\n  %-12s %s\n  %-12s %s\n","Node","Voltage","----","-------");
-        for(int j=0;j<c->nn;j++) printf("  %-12s %s\n",c->nmap[j],real_to_str(v[j],'f',6));
-        printf("\n  Source Currents:\n  %-12s %s\n  %-12s %s\n","Source","Current","------","-------");
-        for(int j=0;j<c->nv;j++) printf("  %-12s %s\n",c->vsrc[j].name,real_to_str(iv[j],'e',6));
-        printf("\n  Device Parameters:\n");
+        /* P4.3: ngspice-compatible output format.
+         * Headers use "Node    Voltage" / "Source    Current" conventions
+         * so that compare_fp.py can parse float_spice output with the same
+         * regex patterns used for ngspice raw output. */
+        printf("\n\tNode\tVoltage\n\t----\t-------\n");
+        for(int j=0;j<c->nn;j++) printf("\t%-12s\t%s\n",c->nmap[j],real_to_str(v[j],'f',6));
+        printf("\n\tSource\tCurrent\n\t------\t-------\n");
+        for(int j=0;j<c->nv;j++) printf("\t%-12s\t%s\n",c->vsrc[j].name,real_to_str(iv[j],'e',6));
+        printf("\n\tDevice\tParameters\n\t------\t----------\n");
         for(int j=0;j<c->nm;j++){
             Mosfet *m=&c->mos[j];
             const BSIM4Param *pp=mos_pp[j];
