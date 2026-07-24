@@ -1,0 +1,42 @@
+{
+  "_meta": {
+    "generated": "2026-07-25",
+    "total": 226,
+    "source_files": {
+      "generated": "E:/MyResearch/tmp/testable_all/ (127 files)",
+      "original_locations": "99 files across datasets"
+    },
+    "categories": {
+      "BGR":  {"count":20, "label":"Bandgap Reference"},
+      "LDO":  {"count":52, "label":"Low-Dropout Regulator"},
+      "OP":   {"count":43, "label":"Operational Amplifier"},
+      "FDA":  {"count":19, "label":"Fully-Differential Amplifier / OTA"},
+      "CMP":  {"count":13, "label":"Comparator"},
+      "BUF":  {"count":13, "label":"Voltage Buffer / CM Buffer"},
+      "DCDC": {"count":6,  "label":"DC-DC Converter"},
+      "RCO":  {"count":5,  "label":"Ring Oscillator"},
+      "DCO":  {"count":4,  "label":"Digitally-Controlled Oscillator"},
+      "INV":  {"count":4,  "label":"CMOS Inverter"},
+      "ADC":  {"count":2,  "label":"Analog-to-Digital Converter"},
+      "BIAS": {"count":2,  "label":"Current Mirror / Bias"},
+      "SAH":  {"count":1,  "label":"Sample-and-Hold"},
+      "POR":  {"count":1,  "label":"Power-on-Reset"},
+      "OTHER":{"count":41, "label":"Single-transistor / Std cells / SC"}
+    },
+    "datasets": {
+      "Mixed_ngspice":   {"prefix":"MX","count":24},
+      "Analog_blocks":   {"prefix":"AB","count":28},
+      "hybridCHIPS":     {"prefix":"HC","count":24},
+      "MAGICAL":         {"prefix":"MG","count":24},
+      "OpenFASOC":       {"prefix":"OF","count":41},
+      "AnalogGym":       {"prefix":"AG","count":10},
+      "SKY130":          {"prefix":"S5","count":2},
+      "caravel_analog":  {"prefix":"CA","count":3}
+    }
+  },
+  "_protocol": {
+    "test_runner": "bash test/run_and_record.sh <version>",
+    "add_circuit": "1. Place netlist in test/circuits/<dataset>/  2. Add entry to circuits[] below  3. Run and verify",
+    "validation": "Each circuit must have: transistors > 0, power supply, analysis command, .end"
+  }
+}
