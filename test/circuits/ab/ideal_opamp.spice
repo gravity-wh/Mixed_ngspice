@@ -1,0 +1,4 @@
+* Behavioral ideal opamp for testbenches
+.subckt ideal_opamp vp vn out
+E1 out 0 vp vn 1e6
+.ends ideal_opamp

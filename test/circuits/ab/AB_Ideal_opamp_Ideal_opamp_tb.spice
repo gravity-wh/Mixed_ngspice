@@ -1,3 +1,4 @@
+.include ideal_opamp.spice
 * Auto TB for Ideal_opamp
 .include /mnt/e/MyResearch/Mixed_ngspice/test/models/45nm_LP_BSIM4/ptm45lp.lib
 .option gmin=1e-12

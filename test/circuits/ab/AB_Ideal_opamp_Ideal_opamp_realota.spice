@@ -1,3 +1,4 @@
+.include ideal_opamp.spice
 .include /mnt/e/MyResearch/Analog_blocks/Analog_Blocks/OTA/Netlists/Design/Miller_OTA/Transitor1.8v/Miller_OTA_NMOS_1.8v.spice
 **.subckt Ideal_opamp Vp Vn Out
 *.ipin Vp
