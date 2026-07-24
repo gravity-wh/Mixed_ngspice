@@ -1,0 +1,20 @@
+--- a/src/maths/sparse/spconfig.h	2026-03-29 17:13:05.000000000 +0800
++++ b/src/maths/sparse/spconfig.h	2026-07-24 22:17:50.448284000 +0800
+@@ -375,9 +375,17 @@
+  *  Grab from Spice include files
+  */
+ 
++#include "ngspice/typedefs.h"
++
++#ifdef SINGLE_PRECISION
++#define  MACHINE_RESOLUTION      FLT_EPSILON
++#define  LARGEST_REAL            FLT_MAX
++#define  SMALLEST_REAL           FLT_MIN
++#else
+ #define  MACHINE_RESOLUTION      DBL_EPSILON
+ #define  LARGEST_REAL            DBL_MAX
+ #define  SMALLEST_REAL           DBL_MIN
++#endif
+ #define  LARGEST_SHORT_INTEGER   SHRT_MAX
+ #define  LARGEST_LONG_INTEGER    LONG_MAX
+ 

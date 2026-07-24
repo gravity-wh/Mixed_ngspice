@@ -1,0 +1,11 @@
+--- a/src/spicelib/devices/bsim4v5/b4v5set.c	2026-03-29 17:13:05.000000000 +0800
++++ b/src/spicelib/devices/bsim4v5/b4v5set.c	2026-07-24 14:55:06.531241600 +0800
+@@ -49,7 +49,7 @@
+ int error;
+ CKTnode *tmp;
+ int    noiseAnalGiven = 0, createNode;  /* Criteria for new node creation */
+-double Rtot, DMCGeff, DMCIeff, DMDGeff;
++SPICE_REAL Rtot, DMCGeff, DMCIeff, DMDGeff;
+ JOB   *job;
+ 
+ #ifdef USE_OMP

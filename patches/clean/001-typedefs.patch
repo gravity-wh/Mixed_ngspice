@@ -1,0 +1,84 @@
+--- a/src/include/ngspice/typedefs.h	2026-03-29 17:13:05.000000000 +0800
++++ b/src/include/ngspice/typedefs.h	2026-07-24 22:17:50.099601900 +0800
+@@ -6,6 +6,81 @@
+ #ifndef ngspice_TYPEDEFS_H
+ #define ngspice_TYPEDEFS_H
+ 
++#include "ngspice/config.h"
++
++/* ── Global floating-point type ───────────────────────────────────────
++ * SPICE_REAL: conditionally float (--enable-single-precision) or double.
++ * SPICE_*():  math macros that resolve to float-variant (sinf, expf…) or
++ *             double-variant (sin, exp…) depending on SINGLE_PRECISION.
++ * ──────────────────────────────────────────────────────────────────── */
++#ifdef SINGLE_PRECISION
++typedef float SPICE_REAL;
++#define SPICE_SIN(x)     sinf(x)
++#define SPICE_COS(x)     cosf(x)
++#define SPICE_TAN(x)     tanf(x)
++#define SPICE_ASIN(x)    asinf(x)
++#define SPICE_ACOS(x)    acosf(x)
++#define SPICE_ATAN(x)    atanf(x)
++#define SPICE_ATAN2(x,y) atan2f(x,y)
++#define SPICE_SINH(x)    sinhf(x)
++#define SPICE_COSH(x)    coshf(x)
++#define SPICE_TANH(x)    tanhf(x)
++#define SPICE_ASINH(x)   asinhf(x)
++#define SPICE_ACOSH(x)   acoshf(x)
++#define SPICE_ATANH(x)   atanhf(x)
++#define SPICE_EXP(x)     expf(x)
++#define SPICE_LOG(x)     logf(x)
++#define SPICE_LOG10(x)   log10f(x)
++#define SPICE_SQRT(x)    sqrtf(x)
++#define SPICE_CBRT(x)    cbrtf(x)
++#define SPICE_POW(x,y)   powf(x,y)
++#define SPICE_HYPOT(x,y) hypotf(x,y)
++#define SPICE_FABS(x)    fabsf(x)
++#define SPICE_FMOD(x,y)  fmodf(x,y)
++#define SPICE_CEIL(x)    ceilf(x)
++#define SPICE_FLOOR(x)   floorf(x)
++#define SPICE_TRUNC(x)   truncf(x)
++#define SPICE_ROUND(x)   roundf(x)
++#define SPICE_FMAX(x,y)  fmaxf(x,y)
++#define SPICE_FMIN(x,y)  fminf(x,y)
++#define SPICE_ERF(x)     erff(x)
++#define SPICE_ERFC(x)    erfcf(x)
++#define SPICE_LGAMMA(x)  lgammaf(x)
++#else
++typedef double SPICE_REAL;
++#define SPICE_SIN(x)     sin(x)
++#define SPICE_COS(x)     cos(x)
++#define SPICE_TAN(x)     tan(x)
++#define SPICE_ASIN(x)    asin(x)
++#define SPICE_ACOS(x)    acos(x)
++#define SPICE_ATAN(x)    atan(x)
++#define SPICE_ATAN2(x,y) atan2(x,y)
++#define SPICE_SINH(x)    sinh(x)
++#define SPICE_COSH(x)    cosh(x)
++#define SPICE_TANH(x)    tanh(x)
++#define SPICE_ASINH(x)   asinh(x)
++#define SPICE_ACOSH(x)   acosh(x)
++#define SPICE_ATANH(x)   atanh(x)
++#define SPICE_EXP(x)     exp(x)
++#define SPICE_LOG(x)     log(x)
++#define SPICE_LOG10(x)   log10(x)
++#define SPICE_SQRT(x)    sqrt(x)
++#define SPICE_CBRT(x)    cbrt(x)
++#define SPICE_POW(x,y)   pow(x,y)
++#define SPICE_HYPOT(x,y) hypot(x,y)
++#define SPICE_FABS(x)    fabs(x)
++#define SPICE_FMOD(x,y)  fmod(x,y)
++#define SPICE_CEIL(x)    ceil(x)
++#define SPICE_FLOOR(x)   floor(x)
++#define SPICE_TRUNC(x)   trunc(x)
++#define SPICE_ROUND(x)   round(x)
++#define SPICE_FMAX(x,y)  fmax(x,y)
++#define SPICE_FMIN(x,y)  fmin(x,y)
++#define SPICE_ERF(x)     erf(x)
++#define SPICE_ERFC(x)    erfc(x)
++#define SPICE_LGAMMA(x)  lgamma(x)
++#endif
++
+ 
+ typedef struct CKTcircuit CKTcircuit;
+ typedef struct CKTnode CKTnode;
