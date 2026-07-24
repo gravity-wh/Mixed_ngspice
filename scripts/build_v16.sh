@@ -85,10 +85,10 @@ block='''/* MIXED-PRECISION FP32 math overrides */
 #undef SPICE_LOG
 #undef SPICE_SQRT
 #undef SPICE_POW
-#define SPICE_EXP(x)  exp((double)(x))
-#define SPICE_LOG(x)  log((double)(x))
-#define SPICE_SQRT(x) sqrt((double)(x))
-#define SPICE_POW(x,y) pow((double)(x),(double)(y))
+#define SPICE_EXP(x)  expf((float)(x))
+#define SPICE_LOG(x)  logf((float)(x))
+#define SPICE_SQRT(x) sqrtf((float)(x))
+#define SPICE_POW(x,y) powf((float)(x),(float)(y))
 #endif
 #define CHECK_NAN(v) do{if(isnan((float)(v))){(v)=0.0f;}}while(0)
 '''
