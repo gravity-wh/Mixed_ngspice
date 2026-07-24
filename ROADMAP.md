@@ -17,58 +17,72 @@ Build a **zero-double float-first SPICE engine** — every floating-point operat
 
 These were discovered during a line-by-line audit of float_spice.c against the reference BSIM4v5 implementation. They block ALL DC accuracy and must be fixed before any other work.
 
-### B1. parse_eng() misinterprets parameter names as suffixes
-- **File**: `float_spice/float_spice.c:197-218`
+### B1. ✅ CLAIMED & FIXED — parse_eng() misinterprets parameter names as suffixes
+- **File**: `float_spice/float_spice.c:197-215`
 - **Bug**: `strtof(buf, NULL)` reads a float, then the function checks trailing characters against engineering suffixes (k, m, u, n, p, f, meg, mil). But BSIM4 parameter names like `paramchk`, `pclm`, `permod`, `fnoimod`, `noia`, `mobmod` START with characters that ARE valid suffixes. `parse_eng("1")` followed by `"paramchk=..."` → suffix 'p' matched → returns `1e-12` instead of `1`.
 - **Impact**: Most BSIM4 parameters parsed from .model cards are silently corrupted. vth0, u0, toxe happen to work because their values don't have adjacent parameter names starting with suffix chars. But nfactor, pclm, vsat, and dozens of others may be silently wrong.
-- **Fix**: Use `strtof(buf, &endptr)` and check `endptr` for the actual stop position.
+- **Fix**: Use `strtof(buf, &endptr)` and check `endptr` for the actual stop position. Removed independent `ne` computation loop — now relies solely on `strtof`'s `endptr` to locate where the numeric portion ends.
 
-### B2. PMOS devices evaluated with NMOS parameters
-- **File**: `float_spice/float_spice.c:480`
+### B2. ✅ CLAIMED & FIXED — PMOS devices evaluated with NMOS parameters
+- **File**: `float_spice/float_spice.c:644-669`
 - **Bug**: `BSIM4Param *pp = &pp_nmos;` — main() selects NMOS model pointer, passes it to dc_solve() and all output code. dc_solve() has no per-device model selection. PMOS transistors get NMOS vth0, u0, vsat.
 - **Impact**: Any circuit with PMOS produces garbage. `mx_pmos_dc.sp` would show NMOS-like behavior.
-- **Fix**: dc_solve() must accept per-device model pointers, or a model lookup based on device model name.
+- **Fix**: Two-part fix:
+  1. **Per-device model lookup** (L660-669): `mos_pp[j]` assigns `&pp_pmos` or `&pp_nmos` based on `find_model()` + type check. `dc_solve()` already accepts `BSIM4Param *const *pp_arr` and dereferences `pp_arr[j]` per device.
+  2. **PMOS defaults** (L644-647): `pp_pmos` starts from `bsim4_default()` but overrides `vth0=-0.62261` (negative threshold) and `u0=0.015` (hole mobility). If a PMOS `.model` card exists, `bsim4_from_model()` overwrites these defaults with card values.
+- **Claimed by**: agent1 @ 2026-07-24
 
-### B3. Voltage source current always zero
-- **File**: `float_spice/float_spice.c:367`
+### B3. ✅ CLAIMED & FIXED — Voltage source current always zero
+- **File**: `float_spice/float_spice.c`
 - **Bug**: `iv[j] = 0.0` at initialization. Never written to after DC solve. No mechanism exists to compute Vsrc currents because the solver fixes node voltages directly (no MNA branch current variables).
 - **Impact**: All source currents print as 0. KCL cannot be verified. Power cannot be computed.
-- **Fix**: After DC solve, compute `iv[j] = -(sum of device currents into p) - gmin*v[p]` via KCL.
+- **Fix**: After DC solve (or best-effort partial convergence), compute Vsrc currents via KCL at the positive node. Three KCL blocks added — one in the success path and two in the early-return paths. All use consistent "current INTO node" convention: `nc[node] = sum of currents INTO node from non-Vsrc elements`, then `iv[j] = -nc[Vsrc+.p]` (SPICE convention: positive = current from + to - through source).
 
-### B4. Matrix assembly: fixed-node column zeroing breaks KCL consistency
-- **File**: `float_spice/float_spice.c:416-419`
-- **Bug**: After assembling the full Jacobian, rows AND columns for fixed nodes are zeroed. But the RHS entries for neighboring free nodes include contributions from the fixed node's voltage (`g*(v[fixed] - v[free])`). Zeroing the column removes the Jacobian entry for `dv[fixed]` but the RHS still expects it. Newton step becomes inconsistent.
-- **Fix**: During assembly, check `vfixed[node]` BEFORE stamping. Skip stamps for fixed nodes entirely (don't zero-after-the-fact).
+### B4. ✅ FIXED — Matrix assembly: fixed-node column zeroing breaks KCL consistency
+- **File**: `float_spice/float_spice.c`
+- **Fixed by**: agent4 @ 2026-07-24
+- **Bug**: After assembling Jacobian, rows AND columns for fixed nodes were zeroed. MOSFET off-diagonal stamps `a[d+s*n]` and `a[s+d*n]` were emitted even when target column was a fixed node, then wiped by post-processing. Column zeroing destroyed KCL structure needed for vsrc current computation.
+- **Fix** (2 changes):
+  1. **MOSFET guard**: Wrapped `a[m->d+m->s*n]` with `if(!vfixed[m->s])` and vice versa — no more stamping into fixed columns.
+  2. **Row-only zeroing**: Post-processing now zeroes ONLY the row (`a[j+i*n]=0`) and preserves column entries (`a[i+j*n]`). Since dv[fixed]=0 after solve, column entries are inert for Newton but essential for KCL current computation.
 
-### B5. All-nodes-fixed circuit converges trivially without computing anything
+### B5. ✅ CLAIMED & FIXED — All-nodes-fixed circuit converges trivially without computing anything
 - **File**: `float_spice/float_spice.c:425-432`
 - **Bug**: When all non-GND nodes are voltage-fixed, `max_dv` stays 0 (no free nodes to iterate). Function returns 1. MOSFET currents are computed during assembly but vsrc currents are never calculated.
 - **Impact**: The NMOS test case "works" only because all nodes are voltage-driven. Add one resistor and it would fail.
+- **Fix**: Added post-convergence KCL pass at end of `dc_solve()`. Computes all device currents at converged node voltages, then back-calculates vsrc currents via `iv[j] = -nc[p]` (SPICE convention: current n+→n- through source). Uses "current leaving the node" convention consistent with matrix assembly. Also fixed sign conventions in the two early-return KCL blocks (failure path and non-convergence path).
 
-### B6. Gmin hardcoded to 1e-10, never steps
-- **File**: `float_spice/float_spice.c:376`
-- **Bug**: `REAL gmin = R(1e-10)` — 100x larger than typical (1e-12). Never reduced. No gmin stepping cascade.
+### B6. ✅ CLAIMED & FIXED — Gmin hardcoded to 1e-10, never steps
+- **File**: `float_spice/float_spice.c:352-435`
+- **Bug**: `REAL gmin = R(1e-10)` — hardcoded inside the Newton loop, 100x larger than typical (1e-12). Never reduced. No gmin stepping cascade.
 - **Impact**: DC solution is biased. Large gmin draws non-physical current from every node.
+- **Fix**: Added 3-stage gmin stepping outer loop (1e-9 → 1e-10 → 1e-12). Each stage starts from the previous stage's converged solution, providing a progressively more accurate DC operating point. If any stage fails to converge, the solver returns immediately with the total iteration count.
 
-### B7. No convergence recovery cascade
-- **File**: `float_spice/float_spice.c:421`
+### B7. ✅ CLAIMED & FIXED — No convergence recovery cascade
+- **File**: `float_spice/float_spice.c:352-495`
 - **Bug**: If `lu_solve()` returns -1 (singular matrix), function bails immediately. No gmin stepping, no source stepping, no pseudo-transient fallback.
 - **Impact**: Any circuit with even mild convergence difficulty immediately fails.
+- **Fix**: Added 5-level recovery cascade within each gmin stage. Recovery 0–2: bump effective gmin 10× per attempt (adds diagonal dominance to cure singular Jacobian). Recovery 3–4: 100× gmin + 0.1× voltage step clamping. If a stage exhausts all recovery, falls back to re-running the previous (larger gmin) stage. Only the first stage failing with full recovery is a hard bail.
 
-### B8. Floating voltage source (neither terminal at GND) assigns meaningless voltage
-- **File**: `float_spice/float_spice.c:370-371`
-- **Bug**: `v[p] = dc*0.5; vfixed[n] = 1` — no constraint `v[p]-v[n]=Vdc` is enforced. The negative terminal is marked fixed but never assigned a value.
-- **Impact**: Any circuit with a Vsource between two non-GND nodes is completely broken.
+### B8. ✅ FIXED — Floating voltage source (neither terminal at GND) assigns meaningless voltage
+- **File**: `float_spice/float_spice.c:378-388`
+- **Bug**: Originally `v[p] = dc*0.5; vfixed[n] = 1` — no constraint enforced, negative terminal never assigned.
+- **Impact**: Any circuit with a Vsource between two non-GND nodes was completely broken.
+- **Fix** (agent4 @ 2026-07-24, MNA upgrade by agent2 @ 2026-07-24): Full MNA branch current variables. Grounded Vsrcs use simple node fixing. Floating Vsrcs get a branch current variable — matrix expands from n×n to N×N (N=n+n_float). Newton system: `[J_nl B; B^T 0] [Δv; ΔI] = [-f-BI; E-(v[p]-v[n])]`. Branch currents solved directly. Extracted `compute_nc()` helper for grounded-Vsrc KCL.
 
-### B9. BSIM4 toxe=0 guard missing → coxe=INF → NaN
-- **File**: `float_spice/float_spice.c:107`
-- **Bug**: `coxe = 3.9*eps0/(pp->toxe + 1e-30)` — if model card parsing fails and toxe stays 0, coxe becomes INF (~3.4e38). All subsequent beta/Ids/gm/gds are INF or NaN.
-- **Fix**: Add `if(pp->toxe < 1e-12) pp->toxe = 1.8e-9f;`
+### B9. ✅ ALREADY FIXED — BSIM4 toxe=0 guard missing → coxe=INF → NaN
+- **File**: `float_spice/float_spice.c:108-112`
+- **Status**: Already implemented. `bsim4_eval()` now uses `toxe_safe` with guard `if(toxe_safe < 1e-12) toxe_safe = 1.8e-9;` before computing `coxe`. Safe default 1.8nm prevents INF/NaN cascade when model parsing fails.
 
-### B10. No NaN detection anywhere
-- **File**: entire file
+### B10. ✅ CLAIMED & FIXED — No NaN detection anywhere
+- **File**: `float_spice/float_spice.c` (3 locations)
 - **Bug**: After one divergent Newton step producing NaN, all subsequent steps continue with NaN. No firewall, no reset, no fallback.
 - **Impact**: Silent NaN propagation. Impossible to debug without adding print statements.
+- **Fix**: Three-layer NaN firewall:
+  1. **`IS_NAN(x)` macro** — IEEE 754 portable `(x)!=(x)` check
+  2. **`bsim4_eval` output guard** — if ids/gm/gds/gmbs are NaN, return safe off-state (1e-15, 0)
+  3. **`dc_solve` voltage update** — if `v_new` is NaN, reset node to 0, set `had_nan` flag that forces retry via recovery cascade instead of false convergence
+  4. **Post-convergence KCL** — NaN check on computed vsrc currents, default to 0
 
 ---
 
@@ -123,8 +137,8 @@ These were discovered during a line-by-line audit of float_spice.c against the r
 
 | Feature | Status |
 |---------|:------|
-| Gmin stepping (1e-2 → 1e-12) | ❌ Hardcoded 1e-10 |
-| Source stepping (ramp from 0) | ❌ |
+| Gmin stepping (1e-2 → 1e-12) | ✅ 3-stage (1e-9/1e-10/1e-12) |
+| Source stepping (ramp from 0) | 🔄 agent4 @ 2026-07-24 (P2.1) |
 | Solution limiting (per-node) | ❌ ±1.0V hard clamp |
 | Cmin stepping (diagonal damping) | ❌ |
 | Pseudo-transient fallback | ❌ |
@@ -140,20 +154,20 @@ These were discovered during a line-by-line audit of float_spice.c against the r
 
 | # | Bug | File | Est. |
 |---|-----|------|:--:|
-| P0.1 | Fix parse_eng() suffix bug | float_spice.c | 30min |
-| P0.2 | Add toxe=0 guard + NaN firewall | float_spice.c | 30min |
-| P0.3 | Fix matrix assembly (skip fixed nodes, don't zero) | float_spice.c | 1.5h |
-| P0.4 | Compute vsrc currents after DC solve | float_spice.c | 1h |
-| P0.5 | Per-device model selection (NMOS/PMOS) | float_spice.c | 1h |
-| P0.6 | Gmin stepping (3 stages) | float_spice.c | 1.5h |
-| P0.7 | Replace printf (double) casts → fprint_real | float_spice.c | 1h |
+| P0.1 | ✅ Fix parse_eng() suffix bug | float_spice.c | 30min |
+| P0.2 | ✅ toxe=0 guard + NaN firewall (B9+B10) | float_spice.c | 30min |
+| P0.3 | ✅ Fix matrix assembly (B4: skip fixed nodes) | float_spice.c | 1.5h |
+| P0.4 | ✅ Compute vsrc currents after DC solve (B3) | float_spice.c | 1h |
+| P0.5 | ✅ Per-device model selection NMOS/PMOS (B2) | float_spice.c | 1h |
+| P0.6 | ✅ Gmin stepping (3 stages) (B6) | float_spice.c | 1.5h |
+| P0.7 | ✅ Replace printf (double) casts → real_to_str (agent3) | float_spice.c | 1h |
 | **P0 Subtot** | | | **~7h** |
 
 ### Phase 1: Make BSIM4 Physically Correct
 
 | # | Task | Est. |
 |---|------|:--:|
-| P1.1 | Expand BSIM4Param from 16→40 fields | 2h |
+| P1.1 | ✅ Expand BSIM4Param from 16→51 fields (agent5 @ 2026-07-24) | 2h |
 | P1.2 | Implement full Vth (dvt0/1/2, dsub, k3, w0) | 2h |
 | P1.3 | Implement Rds (rdsw/rsw/rdw/prwg) | 1.5h |
 | P1.4 | Implement full Early voltage stack (VACLM+VADIBL) | 3h |
@@ -165,11 +179,11 @@ These were discovered during a line-by-line audit of float_spice.c against the r
 
 | # | Task | Est. |
 |---|------|:--:|
-| P2.1 | Source stepping (4 ramp stages) | 2h |
+| P2.1 | 🔄 Source stepping (4 ramp stages) (agent4 @ 2026-07-24) | 2h |
 | P2.2 | Adaptive voltage limiting | 1.5h |
 | P2.3 | Cmin stepping + pseudo-transient fallback | 3h |
-| P2.4 | Floating Vsrc support (branch variable) | 2h |
-| P2.5 | Current source support | 1h |
+| P2.4 | ✅ Floating Vsrc MNA branch variables (B8 fix, agent2 @ 2026-07-24) | 2h |
+| P2.5 | 🔄 Current source support (agent2 @ 2026-07-24) | 1h |
 | **P2 Subtot** | | **~9.5h** |
 
 ### Phase 3: SPICE Compatibility
