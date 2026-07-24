@@ -1,0 +1,32 @@
+============================================================
+  LDO Performance Summary — PTM 180nm
+============================================================
+  Technology : PTM 180nm BSIM3v3 (NMOS / PMOS)
+  VIN_NOM    : 2.3 V
+  VOUT_NOM   : 1.8 V
+  VREF_NOM   : 0.9 V
+  R_COMP     : 2000 Ω
+  C_COMP     : 160 pF
+  C_OUT      : 1.0 uF
+------------------------------------------------------------
+  DC
+    VOUT @ nom      : 1804.93 mV
+    Line regulation : 1.08 mV/V
+------------------------------------------------------------
+  AC
+    DC loop gain    : 51.7 dB
+    GBW             : 1182.1 kHz
+    Phase margin    : 58.6 °
+    PSRR @ DC       : 57.3 dB
+------------------------------------------------------------
+  Noise
+    Vn @ 1 kHz      : 76.3 nV/rtHz
+    Vn_rms (10Hz-100kHz): 7.72 uV_rms
+    1/f corner      : 47.9 kHz
+------------------------------------------------------------
+  Transient (0→100 mA load step)
+    VOUT undershoot : N/A
+    VOUT overshoot  : N/A
+    ΔVout static    : N/A
+    Recovery (1%)   : N/A
+============================================================

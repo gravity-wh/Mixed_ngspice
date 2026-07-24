@@ -1,0 +1,77 @@
+From: Mixed_ngspice
+Subject: Add FP32 voltage clamping to prevent NaN in fast transients
+
+BSIM4v5 computations can produce Inf/NaN during fast transients when
+Vds/Vgs/Vbs swing to extreme values (beyond supply rails) due to
+capacitive coupling or UIC startup.
+
+This patch adds a pre-computation clamping layer: before any BSIM4
+equation is evaluated, terminal voltages are clamped to physically
+reasonable bounds (1.5×VDD for Vds/Vgs/Vbs, ±VDD for body diodes).
+
+This is NOT a precision fix — it's a robustness fix that prevents
+the FP32 computation path from entering numerically dangerous regions.
+Normal operation is unaffected since clamping thresholds exceed all
+normal bias conditions.
+
+Layer 1 of the three-layer FP32 defense system. Applies to all builds
+(FP64, Mixed FP32, Pure FP32) since double can also overflow in
+extreme corner cases.
+
+Files modified:
+  src/spicelib/devices/bsim4v5/b4v5ld.c — add CLAMP_VOLT macro + clamping call
+---
+ src/spicelib/devices/bsim4v5/b4v5ld.c | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+
+diff --git a/src/spicelib/devices/bsim4v5/b4v5ld.c b/src/spicelib/devices/bsim4v5/b4v5ld.c
+index a1b2c3d..e4f5g6h 100644
+--- a/src/spicelib/devices/bsim4v5/b4v5ld.c
++++ b/src/spicelib/devices/bsim4v5/b4v5ld.c
+@@ -101,6 +101,29 @@
+         var = 0.0; \
+     }
+
++/* FP32 voltage clamping: prevent extreme terminal voltages from causing
++ * Inf/NaN in BSIM4 computations during fast transients or UIC startup.
++ * Clamp thresholds: Vds/Vgs/Vbs ≤ 1.5×VDD, body diodes ≤ ±VDD.
++ * These are physically reasonable — real devices cannot sustain voltages
++ * far beyond supply rails without breakdown (which sizing doesn't model).
++ * Normal bias points (Vds,Vgs,Vbs ≤ VDD) are completely unaffected. */
++#define CLAMP_VOLT(var, lo, hi) \
++    if ((var) > (hi)) { \
++        var = (hi); \
++    } else if ((var) < (lo)) { \
++        var = (lo); \
++    }
++
++/* Per-device voltage clamping: called after all terminal voltages are
++ * assigned, before any BSIM4 equation uses them.  The VDD supply voltage
++ * is extracted from model parameters (BSIM4v5vdd if available, else 5.0V). */
++#define CLAMP_DEVICE_VOLTAGES(vds, vgs, vbs, vbd, vdd) \
++    CLAMP_VOLT(vds, -(vdd)*1.5, (vdd)*1.5); \
++    CLAMP_VOLT(vgs, -(vdd)*1.5, (vdd)*1.5); \
++    CLAMP_VOLT(vbs, -(vdd)*1.5, (vdd)*0.5); \
++    CLAMP_VOLT(vbd, -(vdd)*1.5, (vdd)*0.5);
++
++
+ /* FP32 safe math wrappers: clamp arguments to prevent expf overflow/underflow
+  * expf(80)=5.5e34 (safe), expf(-80)=1.8e-35 (effectively zero)
+  * Overflow at x>88.7 in FP32 vs x>709 in FP64 — this is the root cause of
+@@ -466,6 +489,17 @@
+                vbd = vbs - vds;
+                vdbd = vdbs - vds;
+                vgd = vgs - vds;
++
++               /* FP32 Layer 1: clamp terminal voltages to prevent
++                * Inf/NaN from extreme Vds/Vgs/Vbs during fast transients.
++                * The normal operating range (Vds,Vgs,Vbs ≤ VDD) is
++                * completely unaffected by this clamping. */
++               {
++                   SPICE_REAL vdd_clamp = (model->BSIM4v5vdd > 0.0) ?
++                       model->BSIM4v5vdd : 5.0;
++                   CLAMP_DEVICE_VOLTAGES(vds, vgs, vbs, vbd, vdd_clamp);
++               }
++
+                vged = vges - vds;
+                vgmd = vgms - vds;

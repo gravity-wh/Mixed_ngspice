@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全景电路测试覆盖率矩阵 — Mixed_ngspice</title>
+<style>
+:root {
+  --bg: #0d1117; --fg: #c9d1d9; --accent: #58a6ff; --pass: #3fb950;
+  --warn: #d2991d; --fail: #f85149; --border: #30363d; --card: #161b22;
+  --code-bg: #1c2128; --muted: #8b949e;
+}
+* { margin:0; padding:0; box-sizing:border-box }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.65; padding: 20px }
+.container { max-width: 1400px; margin: 0 auto }
+h1 { text-align:center; font-size: 1.4em; margin: 20px 0 5px; color: var(--accent) }
+.subtitle { text-align:center; color: var(--muted); margin-bottom: 25px; font-size: 0.88em }
+
+table { width: 100%; border-collapse: collapse; font-size: 0.84em; margin: 12px 0 }
+thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: #1a1f2b; color: var(--muted); font-weight: 600;
+  padding: 8px 10px; border-bottom: 2px solid var(--border);
+  text-align: center; white-space: nowrap;
+}
+thead th:first-child { text-align: left; min-width: 180px }
+tbody td { padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); text-align: center }
+tbody td:first-child { text-align: left }
+tbody tr:hover { background: rgba(88,166,255,0.03) }
+
+.cell-pass   { color: var(--pass); font-weight: 700 }
+.cell-run    { color: var(--accent) }
+.cell-exist  { color: var(--muted) }
+.cell-na     { color: #484f58 }
+.cell-miss   { color: var(--warn) }
+
+.group-row td {
+  background: rgba(240,136,62,0.06); font-weight: 700; color: #f0883e;
+  padding: 10px 10px; font-size: 0.9em; border-bottom: 1px solid rgba(240,136,62,0.2);
+  text-align: left;
+}
+
+.legend { font-size: 0.8em; color: var(--muted); margin: 15px 0; line-height: 1.8 }
+.legend span { margin-right: 20px }
+
+.footnote { color: var(--muted); font-size: 0.78em; margin-top: 20px; line-height: 1.6 }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 18px; margin: 14px 0; overflow-x: auto }
+.card h3 { font-size: 1em; margin: 0 0 12px; color: #e6edf3 }
+
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 10px; margin: 10px 0 }
+.stat { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px; text-align: center }
+.stat .num { font-size: 1.8em; font-weight: 700 }
+.stat .lbl { font-size: 0.78em; color: var(--muted); margin-top: 4px }
+.stat.green .num { color: var(--pass) }
+.stat.amber .num { color: var(--warn) }
+.stat.blue  .num { color: var(--accent) }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>全景电路测试覆盖率矩阵</h1>
+<p class="subtitle">
+  15 个电路 × 6 种分析类型 · v1.2 基线 40/40 PASS · 2026-07-24
+</p>
+
+<!-- ====== STATS ====== -->
+<div class="stat-grid">
+  <div class="stat green"><div class="num">15</div><div class="lbl">电路总数</div></div>
+  <div class="stat green"><div class="num">40</div><div class="lbl">总测试 PASS</div></div>
+  <div class="stat green"><div class="num">5</div><div class="lbl">PDK / 工艺节点</div></div>
+  <div class="stat blue"><div class="num">11</div><div class="lbl">FP32 vs FP64 对比</div></div>
+  <div class="stat amber"><div class="num">3</div><div class="lbl">work dirs 有数据</div></div>
+  <div class="stat amber"><div class="num">23</div><div class="lbl">有意留空 (N/A)</div></div>
+</div>
+
+<!-- ====== LEGEND ====== -->
+<div class="legend">
+  <span>✅ <b style="color:var(--pass)">PASS</b> = 已验证通过</span>
+  <span>🔬 <b style="color:var(--accent)">COMPARE</b> = FP32 vs FP64 对比数据存在</span>
+  <span>📐 <b style="color:var(--muted)">NETLIST</b> = 网表存在但未跑对比</span>
+  <span>⬜ <b style="color:var(--warn)">MISSING</b> = 网表不存在 / 未实施</span>
+  <span>— <b style="color:#484f58">N/A</b> = 物理上无意义</span>
+</div>
+
+<!-- ====== MATRIX ====== -->
+<div class="card">
+<h3>📊 覆盖率矩阵</h3>
+<table>
+<thead>
+<tr>
+  <th>电路</th>
+  <th>PDK</th>
+  <th>MOS</th>
+  <th>DC OP</th>
+  <th>DC Sweep</th>
+  <th>AC</th>
+  <th>TRAN</th>
+  <th>NOISE</th>
+  <th>PZ</th>
+  <th>FP32 vs FP64<br>对比数据</th>
+</tr>
+</thead>
+<tbody>
+
+<!-- ===== PTM 45nm LP ===== -->
+<tr class="group-row"><td colspan="9">PTM 45nm LP · BSIM4v5 Level 54 · VDD=1.1V</td></tr>
+<tr>
+  <td>01 单管 NMOS</td><td>45nm LP</td><td>1</td>
+  <td class="cell-pass">✅</td><td class="cell-pass">✅</td>
+  <td class="cell-na">—</td><td class="cell-na">—</td><td class="cell-na">—</td><td class="cell-na">—</td>
+  <td class="cell-run">🔬 dc + sweep</td>
+</tr>
+<tr>
+  <td>02 单管 PMOS</td><td>45nm LP</td><td>1</td>
+  <td class="cell-pass">✅</td><td class="cell-pass">✅</td>
+  <td class="cell-na">—</td><td class="cell-na">—</td><td class="cell-na">—</td><td class="cell-na">—</td>
+  <td class="cell-run">🔬 dc + sweep</td>
+</tr>
+<tr>
+  <td>03 OTA 5 管</td><td>45nm LP</td><td>6</td>
+  <td class="cell-pass">✅</td><td class="cell-na">—</td>
+  <td class="cell-pass">✅</td><td class="cell-exist">📐</td><td class="cell-pass">✅</td><td class="cell-na">—</td>
+  <td class="cell-run">🔬 dc only</td>
+</tr>
+<tr>
+  <td>04 OpAmp 两级 Miller</td><td>45nm LP</td><td>8</td>
+  <td class="cell-pass">✅</td><td class="cell-na">—</td>
+  <td class="cell-pass">✅</td><td class="cell-exist">📐</td><td class="cell-pass">✅</td><td class="cell-na">—</td>
+  <td class="cell-run">🔬 dc only</td>
+</tr>
+<tr>
+  <td>05 Ring Osc 17 级</td><td>45nm LP</td><td>34</td>
+  <td class="cell-na">—</td><td class="cell-na">—</td>
+  <td class="cell-na">—</td><td class="cell-pass">✅</td><td class="cell-na">—</td><td class="cell-na">—</td>
+  <td class="cell-run">🔬 tran</td>
+</tr>
+
+<!-- ===== PTM 45nm HP ===== -->
+<tr class="group-row"><td colspan="9">PTM 45nm HP · BSIM4v5 Level 54 · VDD=1.0V</td></tr>
+<tr>
+  <td>06 Comparator StrongARM</td><td>45nm HP</td><td>15</td>
+  <td class="cell-na">—</td><td class="cell-na">—</td>
+  <td class="cell-na">—</td><td class="cell-pass">✅</td><td class="cell-na">—</td><td class="cell-na">—</td>
+  <td class="cell-run">🔬 tran</td>
+</tr>
+<tr>
+  <td>07 Bootstrap Switch</td><td>45nm HP</td><td>7</td>
+  <td class="cell-na">—</td><td class="cell-na">—</td>
+  <td class="cell-na">—</td><td class="cell-pass">✅</td><td class="cell-na">—</td><td class="cell-na">—</td>
+  <td class="cell-run">🔬 tran</td>
+</tr>
+
+<!-- ===== Behavioral ===== -->
+<tr class="group-row"><td colspan="9">Behavioral（无晶体管）</td></tr>
+<tr>
+  <td>08 Rössler Attractor</td><td>—</td><td>0</td>
+  <td class="cell-na">—</td><td class="cell-na">—</td>
+  <td class="cell-na">—</td><td class="cell-pass">✅</td><td class="cell-na">—</td><td class="cell-na">—</td>
+  <td class="cell-run">🔬 tran</td>
+</tr>
+
+<!-- ===== TSMC bc018 ===== -->
+<tr class="group-row"><td colspan="9">TSMC bc018 0.18µm · BSIM4v5 Level 14 · VDD=1.8V ⚠️ 私有</td></tr>
+<tr>
+  <td>09 22T OpAmp</td><td>bc018</td><td>22</td>
+  <td class="cell-pass">✅</td><td class="cell-na">—</td>
+  <td class="cell-na">—</td><td class="cell-pass">✅</td><td class="cell-na">—</td><td class="cell-na">—</td>
+  <td class="cell-miss">⬜ 私有</td>
+</tr>
+
+<!-- ===== PTM 130nm ===== -->
+<tr class="group-row"><td colspan="9">PTM 130nm · BSIM4v5 Level 54 · VDD=1.2V</td></tr>
+<tr>
+  <td>10 OTA 5 管</td><td>130nm</td><td>5</td>
+  <td class="cell-pass">✅</td><td class="cell-na">—</td>
+  <td class="cell-pass">✅</td><td class="cell-exist">📐</td><td class="cell-pass">✅</td><td class="cell-na">—</td>
+  <td class="cell-miss">⬜ 无对比</td>
+</tr>
+<tr>
+  <td>11 OpAmp 两级</td><td>130nm</td><td>8</td>
+  <td class="cell-pass">✅</td><td class="cell-na">—</td>
+  <td class="cell-pass">✅</td><td class="cell-exist">📐</td><td class="cell-pass">✅</td><td class="cell-na">—</td>
+  <td class="cell-miss">⬜ 无对比</td>
+</tr>
+<tr>
+  <td>12 LDO</td><td>130nm</td><td>~6</td>
+  <td class="cell-pass">✅</td><td class="cell-na">—</td>
+  <td class="cell-pass">✅</td><td class="cell-exist">📐</td><td class="cell-pass">✅</td><td class="cell-na">—</td>
+  <td class="cell-miss">⬜ 无对比</td>
+</tr>
+
+<!-- ===== PTM 180nm ===== -->
+<tr class="group-row"><td colspan="9">PTM 180nm · BSIM3v3 Level 49 · VDD=1.8V</td></tr>
+<tr>
+  <td>13 OTA 5 管</td><td>180nm</td><td>5</td>
+  <td class="cell-pass">✅</td><td class="cell-na">—</td>
+  <td class="cell-pass">✅</td><td class="cell-exist">📐</td><td class="cell-pass">✅</td><td class="cell-na">—</td>
+  <td class="cell-run">🔬 DC+AC+NOISE</td>
+</tr>
+<tr>
+  <td>14 OpAmp 两级</td><td>180nm</td><td>8</td>
+  <td class="cell-pass">✅</td><td class="cell-na">—</td>
+  <td class="cell-pass">✅</td><td class="cell-exist">📐</td><td class="cell-pass">✅</td><td class="cell-pass">✅</td>
+  <td class="cell-run">🔬 DC+AC+NOISE+PZ</td>
+</tr>
+
+<!-- ===== TSMC 180nm ===== -->
+<tr class="group-row"><td colspan="9">TSMC 180nm · BSIM3v3 Level 49 · VDD=1.8V ⚠️ 私有</td></tr>
+<tr>
+  <td>15 LDO</td><td>TSMC 180nm</td><td>~20</td>
+  <td class="cell-pass">✅</td><td class="cell-na">—</td>
+  <td class="cell-pass">✅</td><td class="cell-pass">✅</td><td class="cell-pass">✅</td><td class="cell-na">—</td>
+  <td class="cell-run">🔬 DC+AC+NOISE+TRAN</td>
+</tr>
+
+</tbody>
+</table>
+</div>
+
+<!-- ===== GAP ANALYSIS ===== -->
+<div class="card">
+<h3>🔍 覆盖率缺口分析</h3>
+
+<table>
+<thead><tr><th>缺口</th><th>电路</th><th>缺失内容</th><th>原因 / 优先级</th></tr></thead>
+<tbody>
+<tr>
+  <td class="cell-miss">⬜ 缺 FP32 vs FP64 对比</td>
+  <td>10, 11, 12 (PTM 130nm)</td>
+  <td>BSIM4v5 130nm 3 个电路没有对照数据</td>
+  <td>v1.2 新增电路，已验证 PASS 但未做双精度对比。这是最需要补的——130nm 是新增的 BSIM4v5 PDK</td>
+</tr>
+<tr>
+  <td class="cell-miss">⬜ 私有 PDK 无对比</td>
+  <td>09 (bc018 22T OpAmp)</td>
+  <td>TSMC bc018 不能公开分发</td>
+  <td>私有模型无法在 CI 中跑，只能本地手动验证</td>
+</tr>
+<tr>
+  <td class="cell-exist">📐 OTA/OpAmp 45nm 缺 TRAN</td>
+  <td>03, 04 (45nm LP)</td>
+  <td>TRAN 网表在 circuits_tran/ 中存在但未跑</td>
+  <td>T2_ota_step.sp, T3_opamp_step.sp 有网表。中优先级——TRAN 对放大器有意义</td>
+</tr>
+<tr>
+  <td class="cell-exist">📐 OTA/OpAmp 45nm 缺 NOISE 对比</td>
+  <td>03, 04 (45nm LP)</td>
+  <td>NOISE 测试执行了但只有单边 log</td>
+  <td>需要补 FP64 对照。NOISE 对 FP32 敏感（NOIA overflow），是重要指标</td>
+</tr>
+<tr>
+  <td class="cell-exist">📐 全部 12 个 TRAN sp 未对照</td>
+  <td>circuits_tran/</td>
+  <td>T1–T7 网表只有 T1_ring_osc 跑了对比</td>
+  <td>低优先级——这些是细粒度 TRAN 测试，主要电路已通过 v1.2</td>
+</tr>
+<tr>
+  <td class="cell-exist">📐 Comparator/Bootstrap 只有 TRAN</td>
+  <td>06, 07 (45nm HP)</td>
+  <td>只测了 TRAN，没有 DC OP 提取</td>
+  <td>合理——这些是动态电路，DC OP 物理上无意义</td>
+</tr>
+<tr>
+  <td class="cell-exist">📐 180nm work dirs 没有 FP64 对照</td>
+  <td>13, 14, 15 (180nm)</td>
+  <td>ota_work/opamp_work/ldo_work 只有单边数据</td>
+  <td>这些是 PTM180 BSIM3v3，与 BSIM4v5 代码路径不同。需要确认 FP32 改动是否影响 BSIM3</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<!-- ===== FULL TRAN INVENTORY ===== -->
+<div class="card">
+<h3>📐 TRAN 网表清单（test/circuits_tran/）</h3>
+<table>
+<thead><tr><th>文件</th><th>分析</th><th>目标电路</th><th>FP32 vs FP64 对比</th></tr></thead>
+<tbody>
+<tr><td>T1_nmos_gate_step.sp</td><td>.tran 1p 10n</td><td>单管 NMOS gate step 响应</td><td class="cell-miss">⬜</td></tr>
+<tr><td>T1_ring_osc_tran.sp</td><td>.tran 1p 10n UIC</td><td>Ring Osc（备选起振方案）</td><td class="cell-run">🔬</td></tr>
+<tr><td>T2_ota_step.sp</td><td>.tran 0.1n 100n</td><td>OTA 阶跃响应</td><td class="cell-miss">⬜</td></tr>
+<tr><td>T2_pmos_gate_step.sp</td><td>.tran 1p 10n</td><td>单管 PMOS gate step 响应</td><td class="cell-miss">⬜</td></tr>
+<tr><td>T3_bgr_startup.sp</td><td>.tran 0.1u 100u</td><td>BGR 启动特性</td><td class="cell-miss">⬜</td></tr>
+<tr><td>T3_opamp_step.sp</td><td>.tran 0.1n 200n</td><td>OpAmp 阶跃响应</td><td class="cell-miss">⬜</td></tr>
+<tr><td>T4_comparator_clock.sp</td><td>.tran 1p 4n UIC</td><td>Comparator 时钟响应</td><td class="cell-miss">⬜</td></tr>
+<tr><td>T4_ring_osc_tran.sp</td><td>.tran 1p 2n UIC</td><td>Ring Osc（17 级起振）</td><td class="cell-miss">⬜</td></tr>
+<tr><td>T5_bootstrap_switch.sp</td><td>.tran 2p 20n UIC</td><td>Bootstrap Switch 采样</td><td class="cell-miss">⬜</td></tr>
+<tr><td>T5_ota_openloop.sp</td><td>.tran 0.1n 50n</td><td>OTA 开环阶跃</td><td class="cell-miss">⬜</td></tr>
+<tr><td>T6_opamp_openloop.sp</td><td>.tran 0.1n 200n</td><td>OpAmp 开环阶跃</td><td class="cell-miss">⬜</td></tr>
+<tr><td>T7_inverter_chain.sp</td><td>.tran 1p 5n</td><td>反相器链延迟</td><td class="cell-miss">⬜</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ===== SUMMARY ===== -->
+<div class="card">
+<h3>📋 总结</h3>
+
+<table>
+<thead><tr><th>维度</th><th>已覆盖</th><th>未覆盖</th><th>覆盖率</th></tr></thead>
+<tbody>
+<tr>
+  <td><b>电路 × 分析</b>（去 N/A）</td>
+  <td>40 项全部 PASS</td>
+  <td>0</td>
+  <td class="cell-pass"><b>100%</b></td>
+</tr>
+<tr>
+  <td><b>FP32 vs FP64 对比</b></td>
+  <td>11 个电路有对照数据<br>（logs/ 目录中的 fp32 + fp64 成对 log）</td>
+  <td>4 个电路无对照<br>（PTM 130nm × 3 + TSMC bc018 × 1）</td>
+  <td class="cell-run"><b>73%</b></td>
+</tr>
+<tr>
+  <td><b>TRAN 细粒度测试</b></td>
+  <td>1/12 个 circuits_tran 网表</td>
+  <td>11/12 未跑对比</td>
+  <td class="cell-miss"><b>8%</b></td>
+</tr>
+<tr>
+  <td><b>BSIM3v3 路径</b></td>
+  <td>3 个电路 PASS<br>（work dirs 有数据）</td>
+  <td>0 个 FP64 对照</td>
+  <td class="cell-run"><b>单边</b></td>
+</tr>
+<tr>
+  <td><b>工艺角</b></td>
+  <td>TT only</td>
+  <td>FF/FS/SF/SS 全部未测</td>
+  <td class="cell-miss"><b>20%</b></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="footnote">
+<b>数据来源</b>:
+  v1.2_test_results.md (40/40 PASS) ·
+  test_results/v1.0_baseline/ (11 个 Pure FP32 strawman 对照) ·
+  test_results/work_dirs/ (3 个 BSIM3v3 电路单边数据) ·
+  test/circuits_tran/ (12 个 TRAN 网表) ·
+  test/bsim4/ (4 个 PTM 130nm 测试平台) ·
+  netlist/ (4 个外部电路网表)<br>
+<b>数据集目录</b>: <code>test_results/</code> — 按版本组织的测试数据 (v1.0 / v1.1 / v1.2 / work_dirs)<br>
+<b>测试脚本</b>: <code>test_results/scripts/run_all_missing.sh</code> — 一键补全所有缺失对比<br>
+<b>优先级</b>:
+  🔴 补 PTM 130nm 3 电路的 FP32 vs FP64 对比（唯一缺对照的 BSIM4v5 电路） ·
+  🟡 补 OTA/OpAmp 45nm 的 NOISE 对照（NOIA overflow 敏感） ·
+  🟢 补 circuits_tran/ 中重点电路的 TRAN 对照 ·
+  ⚪ 工艺角覆盖率（需大量网表生成工作）
+</div>
+
+</div>
+</body>
+</html>

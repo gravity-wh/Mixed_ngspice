@@ -1,0 +1,11 @@
+{
+  "date": "2026-07-20T13:41:12+08:00",
+  "mode": "quick",
+  "total_compared": 11,
+  "passed": 2,
+  "warned": 2,
+  "failed": 4,
+  "skipped": 9,
+  "pass_rate": "25.0%",
+  "results": [{"label":"01_nmos_dc","verdict":"WARN","compare_exit":2},{"label":"01_nmos_sweep","verdict":"PASS","compare_exit":0},{"label":"02_pmos_dc","verdict":"WARN","compare_exit":2},{"label":"02_pmos_sweep","verdict":"SKIP","reason":"known FP32 issue"},{"label":"03_ringosc","verdict":"FAIL","compare_exit":1},{"label":"04_ota_dc","verdict":"FAIL","reason":"FP32 convergence failure"},{"label":"05_opamp_dc","verdict":"FAIL","compare_exit":1},{"label":"06_comparator","verdict":"FAIL","compare_exit":1},{"label":"07_bootstrap","verdict":"SKIP","reason":"FP64 also fails"},{"label":"08_roessler","verdict":"PASS","compare_exit":0},{"label":"T1_ring_osc_tran","verdict":"SKIP","reason":"FP64 also fails"}]
+}

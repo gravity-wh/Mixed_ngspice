@@ -1,0 +1,28 @@
+* 5-Stage Ring Oscillator DUT — BSIM4 (PTM 130nm)
+* Vdd=1.3V
+* 5 inverters in ring topology: stage outputs = nodes 1..5
+* Uses nmos/pmos BSIM4 models from ptm130.lib
+
+.subckt ringosc5_bsim4 VDD VSS
+
+* Inverter stage 1: input=node5(ring), output=node1
+MP1 node1 node5 VDD VDD pmos L=0.13u W=2u m=1
+MN1 node1 node5 VSS VSS nmos L=0.13u W=1u m=1
+
+* Inverter stage 2: input=node1, output=node2
+MP2 node2 node1 VDD VDD pmos L=0.13u W=2u m=1
+MN2 node2 node1 VSS VSS nmos L=0.13u W=1u m=1
+
+* Inverter stage 3: input=node2, output=node3
+MP3 node3 node2 VDD VDD pmos L=0.13u W=2u m=1
+MN3 node3 node2 VSS VSS nmos L=0.13u W=1u m=1
+
+* Inverter stage 4: input=node3, output=node4
+MP4 node4 node3 VDD VDD pmos L=0.13u W=2u m=1
+MN4 node4 node3 VSS VSS nmos L=0.13u W=1u m=1
+
+* Inverter stage 5: input=node4, output=node5
+MP5 node5 node4 VDD VDD pmos L=0.13u W=2u m=1
+MN5 node5 node4 VSS VSS nmos L=0.13u W=1u m=1
+
+.ends ringosc5_bsim4

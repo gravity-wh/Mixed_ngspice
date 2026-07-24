@@ -1,0 +1,31 @@
+* Five-Transistor OTA DUT
+* PTM 180nm CMOS
+*
+* Ports:
+*   INP   non-inverting input
+*   INN   inverting input
+*   OUT   single-ended output
+*   VDD   positive supply
+*   VSS   ground
+*   VBIAS tail NMOS gate bias
+
+.subckt five_transistor_ota INP INN OUT VDD VSS VBIAS
+
+* NMOS differential pair
+M0 OUT  INP TAIL VSS NMOS L=1u W=20.0u m=1
++ ad=5.4000e-12 as=5.4000e-12 pd=2.4320e-05 ps=2.4320e-05 nrd=0.0135000 nrs=0.0135000
+M1 NETD INN TAIL VSS NMOS L=1u W=20.0u m=1
++ ad=5.4000e-12 as=5.4000e-12 pd=2.4320e-05 ps=2.4320e-05 nrd=0.0135000 nrs=0.0135000
+
+* PMOS current-mirror active load
+M3 OUT  NETD VDD VDD PMOS L=1u W=16.0u m=1
++ ad=4.3200e-12 as=4.3200e-12 pd=2.0320e-05 ps=2.0320e-05 nrd=0.0168750 nrs=0.0168750
+M4 NETD NETD VDD VDD PMOS L=1u W=16.0u m=1
++ ad=4.3200e-12 as=4.3200e-12 pd=2.0320e-05 ps=2.0320e-05 nrd=0.0168750 nrs=0.0168750
+
+* NMOS tail current source
+M5 TAIL VBIAS VSS VSS NMOS L=1u W=12.0u m=1
++ ad=3.2400e-12 as=3.2400e-12 pd=1.6320e-05 ps=1.6320e-05 nrd=0.0225000 nrs=0.0225000
+
+.ends five_transistor_ota
+

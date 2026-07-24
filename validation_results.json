@@ -1,0 +1,36 @@
+{
+  "total": 3,
+  "passed": 0,
+  "warned": 0,
+  "failed": 3,
+  "pass_rate": "0.0%",
+  "results": [
+    {
+      "circuit": "ota_ac.cir",
+      "fp32_converged": true,
+      "fp64_converged": true,
+      "nodes": {},
+      "verdict": "NO_DATA_FP64",
+      "max_error": 0.0,
+      "nan_detected": false
+    },
+    {
+      "circuit": "ota_dc.cir",
+      "fp32_converged": true,
+      "fp64_converged": true,
+      "nodes": {},
+      "verdict": "NO_DATA_FP64",
+      "max_error": 0.0,
+      "nan_detected": false
+    },
+    {
+      "circuit": "ota_noise.cir",
+      "fp32_converged": true,
+      "fp64_converged": true,
+      "nodes": {},
+      "verdict": "NO_DATA_FP64",
+      "max_error": 0.0,
+      "nan_detected": false
+    }
+  ]
+}

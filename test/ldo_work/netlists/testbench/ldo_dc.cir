@@ -1,0 +1,50 @@
+* LDO DC Testbench
+* Runs two sweeps via .control:
+*   1) Line regulation: VIN swept from 1.6V to 3.3V
+*   2) Load regulation: I_load swept from 0 to 0.1A
+* Nominal: VIN=2.3V, VREF=0.9V, R_load=18Ω
+
+* ── Supply, reference, ground ────────────────────────────────────────────────
+VIN_SRC   vin  0  DC 2.3
+VREF_SRC  vref 0  DC 0.9
+VVSS      vss  0  DC 0
+
+* ── Default DC load ──────────────────────────────────────────────────────────
+R_load  vout vss 18
+
+* ── Programmable load current (for load-reg sweep) ──────────────────────────
+* DC=0 at nominal; swept in .control below
+I_load  vout vss DC 0
+
+* ── DUT ─────────────────────────────────────────────────────────────────────
+.include /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/netlists/dut/ldo_dut.cir
+X1 vin vout vss vref ldo_18_3
+
+.include /mnt/e/MyResearch/analog-circuit-skills/LDO/assets/models/ptm180.lib
+.options RELTOL=1e-4 ABSTOL=1e-12 VNTOL=1e-7 ITL4=50
+
+* ── Control block ────────────────────────────────────────────────────────────
+.control
+
+* --- Operating point at nominal conditions ---
+op
+echo "=== DC Operating Point ==="
+print v(vout) v(vin) v(vref)
+echo "Vout (V):" v(vout)
+echo "Vin  (V):" v(vin)
+
+* --- Line regulation: sweep VIN ---
+dc VIN_SRC 1.6 3.3 0.05
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/logs/ldo_dc_line_vin.txt   v(vin)
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/logs/ldo_dc_line_vout.txt  v(vout)
+
+* --- Load regulation: sweep I_load at nominal VIN ---
+* Reset VIN to nominal (dc above may leave it at vin_max)
+alter VIN_SRC dc=2.3
+dc I_load 0 0.1 0.001
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/logs/ldo_dc_load_iload.txt  I(I_load)
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/logs/ldo_dc_load_vout.txt   v(vout)
+
+.endc
+
+.end

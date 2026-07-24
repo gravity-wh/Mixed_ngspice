@@ -1,0 +1,45 @@
+* LDO AC Testbench — PSRR and Output Impedance
+* VIN=2.3V  VREF=0.9V  R_load=18Ω
+* PSRR:  AC=1V on supply → PSRR(dB) = -vdb(vout)
+* Zout:  AC=1A into vout → Zout = v(vout)/I_test
+
+* ── Supply: DC bias + AC test ────────────────────────────────────────────────
+* For PSRR: AC=1 on VIN
+V1  vin  0  DC 2.3  AC 1
+VREF_SRC vref 0  DC 0.9
+VVSS vss  0  DC 0
+
+* ── Default load ─────────────────────────────────────────────────────────────
+R_load  vout vss 18
+
+* ── Output AC test current (for Zout) ────────────────────────────────────────
+* Starts at AC=0 (inactive during PSRR run); enabled via alter for Zout run.
+I_test  vout vss  AC 0  DC 0
+
+* ── DUT ─────────────────────────────────────────────────────────────────────
+.include /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/netlists/dut/ldo_dut.cir
+X1 vin vout vss vref ldo_18_3
+
+.include /mnt/e/MyResearch/analog-circuit-skills/LDO/assets/models/ptm180.lib
+.options RELTOL=1e-4 ABSTOL=1e-12 VNTOL=1e-7 ITL4=50
+
+* ── AC Analysis ──────────────────────────────────────────────────────────────
+.control
+
+* --- PSRR: inject AC at VIN (I_test already AC=0), measure Vout ---
+ac dec 100 1 1e+09
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/logs/ldo_ac_psrr_psrr_freq.txt   frequency
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/logs/ldo_ac_psrr_psrr_mag.txt    vdb(vout)
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/logs/ldo_ac_psrr_psrr_phase.txt  vp(vout)
+
+* --- Zout: inject AC 1A at vout, VIN AC=0 ---
+alter V1 ac=0
+alter I_test ac=1
+ac dec 100 1 1e+09
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/logs/ldo_ac_psrr_zout_freq.txt   frequency
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/logs/ldo_ac_psrr_zout_mag.txt    vdb(vout)
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/logs/ldo_ac_psrr_zout_phase.txt  vp(vout)
+
+.endc
+
+.end

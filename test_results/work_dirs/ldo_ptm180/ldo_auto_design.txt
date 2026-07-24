@@ -1,0 +1,40 @@
+============================================================
+  LDO Auto-Design Report
+============================================================
+
+  Specifications
+    VOUT_target = 1.800 V
+    VIN         = 2.300 V
+    ILOAD_max   = 100 mA
+    VREF        = 0.900 V
+
+  Designed Parameters
+    R_FB_TOP = 900 Ohm
+    R_FB_BOT = 900 Ohm
+    beta     = 0.50000
+    VOUT_act = 1.8000 V  (error +0.0 mV)
+
+    M2: W = 120 um x m = 100
+        W_total = 12000 um  L = 180 nm
+
+    R_COMP   = 2000 Ohm
+    C_COMP   = 150.0 pF
+    fz_act   = 530.5 kHz
+    R_LOAD   = 18.0 Ohm  (100 mA full load)
+
+  Simulation Verification (AC)
+    GBW      = 1185.0 kHz  (target 1284 kHz)
+    PM       = 57.5 deg
+    DC gain  = 51.7 dB
+    PSRR_DC  = 57.3 dB
+
+  STATUS: PASS
+
+  ldo_common.py globals to apply this design:
+    R_FB_TOP = 900
+    R_FB_BOT = 900.0
+    R_COMP   = 2000
+    C_COMP   = 1.500000e-10
+    W_M2_UM  = 120
+    M_M2     = 100
+============================================================

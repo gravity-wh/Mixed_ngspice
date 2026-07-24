@@ -1,0 +1,9 @@
+Five-Transistor OTA Summary
+============================
+DC gain       : 34.33 dB
+UGB           : 84.966 MHz
+Phase @ UGB   : 77.19 deg
+Vn @ 1 kHz    : 14279.82 nV/rtHz
+Vn rms        : 1674.24 uV_rms
+DC local gain : -52.08 V/V
+Vout bias     : 0.9722 V

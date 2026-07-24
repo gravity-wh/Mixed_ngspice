@@ -1,0 +1,25 @@
+* Two-Stage Op Amp — Output Noise
+
+VDD_SRC vdd 0 DC 1.8
+VSS_SRC vss 0 DC 0
+VINP_SRC inp 0 DC 0.9 AC 1
+VINN_SRC inn 0 DC 0.9
+
+.include /mnt/e/MyResearch/Mixed_ngspice/test/opamp_work/netlists/dut/two_stage_opamp_dut.cir
+XOP inp inn out vdd vss two_stage_opamp
+
+CLOAD out vss 1.200000e-12
+RLEAK out vss 1e+09
+
+.include /mnt/e/MyResearch/analog-circuit-skills/two_stage_opamp/assets/models/ptm180.lib
+.options RELTOL=1e-4 ABSTOL=1e-12 VNTOL=1e-7 ITL4=80
+
+.control
+noise V(out, vss) VINP_SRC dec 80 1 1e+08
+setplot noise1
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/opamp_work/logs/opamp_noise_freq.txt frequency
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/opamp_work/logs/opamp_noise_onoise.txt onoise_spectrum
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/opamp_work/logs/opamp_noise_inoise.txt inoise_spectrum
+.endc
+
+.end

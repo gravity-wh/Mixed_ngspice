@@ -1,0 +1,48 @@
+* 5-Stage Ring Oscillator — DC OP (BSIM4 / PTM 130nm) — FLAT netlist
+* Vdd=1.3V, nodes 1..5=stage outputs
+
+VDD_SRC vdd 0 DC 1.3
+VSS_SRC vss 0 DC 0
+
+* Inverter 1: in=node5, out=node1
+MP1 node1 node5 vdd vdd pmos L=0.13u W=2u
+MN1 node1 node5 vss vss nmos L=0.13u W=1u
+
+* Inverter 2: in=node1, out=node2
+MP2 node2 node1 vdd vdd pmos L=0.13u W=2u
+MN2 node2 node1 vss vss nmos L=0.13u W=1u
+
+* Inverter 3: in=node2, out=node3
+MP3 node3 node2 vdd vdd pmos L=0.13u W=2u
+MN3 node3 node2 vss vss nmos L=0.13u W=1u
+
+* Inverter 4: in=node3, out=node4
+MP4 node4 node3 vdd vdd pmos L=0.13u W=2u
+MN4 node4 node3 vss vss nmos L=0.13u W=1u
+
+* Inverter 5: in=node4, out=node5
+MP5 node5 node4 vdd vdd pmos L=0.13u W=2u
+MN5 node5 node4 vss vss nmos L=0.13u W=1u
+
+.include /mnt/e/MyResearch/Mixed_ngspice/test/models/ptm130.lib
+.options RELTOL=1e-4 ABSTOL=1e-12 VNTOL=1e-7 ITL4=80 gmin=1e-12
+
+.nodeset v(node1)=0.65 v(node2)=0.65 v(node3)=0.65 v(node4)=0.65 v(node5)=0.65
+
+.control
+op
+print v(node1) v(node2) v(node3) v(node4) v(node5) v(vdd) i(VDD_SRC)
+* Extract per-transistor DC data
+print @mn1[gm] @mn1[gds] @mn1[id] @mn1[vgs] @mn1[vds] @mn1[vth]
+print @mp1[gm] @mp1[gds] @mp1[id] @mp1[vgs] @mp1[vds] @mp1[vth]
+print @mn2[gm] @mn2[gds] @mn2[id] @mn2[vgs] @mn2[vds]
+print @mp2[gm] @mp2[gds] @mp2[id] @mp2[vgs] @mp2[vds]
+print @mn3[gm] @mn3[gds] @mn3[id] @mn3[vgs] @mn3[vds]
+print @mp3[gm] @mp3[gds] @mp3[id] @mp3[vgs] @mp3[vds]
+print @mn4[gm] @mn4[gds] @mn4[id] @mn4[vgs] @mn4[vds]
+print @mp4[gm] @mp4[gds] @mp4[id] @mp4[vgs] @mp4[vds]
+print @mn5[gm] @mn5[gds] @mn5[id] @mn5[vgs] @mn5[vds]
+print @mp5[gm] @mp5[gds] @mp5[id] @mp5[vgs] @mp5[vds]
+.endc
+
+.end

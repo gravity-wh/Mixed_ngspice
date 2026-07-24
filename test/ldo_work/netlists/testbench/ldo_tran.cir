@@ -1,0 +1,38 @@
+* LDO Transient Testbench — Load Step Response
+* Technology: PTM 180nm, VIN=2.3V, VREF=0.9V
+*
+* Load model: R_idle (always-on light load) + ILOAD (pulsed current step)
+*   R_idle  = 1800.0 Ω   (idle/light load, ~1 mA at 1.8 V)
+*   ILOAD   = 0 → 0.1 A  step, starting at t = 1.000000e-05 s
+*
+* Note: No 'uic' — ngspice computes DC operating point first so VOUT
+*       starts regulated at 1.8 V, and the transient starts cleanly.
+
+* ── DC Sources ───────────────────────────────────────────────────────────────
+V1       vin  0  DC 2.3
+VREF_SRC vref 0  DC 0.9
+VVSS     vss  0  DC 0
+
+* ── Idle (light) load ────────────────────────────────────────────────────────
+R_idle  vout vss  1800.0
+
+* ── Pulsed current load (load step) ─────────────────────────────────────────
+* PULSE( I_init  I_pulse  delay  rise  fall  pw  period )
+* Positive current sinks from vout to vss (conventional SPICE direction).
+ILOAD   vout vss  PULSE(0 0.1 1.000000e-05 1.000000e-07 1.000000e-07 5.000000e-05 2.000000e-04)
+
+* ── DUT ──────────────────────────────────────────────────────────────────────
+.include /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/netlists/dut/ldo_dut.cir
+X1 vin vout vss vref ldo_18_3
+
+.include /mnt/e/MyResearch/analog-circuit-skills/LDO/assets/models/ptm180.lib
+.options RELTOL=1e-4 ABSTOL=1e-12 VNTOL=1e-7 ITL4=50
+
+* ── Transient Analysis ───────────────────────────────────────────────────────
+.control
+tran 5.000000e-09 1.000000e-04
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/logs/ldo_tran_vout.txt  v(vout)
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/logs/ldo_tran_vin.txt   v(vin)
+.endc
+
+.end

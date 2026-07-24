@@ -1,0 +1,19 @@
+Two-Stage Op Amp Summary
+==========================
+Vout bias     : 0.9477 V
+Node B bias   : 0.4931 V
+PMOS bias     : 1.1950 V
+IDD           : 955.86 uA
+Power         : 1720.55 uW
+DC gain       : 64.25 dB
+UGB           : 13.657 MHz
+Phase @ UGB   : -99.32 deg
+Est. PM       : 80.68 deg
+Dominant pole : nan kHz
+Non-dom pole  : nan MHz (nan x UGB)
+First RHP zero: nan MHz (nan x UGB)
+Open-loop output Vn @ 1 kHz : 158632.66 nV/rtHz
+Open-loop output Vn rms     : 12573.43 uV_rms
+Input-referred en @ 1 kHz   : 97.91 nV/rtHz
+Unity CL output Vn @ 1 kHz  : 97.88 nV/rtHz
+Unity CL output Vn rms      : 21.78 uV_rms

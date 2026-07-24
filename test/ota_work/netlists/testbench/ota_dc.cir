@@ -1,0 +1,25 @@
+* Five-Transistor OTA — DC Transfer Testbench
+
+VDD_SRC   vdd   0 DC 1.8
+VSS_SRC   vss   0 DC 0
+VBIAS_SRC vbias 0 DC 0.72
+VINP_SRC  inp   0 DC 0.9
+VINN_SRC  inn   0 DC 0.9
+
+.include /mnt/e/MyResearch/Mixed_ngspice/test/ota_work/netlists/dut/five_transistor_ota_dut.cir
+XOTA inp inn out vdd vss vbias five_transistor_ota
+
+RLOAD out vss 1e+09
+CLOAD out vss 1.000000e-12
+
+.include /mnt/e/MyResearch/analog-circuit-skills/five_transistor_ota/assets/models/ptm180.lib
+.options RELTOL=1e-4 ABSTOL=1e-12 VNTOL=1e-7 ITL4=80
+
+.control
+dc VINP_SRC 0.85000000 0.95000000 0.00025000
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/ota_work/logs/ota_dc_vinp.txt v(inp)
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/ota_work/logs/ota_dc_vout.txt v(out)
+.endc
+
+.end
+

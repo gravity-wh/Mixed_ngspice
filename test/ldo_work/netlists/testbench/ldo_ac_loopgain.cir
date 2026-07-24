@@ -1,0 +1,78 @@
+* LDO AC Testbench — Loop Gain (Flat Netlist, Loop Broken at M1 Gate)
+* Technology: PTM 180nm, VIN=2.3V, VREF=0.9V
+*
+* Loop break point: between feedback divider output (net30) and M1 gate (net2).
+* Vtest (AC=1) is in series at the break.
+* Loop gain T = V(net30)/Vtest = V(net30) [since |Vtest|=1]
+*   |T(jω)| dB  → from vdb(net30) [expect large negative at DC because T<0]
+*   Phase margin = 180° + angle(T) at |T|=0dB
+*   Equivalently, plot vdb(net30) and (vp(net30)+180) for conventional display.
+*
+* Gain/phase margin interpretation:
+*   - GBW: frequency where |T|=0dB
+*   - Phase margin: (vp(net30) + 180) evaluated at GBW frequency
+*   - Gain margin: -|T|_dB evaluated where phase(T)+180 = 0
+
+* ── DC Sources ───────────────────────────────────────────────────────────────
+VIN_SRC  vin  0  DC 2.3
+VREF_SRC vref 0  DC 0.9
+VVSS     vss  0  DC 0
+
+* ── BIAS ─────────────────────────────────────────────────────────────────────
+I1  vin ibias  DC 100u
+C1  ibias vss  1
+
+* ── Current mirror ───────────────────────────────────────────────────────────
+M6 ibias ibias vss vss NMOS L=1u W=160.0u m=1
++ ad=4.3200e-11 as=4.3200e-11 pd=1.6432e-04 ps=1.6432e-04 nrd=0.0016875 nrs=0.0016875
+M5 net16 ibias vss vss NMOS L=1u W=160.0u m=10
++ ad=4.3200e-11 as=4.3200e-11 pd=1.6432e-04 ps=1.6432e-04 nrd=0.0016875 nrs=0.0016875
+
+* ── Differential amp ─────────────────────────────────────────────────────────
+* M0: non-inv input (VREF fixed)
+* M1: inv input is net2 (BROKEN from net30 — Vtest inserted in series)
+M0 net3 vref  net16 vss NMOS L=2u W=240.0u m=10
++ ad=6.4800e-11 as=6.4800e-11 pd=2.4432e-04 ps=2.4432e-04 nrd=0.0011250 nrs=0.0011250
+M1 net4 net2  net16 vss NMOS L=2u W=240.0u m=10
++ ad=6.4800e-11 as=6.4800e-11 pd=2.4432e-04 ps=2.4432e-04 nrd=0.0011250 nrs=0.0011250
+
+* ── Active load ──────────────────────────────────────────────────────────────
+M4 net4 net4 vin vin PMOS L=1u W=32.0u m=10
++ ad=8.6400e-12 as=8.6400e-12 pd=3.6320e-05 ps=3.6320e-05 nrd=0.0084375 nrs=0.0084375
+M3 net3 net4 vin vin PMOS L=1u W=32.0u m=10
++ ad=8.6400e-12 as=8.6400e-12 pd=3.6320e-05 ps=3.6320e-05 nrd=0.0084375 nrs=0.0084375
+
+* ── Pass transistor ──────────────────────────────────────────────────────────
+M2 vout net3 vin vin PMOS L=180n W=120.0u m=100
++ ad=3.2400e-11 as=3.2400e-11 pd=1.2432e-04 ps=1.2432e-04 nrd=0.0022500 nrs=0.0022500
+
+* ── Compensation ─────────────────────────────────────────────────────────────
+R2  net3 net34  2000
+C0  net34 vout  1.600000e-10
+
+* ── Feedback divider ─────────────────────────────────────────────────────────
+R0  vout  net30  900
+R1  net30 vss    900
+
+* ── LOOP BREAK: inject Vtest in series at M1 gate ────────────────────────────
+* net2 = M1 gate (sees injected signal + return)
+* net30 = feedback divider output (the return signal)
+* DC=0 maintains identical bias as closed-loop; AC=1 is the injection
+Vtest  net2 net30  DC 0  AC 1
+
+* ── Load ─────────────────────────────────────────────────────────────────────
+R_load  vout vss  18
+C2      vout vss  1.000000e-06
+
+.include /mnt/e/MyResearch/analog-circuit-skills/LDO/assets/models/ptm180.lib
+.options RELTOL=1e-4 ABSTOL=1e-12 VNTOL=1e-7 ITL4=50
+
+* ── AC Analysis ──────────────────────────────────────────────────────────────
+.control
+ac dec 100 1 1e+09
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/logs/ldo_ac_loopgain_freq.txt    frequency
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/logs/ldo_ac_loopgain_mag.txt     vdb(net30)
+wrdata /mnt/e/MyResearch/Mixed_ngspice/test/ldo_work/logs/ldo_ac_loopgain_phase.txt   vp(net30)
+.endc
+
+.end

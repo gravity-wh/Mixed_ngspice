@@ -180,8 +180,8 @@ def generate_report(fp32_path_or_text, fp64_path_or_text, text_mode=False,
         text32, text64 = fp32_path_or_text, fp64_path_or_text
         fp32_label, fp64_label = "FP32", "FP64"
     else:
-        with open(fp32_path_or_text) as f: text32 = f.read()
-        with open(fp64_path_or_text) as f: text64 = f.read()
+        with open(fp32_path_or_text, encoding='utf-8', errors='replace') as f: text32 = f.read()
+        with open(fp64_path_or_text, encoding='utf-8', errors='replace') as f: text64 = f.read()
         fp32_label = os.path.basename(fp32_path_or_text)
         fp64_label = os.path.basename(fp64_path_or_text)
 

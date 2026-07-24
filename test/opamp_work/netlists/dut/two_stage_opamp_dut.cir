@@ -1,0 +1,41 @@
+* Two-Stage CMOS Op Amp DUT
+* PTM 180nm CMOS
+*
+* Ports:
+*   INP   non-inverting input
+*   INN   inverting input
+*   OUT   output
+*   VDD   positive supply
+*   VSS   ground
+
+.subckt two_stage_opamp INP INN OUT VDD VSS
+
+* PMOS bias mirror. M7 is diode-connected and IBIAS sinks current from PBIAS.
+IBIAS_SRC PBIAS VSS DC 1.200000e-04
+M7 PBIAS PBIAS VDD VDD PMOS L=500n W=120.0u m=1
++ ad=3.2400e-11 as=3.2400e-11 pd=1.2432e-04 ps=1.2432e-04 nrd=0.0022500 nrs=0.0022500
+
+* First-stage PMOS current source and PMOS differential pair
+M5 C PBIAS VDD VDD PMOS L=500n W=120.0u m=1
++ ad=3.2400e-11 as=3.2400e-11 pd=1.2432e-04 ps=1.2432e-04 nrd=0.0022500 nrs=0.0022500
+M0 A INN C VDD PMOS L=500n W=160.0u m=1
++ ad=4.3200e-11 as=4.3200e-11 pd=1.6432e-04 ps=1.6432e-04 nrd=0.0016875 nrs=0.0016875
+M1 B INP C VDD PMOS L=500n W=160.0u m=1
++ ad=4.3200e-11 as=4.3200e-11 pd=1.6432e-04 ps=1.6432e-04 nrd=0.0016875 nrs=0.0016875
+
+* NMOS current-mirror load
+M3 A A VSS VSS NMOS L=500n W=60.0u m=1
++ ad=1.6200e-11 as=1.6200e-11 pd=6.4320e-05 ps=6.4320e-05 nrd=0.0045000 nrs=0.0045000
+M4 B A VSS VSS NMOS L=500n W=60.0u m=1
++ ad=1.6200e-11 as=1.6200e-11 pd=6.4320e-05 ps=6.4320e-05 nrd=0.0045000 nrs=0.0045000
+
+* Second gain stage: NMOS common source with PMOS current-source load
+M6 OUT PBIAS VDD VDD PMOS L=500n W=680.0u m=1
++ ad=1.8360e-10 as=1.8360e-10 pd=6.8432e-04 ps=6.8432e-04 nrd=0.0003971 nrs=0.0003971
+M2 OUT B VSS VSS NMOS L=500n W=720.0u m=1
++ ad=1.9440e-10 as=1.9440e-10 pd=7.2432e-04 ps=7.2432e-04 nrd=0.0003750 nrs=0.0003750
+
+* Miller compensation
+CCOMP B OUT 1.200000e-11
+
+.ends two_stage_opamp
