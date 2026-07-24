@@ -1,0 +1,21 @@
+* Single PMOS ID-VSD Characteristic — 45nm LP PTM BSIM4
+* DC sweep of source-drain voltage at multiple gate voltages
+
+.include ../../models/45nm_LP_BSIM4/ptm45lp.lib
+
+M1  D G VDD VDD pmos W=2u L=45n
+VD D 0 1.1
+VG G 0 0
+
+
+Vdd VDD 0 DC 1.8
+Vss VSS 0 DC 0
+.option gmin=1e-12
+.control
+  dc vd 0 1.1 0.01 vg 0 1.1 0.2
+  plot i(vd)
+  let vth0 = @m1[vth]
+  echo "Vth at VSG=1.1V:"
+  print vth0
+.endc
+.end

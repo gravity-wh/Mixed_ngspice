@@ -1,0 +1,17 @@
+.include /mnt/e/MyResearch/Analog_blocks/Analog_Blocks/OTA/Netlists/Design/Miller_OTA/Transitor1.8v/Miller_OTA_NMOS_1.8v.spice
+**.subckt Ideal_opamp Vp Vn Out
+*.ipin Vp
+*.ipin Vn
+*.opin Out
+V1 Vp PLUS_I 0
+V2 Vn MINUS_I 0
+B1 Out 0 V = 'VDD/2*(1+tanh(GAIN*(V(PLUS_I)-V(MINUS_I))))' 
+**.ends
+** flattened .save nodes
+.save I(V1)
+.save I(V2)
+.end
+Vdd VDD 0 DC 1.8
+Vss VSS 0 DC 0
+.op
+.end

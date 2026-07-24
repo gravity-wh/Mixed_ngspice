@@ -1,0 +1,80 @@
+.include /mnt/e/MyResearch/Analog_blocks/Analog_Blocks/OTA/Netlists/Design/Miller_OTA/Transitor1.8v/Miller_OTA_NMOS_1.8v.spice
+* FIXED for ngspice v1.2
+.include /mnt/e/MyResearch/Analog_blocks/models/sky130A/libs.tech/ngspice/sky130.lib.spice
+.include /mnt/e/MyResearch/Analog_blocks/Analog_Blocks/OTA/Netlists/Design/Ideal_opamp/Ideal_opamp.spice
+.option gmin=1e-12
+**.subckt test_Ideal_Opamp
+x1 Vp Vout Vout Ideal_opamp
+**** begin user architecture code
+
+
+.param mc_mm_switch=0
+.param mc_pr_switch=0
+* Mismatch parameters
+* Resistor/Capacitor
+* Special cells
+* All models
+* Corner
+
+
+
+
+
+**************************************
+*DC Analysis
+**************************************
+**.subckt test_bsource PLUS MINUS OUT
+*.ipin PLUS
+*.ipin MINUS
+*.opin OUT
+.param VDD=3.6
+.param GAIN={1000/VDD*2}
+Vpos Vp 0 0
+*Vneg Vn 0 {VDD/2}
+*.control
+*save all
+*dc Vp 0 3 0.001
+*plot Vout
+*write test_bsource.raw
+*.endc
+**************************************
+*Transient analysis
+**************************************
+.control
+alter @Vpos[Sin] [ 1 100m 1Meg ]
+tran 0.05u 5u
+plot Vp Vout
+.endc
+**************************************
+.control
+alter @Vpos[Sin] [ 1 5 1Meg ]
+tran 0.05u 5u
+plot Vp Vout
+.endc
+**************************************
+
+
+**** end user architecture code
+**.ends
+
+* expanding   symbol:
+*+  /home/eslam/mabrains/Analog_blocks/Analog_Blocks/OTA/Schematic/Ideal_opamp/Ideal_opamp.sym # of pins=3
+* sym_path:
+*+ /home/eslam/mabrains/Analog_blocks/Analog_Blocks/OTA/Schematic/Ideal_opamp/Ideal_opamp.sym
+* sch_path:
+*+ /home/eslam/mabrains/Analog_blocks/Analog_Blocks/OTA/Schematic/Ideal_opamp/Ideal_opamp.sch
+.subckt Ideal_opamp  Vp Out Vn
+*.ipin Vp
+*.ipin Vn
+*.opin Out
+V1 Vp PLUS_I 0
+V2 Vn MINUS_I 0
+B1 Out 0 V = 'VDD/2*(1+tanh(GAIN*(V(PLUS_I)-V(MINUS_I))))' 
+.ends
+
+** flattened .save nodes
+.end
+Vdd VDD 0 DC 1.8
+Vss VSS 0 DC 0
+.op
+.end

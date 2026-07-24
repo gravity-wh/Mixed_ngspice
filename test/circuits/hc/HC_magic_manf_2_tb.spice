@@ -1,0 +1,121 @@
+* Auto TB for manf_edge
+.include /mnt/e/MyResearch/Mixed_ngspice/test/models/45nm_LP_BSIM4/ptm45lp.lib
+.option gmin=1e-12
+* NGSPICE file created from manf.ext - technology: gf180mcuC
+
+.subckt manf_edge vreg gp op im x y ip om vdd gnd bp
+X0 gnd lo lo gnd nmos_3p3 w=1.8u l=0.6u
+X1 vdd hih hih vdd pmos_6p0 w=1.8u l=0.6u
+X2 vreg hi hi bp pmos_3p3 w=1.5u l=0.6u
+C0 hi bp 0.28fF
+C1 vreg vdd 0.22fF
+C2 hi vreg 0.11fF
+C3 bp vreg 0.23fF
+C4 vreg gp 1.01fF
+C5 hih vdd 0.45fF
+C6 vreg gnd 0.44fF
+C7 bp gnd 4.35fF
+C8 vdd gnd 4.01fF
+C9 lo gnd 0.84fF
+C10 hi gnd 0.46fF
+C11 hih gnd 0.46fF
+.ends
+
+.subckt manf_cell inl inr out gp vreg op im x y ip om vdd gnd bp
+X0 vreg gp vdd vdd pmos_6p0 w=1.8u l=0.6u
+X1 vreg inr out bp pmos_3p3 w=1.5u l=0.6u
+X2 vdd gp vreg vdd pmos_6p0 w=1.8u l=0.6u
+X3 d2 inr out gnd nmos_3p3 w=1.8u l=0.6u
+X4 d1 inl gnd gnd nmos_3p3 w=1.8u l=0.6u
+X5 out inr vreg bp pmos_3p3 w=1.5u l=0.6u
+X6 vreg gp vdd vdd pmos_6p0 w=1.8u l=0.6u
+X7 vreg inl out bp pmos_3p3 w=1.5u l=0.6u
+X8 gnd inr d2 gnd nmos_3p3 w=1.8u l=0.6u
+X9 out inl d1 gnd nmos_3p3 w=1.8u l=0.6u
+X10 vdd gp vreg vdd pmos_6p0 w=1.8u l=0.6u
+X11 out inl vreg bp pmos_3p3 w=1.5u l=0.6u
+C0 vdd gp 0.66fF
+C1 inl inr 0.60fF
+C2 vreg gp 1.98fF
+C3 inr bp 0.32fF
+C4 inr om 0.18fF
+C5 inr op 0.20fF
+C6 inl out 0.17fF
+C7 bp out 0.15fF
+C8 out om 0.11fF
+C9 inl bp 0.32fF
+C10 inl om 0.18fF
+C11 vreg out 0.78fF
+C12 vreg bp 0.92fF
+C13 vdd vreg 1.41fF
+C14 out op 0.11fF
+C15 inl op 0.20fF
+C16 inr out 0.20fF
+C17 out gnd 1.69fF
+C18 inr gnd 2.35fF
+C19 inl gnd 2.36fF
+C20 vreg gnd 0.72fF
+C21 gp gnd 1.56fF
+C22 bp gnd 6.58fF
+C23 vdd gnd 6.08fF
+C24 d2 gnd 0.18fF
+C25 d1 gnd 0.18fF
+.ends
+
+.subckt manf ip im op om vdd gp bp vreg gnd
+Xmanf_edge_0 vreg gp op im x y ip om vdd gnd bp manf_edge
+Xmanf_edge_1 vreg gp op im x y ip om vdd gnd bp manf_edge
+Xmanf_cell_0 im y op gp vreg op im x y ip om vdd gnd bp manf_cell
+Xmanf_cell_2 om x x gp vreg op im x y ip om vdd gnd bp manf_cell
+Xmanf_cell_1 y ip om gp vreg op im x y ip om vdd gnd bp manf_cell
+Xmanf_cell_3 x op x gp vreg op im x y ip om vdd gnd bp manf_cell
+Xmanf_cell_4 x y y gp vreg op im x y ip om vdd gnd bp manf_cell
+Xmanf_cell_5 ip y om gp vreg op im x y ip om vdd gnd bp manf_cell
+Xmanf_cell_6 y im op gp vreg op im x y ip om vdd gnd bp manf_cell
+Xmanf_cell_9 im y op gp vreg op im x y ip om vdd gnd bp manf_cell
+Xmanf_cell_10 y ip om gp vreg op im x y ip om vdd gnd bp manf_cell
+Xmanf_cell_11 om x x gp vreg op im x y ip om vdd gnd bp manf_cell
+Xmanf_cell_12 x op x gp vreg op im x y ip om vdd gnd bp manf_cell
+Xmanf_cell_13 x y y gp vreg op im x y ip om vdd gnd bp manf_cell
+Xmanf_cell_14 ip y om gp vreg op im x y ip om vdd gnd bp manf_cell
+Xmanf_cell_16 y im op gp vreg op im x y ip om vdd gnd bp manf_cell
+C0 vreg x 0.12fF
+C1 ip om 0.91fF
+C2 y ip 0.97fF
+C3 x om 0.29fF
+C4 op om 0.23fF
+C5 x y 0.17fF
+C6 op y 0.63fF
+C7 op im 0.33fF
+C8 vreg gp -1.04fF
+C9 gp vdd 0.20fF
+C10 x ip 0.21fF
+C11 op ip 0.19fF
+C12 op x 0.95fF
+C13 vreg y 0.11fF
+C14 y om 0.65fF
+C15 om im 0.29fF
+C16 y im 0.20fF
+C17 vreg vdd 0.35fF
+C18 bp gnd 90.32fF
+C19 vdd gnd 79.79fF
+C20 om gnd 26.26fF
+C21 ip gnd 19.49fF
+C22 y gnd 35.73fF
+C23 x gnd 31.14fF
+C24 im gnd 20.25fF
+C25 op gnd 26.36fF
+C26 vreg gnd 3.94fF
+C27 gp gnd 19.62fF
+.ends
+
+
+
+Vdd vdd 0 DC 1.8
+Vss gnd 0 DC 0
+X1 vreg gp op im x y ip om vdd gnd bp manf_edge
+.op
+.control
+op
+.endc
+.end
