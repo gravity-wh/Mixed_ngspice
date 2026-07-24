@@ -105,6 +105,27 @@ patch -p6 -F 5 < "$PATCHDIR/013-multi-t-nan-fix.patch" 2>&1 | tail -1
 echo "  CHECK_NAN: $(grep -c CHECK_NAN $BSIM4/b4v5ld.c)"
 echo "  SPICE_REAL: $(grep -c SPICE_REAL $BSIM4/b4v5ld.c)"
 
+# Step 4c: Vbseff diff-of-squares (b4v5ld.c)
+echo "[4c/6] Vbseff diff-of-squares..."
+python3 << 'PYEOF'
+SRC='/tmp/ngspice_v16/ngspice_fp32/src/spicelib/devices/bsim4v5/b4v5ld.c'
+with open(SRC) as f: c=f.read()
+# Vbseff block 1
+old1='\t  {   double dT0 = (double)Vbs - (double)here->BSIM4v5vbsc - 0.001;\n\t      double dT1 = sqrt(fmax(dT0 * dT0 - 0.004 * (double)here->BSIM4v5vbsc, 0.0));'
+new1='\t  {   float sqrtC = sqrtf(0.004f * here->BSIM4v5vbsc);\n\t      float fT0 = Vbs - here->BSIM4v5vbsc - 0.001f;\n\t      float fT1 = sqrtf(fmaxf((fT0 - sqrtC) * (fT0 + sqrtC), 0.0f));'
+c=c.replace(old1,new1)
+# Fix rest of Vbseff: dT0→fT0, dT1→fT1, dT2→fT2, double→float
+# Fix rest of Vbseff block: dT0→fT0, dT1→fT1, dT2→fT2
+c=c.replace('(double)here->BSIM4v5vbsc','(float)here->BSIM4v5vbsc')
+c=c.replace('(double)Vbs','(float)Vbs')
+c=c.replace('dT0','fT0').replace('dT1','fT1').replace('dT2','fT2')
+c=c.replace('(SPICE_REAL)((float)here','(SPICE_REAL)(here')
+c=c.replace('(SPICE_REAL)(0.5','0.5f')
+c=c.replace('(SPICE_REAL)(dT2','dT2')
+with open(SRC,'w') as f: f.write(c)
+print('  Vbseff diff-of-squares: applied')
+PYEOF
+
 # Step 5: Vbi log-split + Leff/Weff float (b4v5temp.c)
 echo "[5/6] Vbi log-split + Leff/Weff float..."
 python3 << 'PYEOF'
@@ -114,12 +135,18 @@ with open(SRC) as f: c=f.read()
 c=c.replace(
     'pParam->BSIM4v5vbi = Vtm0 * log(pParam->BSIM4v5nsd\n                                   * pParam->BSIM4v5ndep / (ni * ni));',
     'pParam->BSIM4v5vbi = Vtm0 * (logf(pParam->BSIM4v5nsd) + logf(pParam->BSIM4v5ndep) - 2.0f * logf(ni)); /* v1.6 log-split */')
-# Leff/Weff float
+# Leff/Weff float — convert preamble declaration
 c=c.replace('double T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, Lnew=0.0, Wnew;',
             'float T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,Lnew=0.0f,Wnew;')
 c=c.replace('pow(Lnew,','powf(Lnew,').replace('pow(Wnew,','powf(Wnew,')
+# Leff/Weff binning FP64 island — convert the double block
+c=c.replace('                      double dLnew = (double)Lnew;\n                      double dWnew = (double)Wnew;\n                      double dT0, dT1, dT2, dT3, dtmp1, dtmp2;',
+            '                      float fLnew = Lnew;\n                      float fWnew = Wnew;\n                      float fT0,fT1,fT2,fT3,ftmp1,ftmp2;')
+c=c.replace('dLnew','fLnew').replace('dWnew','fWnew').replace('dT0','fT0').replace('dT1','fT1').replace('dT2','fT2').replace('dT3','fT3').replace('dtmp1','ftmp1').replace('dtmp2','ftmp2')
+c=c.replace('pow(fLnew, (double)','powf(fLnew, (float)')
+c=c.replace('pow(fWnew, (double)','powf(fWnew, (float)')
 with open(SRC,'w') as f: f.write(c)
-print('  Vbi + Leff/Weff: OK')
+print('  Vbi + Leff/Weff + binning: OK')
 PYEOF
 
 # Step 6: autoreconf + build
