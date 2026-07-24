@@ -51,15 +51,10 @@ PYEOF
 echo "[3/6] Fixing type declarations..."
 python3 << 'PYEOF'
 SRC='/tmp/ngspice_v16/ngspice_fp32/src'
-# devdefs.h — only function declarations, replace double with SPICE_REAL
-with open(SRC+'/include/ngspice/devdefs.h') as f: lines=f.readlines()
-new=[]
-for l in lines:
-    s=l.strip()
-    if s.startswith(('double ','int ','void ','SPICE_REAL ')):
-        l=l.replace('double','SPICE_REAL')
-    new.append(l)
-with open(SRC+'/include/ngspice/devdefs.h','w') as f: f.writelines(new)
+# devdefs.h — global double→SPICE_REAL replacement
+with open(SRC+'/include/ngspice/devdefs.h') as f: c=f.read()
+c=c.replace('double','SPICE_REAL')
+with open(SRC+'/include/ngspice/devdefs.h','w') as f: f.write(c)
 
 # bsim4v5ext.h
 with open(SRC+'/spicelib/devices/bsim4v5/bsim4v5ext.h') as f: c=f.read()
@@ -70,7 +65,11 @@ with open(SRC+'/spicelib/devices/bsim4v5/bsim4v5ext.h','w') as f: f.write(c)
 with open(SRC+'/spicelib/devices/bsim4v5/b4v5trunc.c') as f: c=f.read()
 c=c.replace('double *timeStep','SPICE_REAL *timeStep')
 with open(SRC+'/spicelib/devices/bsim4v5/b4v5trunc.c','w') as f: f.write(c)
-print('  Headers: OK')
+# limit.c — all double → SPICE_REAL
+with open(SRC+'/spicelib/devices/limit.c') as f: c=f.read()
+c=c.replace('double','SPICE_REAL')
+with open(SRC+'/spicelib/devices/limit.c','w') as f: f.write(c)
+print('  Headers + limit.c: OK')
 PYEOF
 
 # Step 4: Hot-path fixes (b4v5ld.c)
@@ -86,10 +85,10 @@ block='''/* MIXED-PRECISION FP32 math overrides */
 #undef SPICE_LOG
 #undef SPICE_SQRT
 #undef SPICE_POW
-#define SPICE_EXP(x)  expf((float)(x))
-#define SPICE_LOG(x)  logf((float)(x))
-#define SPICE_SQRT(x) sqrtf((float)(x))
-#define SPICE_POW(x,y) powf((float)(x),(float)(y))
+#define SPICE_EXP(x)  exp((double)(x))
+#define SPICE_LOG(x)  log((double)(x))
+#define SPICE_SQRT(x) sqrt((double)(x))
+#define SPICE_POW(x,y) pow((double)(x),(double)(y))
 #endif
 #define CHECK_NAN(v) do{if(isnan((float)(v))){(v)=0.0f;}}while(0)
 '''
@@ -97,6 +96,14 @@ c=c.replace('#include "bsim4v5def.h"\n','#include "bsim4v5def.h"\n'+block)
 with open(SRC,'w') as f: f.write(c)
 print('  Math block + CHECK_NAN: OK')
 PYEOF
+
+# Step 4b: Apply patches 003+012+013 with fuzz factor
+echo "[4b/6] Applying patches 003+012+013 with fuzz..."
+patch -p6 -F 10 < "$PATCHDIR/003-b4v5ld-hotpath-fp32.patch" 2>&1 | tail -1
+patch -p6 -F 5 < "$PATCHDIR/012-b4v5temp-vbi-overflow-fix.patch" 2>&1 | tail -1
+patch -p6 -F 5 < "$PATCHDIR/013-multi-t-nan-fix.patch" 2>&1 | tail -1
+echo "  CHECK_NAN: $(grep -c CHECK_NAN $BSIM4/b4v5ld.c)"
+echo "  SPICE_REAL: $(grep -c SPICE_REAL $BSIM4/b4v5ld.c)"
 
 # Step 5: Vbi log-split + Leff/Weff float (b4v5temp.c)
 echo "[5/6] Vbi log-split + Leff/Weff float..."
