@@ -337,6 +337,40 @@ Phase 5: 验证与发布（3 天）
 
 ---
 
+### 2.4 额外发现：已有的重复代码是转换的加速器
+
+深度代码审计发现，ngspice 器件模型中有大量**无意的代码重复**，但这对 FP32 转换反而是好事：
+
+**DEXP 安全指数宏** — 在 25+ 个文件中独立定义，代码完全相同:
+```
+b4ld.c, b3soipdld.c, b3soifdld.c, b3soiddld.c, b3ld.c, 
+b3v0ld.c, b3v1ld.c, b3v32ld.c, b3soipdtemp.c, ...
+全部使用: EXP_THRESHOLD=34.0, MAX_EXP=5.834617425e14, MIN_EXP=1.713908431e-15
+```
+
+**FLOG 安全对数宏** — 也在多个文件中独立定义:
+```
+#define FLOG(A)  fabs(A) + 1e-14   // b3soipdld.c:60, b4soild.c:64 完全一致
+```
+
+**这意味着**: 只需在一个共享头文件中替换 DEXP/FLOG 为 FP32 安全版本，25+ 文件自动受益。不是 25 次修改，是 1 次。
+
+### 2.5 收敛辅助代码位置（补充审计）
+
+| 函数 | 文件 | 行数 | FP32 影响 |
+|------|------|:--:|------|
+| `DEVlimvds` | devsup.c | 20 | VDS 限幅 — 容差需调整 |
+| `DEVpnjlim` | devsup.c | 34 | PN 结限幅 — 指数密集型 |
+| `DEVfetlim` | devsup.c | 58 | FET 栅压限幅 |
+| `DEVlimitlog` | devsup.c | 27 | 热反馈限幅 — `log10` |
+| `NIintegrate` | ninteg.c | — | 电容伴随模型 — 乘以 2/dt |
+| `cktterr` | cktterr.c | — | LTE 截断误差 — `exp/log` |
+| `*check.c` | 各器件 | 100-200 | 器件内部收敛检查 |
+
+这些函数的 `<1e-12` 容差和 `exp/log` 操作在 FP32 下需要适配。
+
+---
+
 ## 三、风险评估
 
 ### 3.1 数值风险矩阵
