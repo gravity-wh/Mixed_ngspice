@@ -36,3 +36,4 @@ test/models_private_tsmc/
 # OS
 .DS_Store
 Thumbs.db
+build_fp32/
