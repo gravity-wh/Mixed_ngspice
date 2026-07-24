@@ -121,7 +121,7 @@ These were discovered during a line-by-line audit of float_spice.c against the r
 | `.ic` / `.nodeset` | ❌ | TRAN startup |
 | `.lib 'file' section` | ❌ | SKY130 PDK circuits |
 | Current sources (`Ixxx`) | ❌ | OTA bias circuits |
-| PULSE/SIN/PWL Vsrc waveforms | ❌ | All TRAN circuits |
+| PULSE/SIN/PWL Vsrc waveforms | ✅ Parsing + evaluator (agent4) | All TRAN circuits |
 | Controlled sources (E/F/G/H) | ❌ | Behavioral models |
 | Spectre syntax (`simulator lang=spectre`) | ❌ | MG dataset (24 circuits) |
 | Nested DC sweep | ❌ | MOSFET family curves |
@@ -139,9 +139,9 @@ These were discovered during a line-by-line audit of float_spice.c against the r
 |---------|:------|
 | Gmin stepping (1e-2 → 1e-12) | ✅ 3-stage (1e-9/1e-10/1e-12) |
 | Source stepping (ramp from 0) | ✅ 4-stage (1e-3→1e-2→1e-1→1.0) agent4 |
-| Solution limiting (per-node) | ❌ ±1.0V hard clamp |
-| Cmin stepping (diagonal damping) | ❌ |
-| Pseudo-transient fallback | ❌ |
+| Solution limiting (per-node) | ✅ Adaptive [0.01..5.0]V agent4 |
+| Cmin stepping (diagonal damping) | ✅ 3-stage (1e-6/1e-9/0) agent4 |
+| Pseudo-transient fallback | ✅ Cmin=1e-3 last-resort inject agent4 |
 | RELTOL/ABSTOL/VNTOL convergence | ❌ ABSTOL only |
 | Pivot tolerance (>1e-30) | ❌ |
 | .option parsing for all above | ❌ |
@@ -168,11 +168,11 @@ These were discovered during a line-by-line audit of float_spice.c against the r
 | # | Task | Est. |
 |---|------|:--:|
 | P1.1 | ✅ Expand BSIM4Param from 16→51 fields (agent5 @ 2026-07-24) | 2h |
-| P1.2 | 🔄 Implement full Vth: dvt0/1/2, dsub, k3, w0, nlx (agent3 @ 2026-07-24) | 2h |
+| P1.2 | ✅ Full Vth: SCE(dvt0/1)+DIBL(dsub)+NW(k3,w0)+LPE(nlx) (agent3 @ 2026-07-24) | 2h |
 | P1.3 | ✅ Implement Rds: rdsw/prwg — source/drain resistance (agent1 @ 2026-07-24) | 1.5h |
-| P1.4 | 🔄 Implement full Early voltage stack: VACLM+VADIBL+VADITS+VASCBE (agent5 @ 2026-07-24) | 3h |
-| P1.5 | Implement mobMod=0/1/2 + Coulomb scattering | 2h |
-| P1.6 | Implement proper subthreshold (mstar, voffcv, minv) | 2h |
+| P1.4 | ✅ Implement 5-part Early voltage stack: Vasat+VACLM+VADIBL+VADITS+VASCBE (agent5 @ 2026-07-24) | 3h |
+| P1.5 | ✅ mobMod=0/1/2 + EU exponent (agent1 @ 2026-07-24) | 2h |
+| P1.6 | ✅ Subthreshold: voffcv + cdsc/d/b n_eff + dual-branch Vgsteff (agent3 @ 2026-07-24) | 2h |
 | **P1 Subtot** | | **~12.5h** |
 
 ### Phase 2: Solver Robustness
@@ -180,8 +180,8 @@ These were discovered during a line-by-line audit of float_spice.c against the r
 | # | Task | Est. |
 |---|------|:--:|
 | P2.1 | ✅ Source stepping (4 ramp stages) (agent4 @ 2026-07-24) | 2h |
-| P2.2 | 🔄 Adaptive voltage limiting (agent4 @ 2026-07-24) | 1.5h |
-| P2.3 | Cmin stepping + pseudo-transient fallback | 3h |
+| P2.2 | ✅ Adaptive voltage limiting (agent4 @ 2026-07-24) | 1.5h |
+| P2.3 | ✅ Cmin stepping + pseudo-transient fallback (agent4 @ 2026-07-24) | 3h |
 | P2.4 | ✅ Floating Vsrc MNA branch variables (B8 fix, agent2 @ 2026-07-24) | 2h |
 | P2.5 | ✅ Current source support (agent2 @ 2026-07-24) | 1h |
 | **P2 Subtot** | | **~9.5h** |
@@ -190,19 +190,19 @@ These were discovered during a line-by-line audit of float_spice.c against the r
 
 | # | Task | Est. |
 |---|------|:--:|
-| P3.1 | .control block interpreter (op/dc/tran/print) | 2h |
-| P3.2 | .option + .param + .temp parsing | 2h |
-| P3.3 | .subckt framework + X instantiation | 4h |
-| P3.4 | Vsrc waveforms (SIN/PULSE/PWL) | 2h |
-| P3.5 | Nested DC sweep + engineering suffixes in R/C | 2h |
-| P3.6 | Resistor/Capacitor values via parse_eng | 1h |
+| P3.1 | ✅ .control block: op/dc/tran + print v()/i() (agent3 @ 2026-07-24) | 2h |
+| P3.2 | ✅ .option + .param + .temp parsing (agent1 @ 2026-07-24) | 2h |
+| P3.3 | ✅ .subckt framework + X instantiation (agent1 @ 2026-07-24) | 4h |
+| P3.4 | ✅ Vsrc waveforms (SIN/PULSE/PWL) (agent4 @ 2026-07-24) | 2h |
+| P3.5 | ✅ Nested DC sweep (agent2 @ 2026-07-24) | 2h |
+| P3.6 | ✅ R/C/V/I values via parse_eng (agent2 @ 2026-07-24) | 1h |
 | **P3 Subtot** | | **~13h** |
 
 ### Phase 4: TRAN + Verification + Docs
 
 | # | Task | Est. |
 |---|------|:--:|
-| P4.1 | Trapezoidal integration + capacitor companion | 2h |
+| P4.1 | ✅ Trapezoidal integration + capacitor companion model (agent5 @ 2026-07-24) | 2h |
 | P4.2 | BSIM4 Cgs/Cgd/Cgb for TRAN | 2h |
 | P4.3 | Output format ngspice-compatible (compare_fp.py) | 2h |
 | P4.4 | Batch test script (mx/ circuits) | 1.5h |
