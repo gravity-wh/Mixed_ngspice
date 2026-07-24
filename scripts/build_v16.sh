@@ -1,7 +1,6 @@
 #!/bin/bash
 # build_v16.sh — Complete FP32 ngspice build from pristine source
 # All 6 FP64 islands converted to pure FP32 via numerical methods
-set -e
 PROJ=/mnt/e/MyResearch/Mixed_ngspice
 cd $PROJ
 
@@ -154,7 +153,7 @@ echo "[6/6] autoreconf + configure + make..."
 cd $SRC
 autoreconf -fi 2>&1 | tail -1
 mkdir -p build && cd build
-../configure --enable-single-precision --disable-klu --disable-xspice --disable-osdi --disable-cider CFLAGS='-O2 -fopenmp -Wno-conversion' 2>&1 | grep 'Single precision'
+../configure --enable-single-precision --disable-klu --disable-xspice --disable-osdi --disable-cider CFLAGS='-O2 -g -fopenmp -Wno-conversion' 2>&1 | grep 'Single precision'
 make -j20 2>&1 | tail -3
 
 echo ""
