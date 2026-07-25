@@ -1,5 +1,5 @@
---- /dev/fd/63	2026-07-17 02:20:58.227803110 +0800
-+++ /mnt/e/MyResearch/Ngspice/ngspice-46_mixed/src/spicelib/devices/bsim4v5/b4v5ld.c	2026-07-17 02:15:17.780517100 +0800
+--- a/src/spicelib/devices/bsim4v5/b4v5ld.c
++++ b/src/spicelib/devices/bsim4v5/b4v5ld.c
 @@ -55,7 +55,52 @@
  void BSIM4v5LoadRhsMat(GENmodel *inModel, CKTcircuit *ckt);
  #endif

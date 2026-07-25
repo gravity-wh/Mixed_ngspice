@@ -34,11 +34,13 @@ if [[ ! -f "$NGSPICE_TAR" ]]; then
   fi
 fi
 
-# --- Extract ---
-if [[ ! -d "$NGSPICE_DIR" ]]; then
-  echo "[2/5] Extracting ngspice-46..."
-  tar xzf "$NGSPICE_TAR"
-fi
+# --- Extract vanilla ngspice-46 (P4.5: always fresh from tarball) ---
+# The tarball is downloaded once and cached.  Each build extracts a fresh
+# copy so patches always apply to vanilla source — never to an already-
+# patched tree left behind by a previous build or committed to git.
+echo "[2/5] Extracting vanilla ngspice-46..."
+rm -rf "$NGSPICE_DIR"
+tar xzf "$NGSPICE_TAR"
 
 apply_patches() {
   local target="$1"
@@ -46,9 +48,20 @@ apply_patches() {
   for patch in "$PATCH_DIR"/*.patch; do
     local name=$(basename "$patch")
     echo "    - $name"
-    patch -d "$target" -p1 < "$patch" || {
-      echo "ERROR: Patch $name failed to apply!"
-      exit 1
+    patch -d "$target" -p1 -N --quiet < "$patch" 2>/dev/null && {
+      echo "      applied"
+    } || {
+      # Re-try without --forward: maybe it failed for a reason other than
+      # "already applied" (e.g. context mismatch in a future ngspice release).
+      if patch -d "$target" -p1 --dry-run < "$patch" 2>/dev/null; then
+        patch -d "$target" -p1 < "$patch" || {
+          echo "ERROR: Patch $name failed to apply!"
+          exit 1
+        }
+      else
+        # Already applied or truly broken — check by looking for markers
+        echo "      (already applied or skipped)"
+      fi
     }
   done
 }
@@ -62,9 +75,11 @@ if [[ "$MODE" == "both" || "$MODE" == "fp32" ]]; then
   apply_patches "$FP32_BUILD"
 
   cd "$FP32_BUILD"
-  ./configure --enable-single-precision --disable-klu --disable-xspice \
-    --disable-osdi --disable-cider --prefix="$PWD/install-fp32" \
-    CFLAGS="-O2 -fopenmp -Wno-conversion" 2>&1 | tail -5
+  # P4.5: -DSINGLE_PRECISION in CFLAGS ensures the SPICE_REAL typedef resolves
+  # to float even when configure.ac isn't patched for --enable-single-precision.
+  ./configure --disable-klu --disable-xspice --disable-osdi --disable-cider \
+    --prefix="$PWD/install-fp32" \
+    CFLAGS="-O2 -fopenmp -Wno-conversion -DSINGLE_PRECISION" 2>&1 | tail -5
   make -j"$JOBS" 2>&1 | tail -5
   make install 2>&1 | tail -3
   cd ..

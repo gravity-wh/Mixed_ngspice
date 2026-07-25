@@ -1,31 +1,4 @@
-From: Mixed_ngspice
-Subject: Add FP32 voltage clamping to prevent NaN in fast transients
-
-BSIM4v5 computations can produce Inf/NaN during fast transients when
-Vds/Vgs/Vbs swing to extreme values (beyond supply rails) due to
-capacitive coupling or UIC startup.
-
-This patch adds a pre-computation clamping layer: before any BSIM4
-equation is evaluated, terminal voltages are clamped to physically
-reasonable bounds (1.5×VDD for Vds/Vgs/Vbs, ±VDD for body diodes).
-
-This is NOT a precision fix — it's a robustness fix that prevents
-the FP32 computation path from entering numerically dangerous regions.
-Normal operation is unaffected since clamping thresholds exceed all
-normal bias conditions.
-
-Layer 1 of the three-layer FP32 defense system. Applies to all builds
-(FP64, Mixed FP32, Pure FP32) since double can also overflow in
-extreme corner cases.
-
-Files modified:
-  src/spicelib/devices/bsim4v5/b4v5ld.c — add CLAMP_VOLT macro + clamping call
----
- src/spicelib/devices/bsim4v5/b4v5ld.c | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
-
 diff --git a/src/spicelib/devices/bsim4v5/b4v5ld.c b/src/spicelib/devices/bsim4v5/b4v5ld.c
-index a1b2c3d..e4f5g6h 100644
 --- a/src/spicelib/devices/bsim4v5/b4v5ld.c
 +++ b/src/spicelib/devices/bsim4v5/b4v5ld.c
 @@ -101,6 +101,29 @@

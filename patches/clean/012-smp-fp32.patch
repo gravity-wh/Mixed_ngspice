@@ -1,0 +1,56 @@
+--- a/src/include/ngspice/smpdefs.h
++++ b/src/include/ngspice/smpdefs.h
+@@ -39,9 +39,17 @@
+ } SMPmatrix ;
+
+
++#ifdef SINGLE_PRECISION
++typedef SPICE_REAL * SMPdblPtr;
++#define SMP_REAL SPICE_REAL
++#else
++typedef double * SMPdblPtr;
++#define SMP_REAL double
++#endif
++
+ #ifdef KLU
+-void spDeterminant_KLU (SMPmatrix *, int *, double *, double *) ;
+-void SMPconvertCOOtoCSC (SMPmatrix *) ;
++void spDeterminant_KLU (SMPmatrix *, int *, SMP_REAL *, SMP_REAL *) ;
++void SMPconvertCOOtoCSC (SMPmatrix *);
+
+ #ifdef CIDER
+ void SMPcSolveForCIDER (SMPmatrix *, double [], double [], double [], double []) ;
+@@ -58,9 +66,9 @@
+ #endif
+
+ #else
+-int SMPaddElt (SMPmatrix *, int, int, double) ;
++int SMPaddElt (SMPmatrix *, int, int, SMP_REAL);
+ #endif
+-double * SMPmakeElt( SMPmatrix * , int , int );
++SMPdblPtr SMPmakeElt( SMPmatrix * , int , int );
+ void SMPcClear( SMPmatrix *);
+ void SMPclear( SMPmatrix *);
+ int SMPcLUfac( SMPmatrix *, double );
+@@ -69,10 +77,10 @@
+ int SMPreorder( SMPmatrix * , double , double , double );
+ void SMPcaSolve(SMPmatrix *Matrix, double RHS[], double iRHS[],
+ 		double Spare[], double iSpare[]);
+-void SMPcSolve( SMPmatrix *, double [], double [], double [], double []);
+-void SMPsolve( SMPmatrix *, double [], double []);
++void SMPcSolve( SMPmatrix *, SMP_REAL [], SMP_REAL [], SMP_REAL [], SMP_REAL []);
++void SMPsolve( SMPmatrix *, SMP_REAL [], SMP_REAL []);
+ int SMPmatSize( SMPmatrix *);
+ int SMPnewMatrix( SMPmatrix *, int );
+ void SMPdestroy( SMPmatrix *);
+@@ -83,8 +91,8 @@
+ int SMPcProdDiag( SMPmatrix *, SPcomplex *, int *);
+ int SMPcDProd(SMPmatrix *Matrix, SPcomplex *pMantissa, int *pExponent);
+ SMPelement * SMPfindElt( SMPmatrix *, int , int , int );
+-int SMPcZeroCol(SMPmatrix *Matrix, int Col);
+-int SMPcAddCol(SMPmatrix *Matrix, int Accum_Col, int Addend_Col);
++int SMPcZeroCol(SMPmatrix *, int);
++int SMPcAddCol(SMPmatrix *, int, int);
+ int SMPzeroRow(SMPmatrix *Matrix, int Row);
+ void SMPconstMult(SMPmatrix *, double);
+ void SMPmultiply(SMPmatrix *, double *, double *, double *, double *);

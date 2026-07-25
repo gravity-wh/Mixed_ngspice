@@ -1,5 +1,5 @@
---- /dev/fd/63	2026-07-16 23:07:47.661571429 +0800
-+++ /mnt/e/MyResearch/Ngspice/ngspice-46_fp32/src/spicelib/devices/bsim4v5/b4v5geo.c	2026-07-14 13:09:05.620114600 +0800
+--- a/src/spicelib/devices/bsim4v5/b4v5geo.c
++++ b/src/spicelib/devices/bsim4v5/b4v5geo.c
 @@ -11,6 +11,11 @@
  #include "ngspice/ngspice.h"
  #include "bsim4v5def.h"
