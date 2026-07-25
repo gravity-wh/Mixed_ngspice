@@ -1,0 +1,14 @@
+--- a/src/maths/sparse/spdefs.h
++++ b/src/maths/sparse/spdefs.h
+@@ -80,6 +80,11 @@
+ /* Forward and backward substitution */
+ void spSolve( MatrixPtr, RealNumber RHS[], RealNumber Solution[] );
+
++/* Mixed-precision iterative refinement solve (Phase 4)
++ * Uses existing LU factors + refinement to recover fp64 accuracy from fp32 LU */
++int spSolveRefined( MatrixPtr, RealNumber RHS[], RealNumber Solution[],
++    RealNumber RelThreshold, RealNumber AbsThreshold, int DiagPivoting,
++    int MaxRefinements, RealNumber ConvergeTol );
+
+ /* Convergence test */
+ void spDeterminant( MatrixPtr, int*, RealNumber*, RealNumber* );

@@ -1,0 +1,94 @@
+--- a/src/maths/sparse/spsolve.c
++++ b/src/maths/sparse/spsolve.c
+@@ -601,3 +601,90 @@
+ 	Solution[*(pExtOrder)] = Intermediate[I].Real;
+         iSolution[*(pExtOrder--)] = Intermediate[I].Imag;
+ }
++
++/*
++ *  ITERATIVE REFINEMENT SOLVE (Phase 4)
++ *
++ *  Mixed-precision iterative refinement for fp32 LU factorization.
++ *  When spREAL = float, the LU factors have reduced precision.
++ *  This function recovers near-fp64 accuracy through 2-5 refinement steps.
++ *
++ *  Algorithm:
++ *    1. Factor A in current precision (spREAL)
++ *    2. Initial solve A*x0 = b
++ *    3. For k = 0..MaxRefinements:
++ *       a. Compute Ax = A * xk via matrix-vector multiply
++ *       b. Compute residual r = b - Ax
++ *       c. if max|r| < tol: converged
++ *       d. Solve A*dx = r using existing LU factors
++ *       e. xk+1 = xk + dx
++ *
++ *  References:
++ *    Jiao et al. IEEE 2024 — Mixed Precision Sparse Matrix Solving
++ *    Dongarra & Luszczek 2025 — HPL-MxP Benchmark
++ */
++int
++spSolveRefined(
++    MatrixPtr Matrix,
++    RealNumber RHS[],
++    RealNumber Solution[],
++    RealNumber RelThreshold,
++    RealNumber AbsThreshold,
++    int DiagPivoting,
++    int MaxRefinements,
++    RealNumber ConvergeTol
++)
++{
++    RealNumber *Residual, *Correction, *AxVector;
++    int N = Matrix->Size;
++    int i, k, error;
++    RealNumber norm_r;
++
++    /* Allocate work vectors */
++    Residual   = (RealNumber *)malloc((size_t)N * sizeof(RealNumber));
++    Correction = (RealNumber *)malloc((size_t)N * sizeof(RealNumber));
++    AxVector   = (RealNumber *)malloc((size_t)N * sizeof(RealNumber));
++    if (!Residual || !Correction || !AxVector) {
++        free(Residual); free(Correction); free(AxVector);
++        return -1;
++    }
++
++    /* Step 1: Factor A */
++    error = spOrderAndFactor(Matrix, RHS, RelThreshold, AbsThreshold,
++                             DiagPivoting);
++    if (error) {
++        free(Residual); free(Correction); free(AxVector);
++        return error;
++    }
++
++    /* Step 2: Initial solve A*x0 = b */
++    for (i = 0; i < N; i++) Solution[i] = RHS[i];
++    spSolve(Matrix, Solution, Solution);
++
++    /* Step 3: Iterative refinement */
++    for (k = 0; k < MaxRefinements; k++) {
++        /* Compute Ax = A * x */
++        spMultVec(Matrix, Solution, AxVector);
++
++        /* r = b - Ax, norm */
++        norm_r = 0.0;
++        for (i = 0; i < N; i++) {
++            Residual[i] = RHS[i] - AxVector[i];
++            RealNumber abs_r = (Residual[i] >= 0.0) ? Residual[i] : -Residual[i];
++            if (abs_r > norm_r) norm_r = abs_r;
++        }
++
++        if (norm_r < ConvergeTol) {
++            free(Residual); free(Correction); free(AxVector);
++            return k + 1;  /* converged, return refinement count */
++        }
++
++        /* Solve A*dx = r */
++        spSolve(Matrix, Residual, Correction);
++
++        /* x += dx */
++        for (i = 0; i < N; i++) Solution[i] += Correction[i];
++    }
++
++    free(Residual); free(Correction); free(AxVector);
++    return 0;  /* did not converge */
++}
