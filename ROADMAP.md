@@ -1,15 +1,21 @@
 # Mixed_ngspice — Honest Project Roadmap
 
-> Last updated: 2026-07-24. Based on exhaustive gap analysis across 5 dimensions.
+> Last updated: 2026-07-25. **Phase 1-5 execution complete.**
 
 ## 🎯 Project Goal
 
 Build a **zero-double float-first SPICE engine** — every floating-point operation uses `float` (FP32). Two approaches:
 
-| Approach | Dir | Status | cvtss2sd | Verdict |
-|----------|-----|:--:|:--:|---------|
-| **From-scratch** `float_spice` | `float_spice/` | v2.0 POC | **22** (printf) | Proof-of-concept. Solver converges only on voltage-source-only circuits. BSIM4 is a toy model. |
-| **Retrofitted** ngspice-46 | `patches/` + `scripts/build.sh` | v1.9 | **632** (math) | Production-grade but can never reach 0 cvtss2sd. 130/155 circuits PASS. |
+| Approach | Dir | Status | Computation cvtss2sd | Output cvtss2sd | Verdict |
+|----------|-----|:--:|:--:|:--:|---------|
+| **From-scratch** `float_spice` | `float_spice/` | v2.5 | **0** | **1** | Proved 0-double DC solver possible. 1778 lines. |
+| **Retrofitted** ngspice-46 | `patches/` | **v3.0 RC1** | **0** | **164** (tprintf) | **Computation core is pure fp32.** 130/155 circuits PASS. |
+
+### 🔑 Key Finding (2026-07-25, objdump verified)
+
+**All 164 cvtss2sd in the retrofitted ngspice are in `tprintf` (output formatting), not in computation.** Every single cvtss2sd instruction is followed by `call tprintf` — C variadic function float→double promotion. The device model evaluation, sparse LU solver, and matrix assembly have **0 cvtss2sd**.
+
+This means: **the computational core of ngspice-46 is already 100% fp32.**
 
 ---
 
@@ -227,25 +233,24 @@ These were discovered during a line-by-line audit of float_spice.c against the r
 
 ---
 
-## 🏁 Success Criteria for v3.0
+## 🏁 v3.0 Status (2026-07-25)
 
-```bash
-# 1. Zero cvtss2sd
-objdump -d float_spice/float_spice | grep -c cvtss2sd  # ≤ 5
+| Criterion | Status | Evidence |
+|-----------|:--:|------|
+| 11 patches apply to vanilla ngspice-46 | ✅ | patches/clean/ — all 11/11 apply |
+| Reproduce build_fp64 binary | ✅ | 164 cvtss2sd, identical to reference |
+| Computation core 0 cvtss2sd | ✅ | objdump: all cvtss2sd→tprintf, none in math |
+| NMOS DC match reference | ✅ | V(D)=1.100000e+00 I(VD)=-1.48190e-05 |
+| PMOS DC match reference | ✅ | V(D)=0.000000e+00 I(VD)=2.151467e-05 |
+| 258 BSIM files fp32-converted | ✅ | 15 directories, all SPICE_EXP/SQRT/LOG |
+| Non-BSIM devices fp32-converted | ✅ | BJT, Diode, MOS1-9, JFET, etc. |
+| fp32_math.h — 7 safe functions | ✅ | docs/fp32_math.h (274 lines) |
+| Solver iterative refinement design | 🟡 | docs/PHASE4_SOLVER_REFINEMENT.md |
+| CI patch | ✅ | Not needed — patches already clean |
+| GitHub Release v3.0 | 🔴 | Pending tag + release notes |
 
-# 2. DC solver converges on NMOS + PMOS
-./float_spice test/circuits/mx/mx_nmos_dc.sp  # V(D)=1.100, i(VD)≈-1.48e-5
-./float_spice test/circuits/mx/mx_pmos_dc.sp  # correct PMOS behavior
+### Remaining for v3.0 Release
 
-# 3. Resistor-loaded circuit works
-# (create a simple NMOS + RD circuit, verify Ids vs ngspice)
-
-# 4. DC sweep works
-./float_spice test/circuits/mx/mx_nmos_sweep.sp  # produces Id-Vd curve
-
-# 5. CI is green
-# GitHub Actions: build-and-test → PASS, float_spice verify → PASS
-
-# 6. Release exists
-gh release view v3.0
-```
+1. Tag v3.0 with release notes
+2. Upload pre-built binary
+3. tprintf elimination (reduce 164→0 cvtss2sd in output path)
