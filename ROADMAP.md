@@ -251,9 +251,27 @@ These were discovered during a line-by-line audit of float_spice.c against the r
 
 ### Remaining for v3.0 Release
 
-1. Tag v3.0 with release notes
+1. ~~Tag v3.0 with release notes~~ ✅ v3.0-rc1 tagged
 2. Upload pre-built binary
 3. tprintf elimination (reduce 164→0 cvtss2sd in output path)
+
+### What Was Actually Achieved
+
+| Claim | Evidence |
+|-------|---------|
+| 13 patches apply to vanilla ngspice-46 | ✅ All 11/11 + 2 new infra patches |
+| Device model transcendental math → fp32 | ✅ 266 cvtsd2ss/cvtss2sd per BSIM eval file (was 0) |
+| DC accuracy preserved | ✅ NMOS V(D)=1.1V I(VD)=-1.48e-05, PMOS V(D)=0V |
+| spSolveRefined() in solver | ✅ Compiled into Sparse 1.3 |
+| SINGLE_PRECISION build | 🟡 30→2 errors, auto-fix script provided |
+| Full SPICE_REAL=float computation | ❌ Requires ~100 function signature changes |
+
+### What Remains for True "Zero Double"
+
+The `expf((float)x)` macros convert transcendental functions to fp32 (~5% of computation).
+Full fp32 (SPICE_REAL=float) requires systematic `double`→`SPICE_REAL` changes across:
+- 100+ device model function signatures (noise, trunc, eval, disto)
+- tprintf elimination (164 cvtss2sd → integer-based formatting)
 
 ## 🎉 v3.0 RC1 Release Notes
 
