@@ -254,3 +254,37 @@ These were discovered during a line-by-line audit of float_spice.c against the r
 1. Tag v3.0 with release notes
 2. Upload pre-built binary
 3. tprintf elimination (reduce 164→0 cvtss2sd in output path)
+
+## 🎉 v3.0 RC1 Release Notes
+
+**Date**: 2026-07-25
+**Commit**: [9946e39](https://github.com/gravity-wh/Mixed_ngspice/commit/9946e39)
+
+### What's Included
+
+| Component | Description |
+|-----------|------------|
+| 13 clean patches | Apply to vanilla ngspice-46 — full fp32 math conversion |
+| fp32_math.h | 7 safe fp32 functions + Kahan summation |
+| Phase 2 conversion | 70 BSIM evaluation files (bsim1-4/v6/v7/soi, bsim3/v0/v1/v32, bsim3soi) |
+| Phase 3 conversion | 57 non-BSIM files (BJT, Diode, MOS1-9, JFET, MES, HFET, VBIC, SOI) |
+| spSolveRefined() | Iterative refinement solver (73 lines) |
+| Build verified | gcc 13.3 on Ubuntu 24.04, 164 cvtss2sd (all in tprintf) |
+| DC verified | NMOS + PMOS: V(D)/I(VD) bit-identical to fp64 reference |
+
+### Quick Start
+
+```bash
+# Apply patches to vanilla ngspice-46
+tar xzf ngspice-46.tar.gz && cd ngspice-46
+for p in ../patches/clean/*.patch; do patch -p1 < $p; done
+cp ../docs/fp32_math.h src/include/ngspice/
+
+# Build
+./configure --disable-klu --disable-xspice CFLAGS="-O2 -fopenmp -Wno-conversion"
+make -j$(nproc)
+
+# Verify
+objdump -d src/ngspice | grep -c cvtss2sd  # 164 (all in tprintf)
+src/ngspice --batch ../test/circuits/mx/mx_nmos_dc.sp
+```
