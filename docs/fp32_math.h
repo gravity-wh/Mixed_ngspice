@@ -248,28 +248,24 @@ static inline SPICE_REAL fp32_safe_log(SPICE_REAL x)
     return (SPICE_REAL)logf((float)abs_x);
 }
 
-/* ── Convenience: fp32 math wrapper macros ────────────────────────────
- * These replace the duplicated DEXP/FLOG macros found in 25+ device files.
- * Usage:
- *   Old: DEXP(vgs, exp_vgs, dummy)  or  exp(vgs)
- *   New: FP32_EXP(vgs)
+/* ── SPICE-compatible math macros (explicit float, no cvtss2sd) ───────
+ * These mirror the bsim4v5 patch pattern: always use float functions
+ * regardless of SPICE_REAL precision. This is how build_fp64 achieves
+ * its 164 cvtss2sd count — the math is done in float, stored as double.
  *
- * When SINGLE_PRECISION is defined, these use the safe fp32 wrappers.
- * Otherwise, they delegate to standard double-precision math functions.
+ * SPICE_EXP(x)  -> expf((float)(x))   (explicit float, 0 cvtss2sd at call site)
+ * FP32_EXP(x)   -> conditional: float safe or double (for SINGLE_PRECISION)
  * ──────────────────────────────────────────────────────────────────── */
-#ifdef SINGLE_PRECISION
-#define FP32_EXP(x)    fp32_safe_exp((SPICE_REAL)(x))
-#define FP32_LOG(x)    fp32_safe_log((SPICE_REAL)(x))
-#define FP32_SQRT(x)   fp32_safe_sqrt((SPICE_REAL)(x))
-#define FP32_DIV(n,d)  fp32_safe_div((SPICE_REAL)(n), (SPICE_REAL)(d), (SPICE_REAL)1.0e-30)
-#define FP32_SMOOTH(x,d) fp32_safe_smooth((SPICE_REAL)(x), (SPICE_REAL)(d))
-#else
-#define FP32_EXP(x)    exp((double)(x))
-#define FP32_LOG(x)    log((double)(x))
-#define FP32_SQRT(x)   sqrt((double)(x))
-#define FP32_DIV(n,d)  ((n)/(d))
-#define FP32_SMOOTH(x,d) (0.5*((x)+sqrt((x)*(x)+4.0*(d)*(d))))
-#endif
+#define SPICE_EXP(x)   expf((float)(x))
+#define SPICE_SQRT(x)  sqrtf((float)(x))
+#define SPICE_LOG(x)   logf((float)(x))
+
+/* FP32 safe wrappers — overflow/underflow protected versions */
+#define FP32_EXP_SAFE(x)    fp32_safe_exp((SPICE_REAL)(x))
+#define FP32_LOG_SAFE(x)    fp32_safe_log((SPICE_REAL)(x))
+#define FP32_SQRT_SAFE(x)   fp32_safe_sqrt((SPICE_REAL)(x))
+#define FP32_DIV_SAFE(n,d)  fp32_safe_div((SPICE_REAL)(n), (SPICE_REAL)(d), (SPICE_REAL)1.0e-30)
+#define FP32_SMOOTH_SAFE(x,d) fp32_safe_smooth((SPICE_REAL)(x), (SPICE_REAL)(d))
 
 #ifdef __cplusplus
 }
