@@ -224,16 +224,28 @@ typedef struct {
     REAL wint,lint,dwg,dwb;
     /* --- Capacitance / junction (4) --- */
     REAL cgso,cgdo,cgbo,cj;
-    /* --- Noise (2) --- */
-    REAL noia,noib;
+    /* --- Intrinsic capacitance model (9) --- */
+    REAL capmod,acde,moin,noff,cgsl,cgdl,ckappas,ckappad,cf;
+    /* --- Junction diode (13) --- */
+    REAL jss,jsws,jswgs,njs,bvs,xjbvs;  /* source-side */
+    REAL jsd,jswd,jswgd,njd,bvd,xjbvd;  /* drain-side */
+    REAL mj;  /* junction grading coefficient */
+    /* --- Noise (4) --- */
+    REAL noia,noib,fnoimod,tnoimod;
     /* --- Physical / process (4) --- */
     REAL xj,ndep,nsd,at;
+    /* --- Gate resistance (1) --- */
+    REAL rgatemod;
+    /* --- Body resistance network (6) --- */
+    REAL rbodymod, rbdb, rbsb, rbpb, rbps, rbpd;
 } BSIM4Param;
 
 typedef struct {
     REAL ids,gm,gds,gmbs,vth,vdsat,vdseff,vgsteff,Abulk,ueff,EsatL,beta;
     /* P4.2: Intrinsic capacitances for TRAN (Meyer model + overlap) */
     REAL cgs,cgd,cgb;
+    REAL ibs,ibd,gbs,gbd;  /* junction currents + conductances */
+    REAL rbody;  /* equivalent body resistance Ω (simplified single-resistor model) */
 } BSIM4Out;
 
 static BSIM4Param bsim4_default(void) {
@@ -272,11 +284,21 @@ static BSIM4Param bsim4_default(void) {
     /* --- Capacitance (off by default) --- */
     p.cj=R(5.0e-4);
     /* cgso, cgdo, cgbo = 0 (from calloc) */
+    /* --- Intrinsic capacitance model --- */
+    p.capmod=R(0.0); /* Meyer by default */
+    /* acde, moin, noff, cgsl, cgdl, ckappas, ckappad, cf = 0 (from calloc) */
+    /* --- Junction diode (off by default) ---
+     * jss/jsws/jswgs/bvs/bvd/xjbvs/xjbvd = 0 (from calloc)
+     * jsd/jswd/jswgd likewise zero; njs/njd=1.0, mj=0.5 (nonzero defaults) */
+    p.njs=R(1.0); p.njd=R(1.0); p.mj=R(0.5);
     /* --- Noise (off by default) --- */
-    /* noia, noib = 0 (from calloc) */
+    /* noia, noib, fnoimod, tnoimod = 0 (from calloc);
+     * fnoimod=1 (PTM 默认) — 由 bsim4_from_model() 从 .lib 覆盖 */
     /* --- Physical / process --- */
     p.xj=R(1.5e-8); p.ndep=R(1.7e17); p.nsd=R(1.0e20);
     p.at=R(3.3e4);
+    /* rgatemod = 0 (off by default, from calloc) */
+    /* rbodymod/rbdb/rbsb/rbpb/rbps/rbpd = 0 (off by default, from calloc) */
     return p;
 }
 
@@ -616,41 +638,163 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
         if(o.ids<R(0.0)) o.ids=R(0.0);
     }
 
-    /* ===== P4.2: BSIM4 intrinsic capacitances (Meyer model + overlap) =====
-     * Cox = εox/toxe * Weff * Leff  (already have coxe from above).
-     * Region-based piecewise model:
-     *   Cutoff    (vgsteff≤0):        Cgs≈0,       Cgd≈0,      Cgb≈Cox
-     *   Linear    (vgsteff>0,Vds<Vdsat): Cgs≈Cox/2, Cgd≈Cox/2, Cgb≈0
-     *   Saturation(vgsteff>0,Vds≥Vdsat): Cgs≈2Cox/3, Cgd≈0,    Cgb≈0
-     * Overlap: Cgs+=cgso*Weff, Cgd+=cgdo*Weff, Cgb+=cgbo*Leff
-     * Clamped to >=0 for physical consistency. */
+    /* ===== P4.2 / P2.6: BSIM4 intrinsic capacitances =====
+     * capmod==0: Meyer piecewise model (Cgs/Cgd/Cgb 三段式)
+     * capmod==2: simplified charge-conserving model
+     *   Qg = Cox*(Vgsteff - 0.5*Abulk*Vdseff)
+     *   Cgs/d/gb via finite difference, cgsl/cgdl linear terms, noff tanh */
     {
         REAL Cox=coxe*weff*leff;
         if(Cox<R(0.0)) Cox=R(0.0);
-        if(vgsteff<=R(0.0)){
-            /* Cutoff: gate couples to body */
-            o.cgs=R(0.0); o.cgd=R(0.0); o.cgb=Cox;
-        }else if(vds<vdsat){
-            /* Linear/triode: gate couples equally to source and drain */
-            o.cgs=Cox*R(0.5); o.cgd=Cox*R(0.5); o.cgb=R(0.0);
+        if(pp->capmod==R(0.0)){
+            /* === Meyer model (capmod=0) === */
+            if(vgsteff<=R(0.0)){
+                o.cgs=R(0.0); o.cgd=R(0.0); o.cgb=Cox;
+            }else if(vds<vdsat){
+                o.cgs=Cox*R(0.5); o.cgd=Cox*R(0.5); o.cgb=R(0.0);
+            }else{
+                o.cgs=Cox*R(0.6666667); o.cgd=R(0.0); o.cgb=R(0.0);
+            }
         }else{
-            /* Saturation: channel pinched off near drain */
-            o.cgs=Cox*R(0.6666667); o.cgd=R(0.0); o.cgb=R(0.0);
+            /* === capmod==2: simplified charge-conserving model === */
+            REAL Ab=o.Abulk; if(Ab<R(0.01)) Ab=R(0.01);
+            REAL Vde=o.vdseff;
+            REAL delta=R(1e-6);
+            REAL vt_c=R(8.617333e-5)*temp; if(vt_c<R(1e-6)) vt_c=R(0.02585);
+            REAL n_eff=pp->nfactor+pp->cdsc*vds+pp->cdscd*vds*vds+pp->cdscb*vbs_c;
+            if(n_eff<R(1.0)) n_eff=R(1.0); if(n_eff>R(10.0)) n_eff=R(10.0);
+            /* vgsteff helper for perturbed Vgs (keeping Vth/Abulk/Vdseff fixed) */
+            #define VGSTP(vgs_p) ( \
+             ((vgs_p-o.vth-pp->voffcv)>R(0.1))?(vgs_p-o.vth-pp->voffcv): \
+             ((vgs_p-o.vth-pp->voffcv)<R(-0.1))?n_eff*vt_c*expf((vgs_p-o.vth-pp->voffcv)/(n_eff*vt_c+R(1e-15))): \
+             n_eff*vt_c*logf(R(1.0)+expf((vgs_p-o.vth-pp->voffcv)/(n_eff*vt_c+R(1e-15)))) )
+            /* Cgs = dQg/dVgs */
+            {REAL vp=VGSTP(vgs+delta),vm=VGSTP(vgs-delta);
+             o.cgs=Cox*((vp-R(0.5)*Ab*Vde)-(vm-R(0.5)*Ab*Vde))/(R(2.0)*delta);
+             if(pp->cgsl>R(0.0)) o.cgs+=pp->cgsl*weff*(vgs-o.vth);}
+            /* Cgd = dQg/dVds via Vdseff perturbation */
+            {REAL dp=vds+delta,dm=vds-delta;
+             REAL vp=smooth_vdseff(dp,vdsat),vm=smooth_vdseff(dm,vdsat);
+             o.cgd=Cox*R(0.5)*Ab*((vgsteff-R(0.5)*Ab*vm)-(vgsteff-R(0.5)*Ab*vp))/(R(2.0)*delta);
+             REAL vgd=vgs-vds;
+             if(pp->cgdl>R(0.0)) o.cgd+=pp->cgdl*weff*(vgd-o.vth);}
+            /* Cgb = dQg/dVbs via Vth + Abulk perturbation */
+            {REAL vbp=vbs+delta,vbm=vbs-delta;
+             REAL vcp=(vbp<R(0.0))?vbp:R(0.0),vcm=(vbm<R(0.0))?vbm:R(0.0);
+             REAL sqp=sqrtf(phis-vcp+R(1e-12)),sqm=sqrtf(phis-vcm+R(1e-12));
+             REAL vthp=pp->vth0+pp->k1*(sqp-sqrt_phis)-pp->k2*vcp;
+             REAL vthm=pp->vth0+pp->k1*(sqm-sqrt_phis)-pp->k2*vcm;
+             REAL Vgstp=vgs-vthp-pp->voffcv,Vgstm=vgs-vthm-pp->voffcv;
+             REAL vgp,vgm;
+             if(Vgstp>R(0.1)) vgp=Vgstp; else if(Vgstp<R(-0.1)) vgp=n_eff*vt_c*expf(Vgstp/(n_eff*vt_c+R(1e-15))); else vgp=n_eff*vt_c*logf(R(1.0)+expf(Vgstp/(n_eff*vt_c+R(1e-15))));
+             if(Vgstm>R(0.1)) vgm=Vgstm; else if(Vgstm<R(-0.1)) vgm=n_eff*vt_c*expf(Vgstm/(n_eff*vt_c+R(1e-15))); else vgm=n_eff*vt_c*logf(R(1.0)+expf(Vgstm/(n_eff*vt_c+R(1e-15))));
+             REAL Abp=Ab*(sqp+sqrt_phis)/(sqm+sqrt_phis+R(1e-12))*R(0.5)+Ab*R(0.5);
+             REAL Abm=Ab*(sqm+sqrt_phis)/(sqp+sqrt_phis+R(1e-12))*R(0.5)+Ab*R(0.5);
+             REAL Qp=Cox*(vgp-R(0.5)*Abp*Vde),Qm=Cox*(vgm-R(0.5)*Abm*Vde);
+             o.cgb=(Qp-Qm)/(R(2.0)*delta);}
+            /* noff>0 subthreshold: tanh smoothing transition */
+            if(pp->noff>R(0.0)&&vgsteff<=R(0.0)){
+             REAL sm=R(0.5)*(tanhf((vgsteff+R(0.05))/R(0.02))+R(1.0));
+             o.cgs=o.cgs*sm; o.cgd=o.cgd*sm;
+             o.cgb=Cox*(R(1.0)-sm)+o.cgb*sm;}
+            #undef VGSTP
         }
-        /* Overlap/fringing capacitances */
-        o.cgs+=pp->cgso*weff;
-        o.cgd+=pp->cgdo*weff;
-        o.cgb+=pp->cgbo*leff;
-        /* Clamp */
+        /* Overlap/fringing capacitances (both models) */
+        o.cgs+=pp->cgso*weff; o.cgd+=pp->cgdo*weff; o.cgb+=pp->cgbo*leff;
+        /* cf: additional fixed fringe cap */
+        o.cgs+=pp->cf*weff*R(0.5); o.cgd+=pp->cf*weff*R(0.5);
         if(o.cgs<R(0.0)) o.cgs=R(0.0);
         if(o.cgd<R(0.0)) o.cgd=R(0.0);
         if(o.cgb<R(0.0)) o.cgb=R(0.0);
     }
 
+    /* ===== P2.3: BSIM4 body-source/drain junction diode currents =====
+     * Source side: Ibs = Is_src*(exp(Vbs/(njs*Vt))-1), gbs = dIbs/dVbs
+     * Drain side:  Ibd = Is_drn*(exp(Vbd/(njd*Vt))-1), gbd = dIbd/dVbd
+     * Vbd = Vbs-Vds (reuse existing terminal voltages).
+     * Breakdown: if(|Vbx|>bvx) multiply by exp((|Vbx|-bvx)/xjbvx).
+     * Clamp exp arg to [-80,80] for FP32 safety.
+     * Default jss=jsd=0 → Is_src/Is_drn < 1e-30 → skip → zero regression. */
+    {
+        REAL Vt=temp*R(8.617333262145e-5);  /* kT/q */
+        if(Vt<R(1e-6)) Vt=R(0.02585);
+        REAL vbd=vbs-vds;  /* body-drain voltage */
+
+        /* --- Source junction --- */
+        REAL Is_src=pp->jss*weff*leff + pp->jsws*(weff+leff) + pp->jswgs*weff;
+        if(Is_src>R(1e-30)){
+            REAL arg_s=vbs/(pp->njs*Vt+R(1e-30));
+            if(arg_s>R(80.0)) arg_s=R(80.0);
+            if(arg_s<R(-80.0)) arg_s=R(-80.0);
+            REAL exp_s=expf(arg_s);
+            o.ibs=Is_src*(exp_s-R(1.0));
+            o.gbs=Is_src*exp_s/(pp->njs*Vt+R(1e-30));
+            /* Breakdown: if |Vbs| > bvs, multiply by exp((|Vbs|-bvs)/xjbvs) */
+            if(pp->bvs>R(1e-6)){
+                REAL abs_vbs=fabsf(vbs);
+                if(abs_vbs>pp->bvs){
+                    REAL brk_arg=(abs_vbs-pp->bvs)/(pp->xjbvs+R(1e-30));
+                    if(brk_arg>R(80.0)) brk_arg=R(80.0);
+                    if(brk_arg<R(-80.0)) brk_arg=R(-80.0);
+                    REAL brk_mul=expf(brk_arg);
+                    REAL sign_vbs=(vbs>R(0.0))?R(1.0):((vbs<R(0.0))?R(-1.0):R(0.0));
+                    o.gbs=o.gbs*brk_mul + o.ibs*sign_vbs/(pp->xjbvs+R(1e-30));
+                    o.ibs*=brk_mul;
+                }
+            }
+        }else{ o.ibs=R(0.0); o.gbs=R(0.0); }
+
+        /* --- Drain junction --- */
+        REAL Is_drn=pp->jsd*weff*leff + pp->jswd*(weff+leff) + pp->jswgd*weff;
+        if(Is_drn>R(1e-30)){
+            REAL arg_d=vbd/(pp->njd*Vt+R(1e-30));
+            if(arg_d>R(80.0)) arg_d=R(80.0);
+            if(arg_d<R(-80.0)) arg_d=R(-80.0);
+            REAL exp_d=expf(arg_d);
+            o.ibd=Is_drn*(exp_d-R(1.0));
+            o.gbd=Is_drn*exp_d/(pp->njd*Vt+R(1e-30));
+            /* Breakdown: if |Vbd| > bvd, multiply by exp((|Vbd|-bvd)/xjbvd) */
+            if(pp->bvd>R(1e-6)){
+                REAL abs_vbd=fabsf(vbd);
+                if(abs_vbd>pp->bvd){
+                    REAL brk_arg=(abs_vbd-pp->bvd)/(pp->xjbvd+R(1e-30));
+                    if(brk_arg>R(80.0)) brk_arg=R(80.0);
+                    if(brk_arg<R(-80.0)) brk_arg=R(-80.0);
+                    REAL brk_mul=expf(brk_arg);
+                    REAL sign_vbd=(vbd>R(0.0))?R(1.0):((vbd<R(0.0))?R(-1.0):R(0.0));
+                    o.gbd=o.gbd*brk_mul + o.ibd*sign_vbd/(pp->xjbvd+R(1e-30));
+                    o.ibd*=brk_mul;
+                }
+            }
+        }else{ o.ibd=R(0.0); o.gbd=R(0.0); }
+
+        /* NaN/small-value guard: clamp near-zero */
+        if(fabsf(o.ibs)<R(1e-18)) o.ibs=R(0.0);
+        if(fabsf(o.ibd)<R(1e-18)) o.ibd=R(0.0);
+        if(fabsf(o.gbs)<R(1e-18)) o.gbs=R(0.0);
+        if(fabsf(o.gbd)<R(1e-18)) o.gbd=R(0.0);
+    }
+
+    /* === P2.4: Body resistance network ===
+     * Simplified single-resistor model: rbody = rbdb||rbsb||rbpb
+     * PTM LP: rbdb=15, rbsb=15, rbpb=5 → rbody ≈ 3.75Ω
+     * Provides finite-impedance path from body to internal nodes,
+     * improving convergence for NMOS inverter body tied to GND/VDD. */
+    if(pp->rbodymod > R(0.5)) {
+        o.rbody = R(1.0) / (R(1.0)/(pp->rbdb + R(1e-30))
+                          + R(1.0)/(pp->rbsb + R(1e-30))
+                          + R(1.0)/(pp->rbpb + R(1e-30)));
+    } else {
+        o.rbody = R(0.0);
+    }
+
     /* NaN firewall: divergent Newton step → return safe off-state */
-    if(IS_NAN(o.ids)||IS_NAN(o.gm)||IS_NAN(o.gds)||IS_NAN(o.gmbs)){
+    if(IS_NAN(o.ids)||IS_NAN(o.gm)||IS_NAN(o.gds)||IS_NAN(o.gmbs)
+        ||IS_NAN(o.ibs)||IS_NAN(o.ibd)||IS_NAN(o.gbs)||IS_NAN(o.gbd)){
         o.ids=R(1e-15); o.gm=R(1e-15); o.gds=R(1e-15); o.gmbs=R(0.0);
         o.vgsteff=R(0.0);
+        o.ibs=R(0.0); o.ibd=R(0.0); o.gbs=R(0.0); o.gbd=R(0.0);
+        o.rbody=R(0.0);
     }
 
     return o;
@@ -893,11 +1037,40 @@ static void bsim4_from_model(BSIM4Param *pp, const Model *m) {
     /* --- Capacitance / junction (4) --- */
     pp->cgso=model_get(m,"cgso",pp->cgso); pp->cgdo=model_get(m,"cgdo",pp->cgdo);
     pp->cgbo=model_get(m,"cgbo",pp->cgbo); pp->cj=model_get(m,"cj",pp->cj);
-    /* --- Noise (2) --- */
+    /* --- Intrinsic capacitance model (9) --- */
+    pp->capmod =model_get(m,"capmod", pp->capmod);
+    pp->acde   =model_get(m,"acde",   pp->acde);
+    pp->moin   =model_get(m,"moin",   pp->moin);
+    pp->noff   =model_get(m,"noff",   pp->noff);
+    pp->cgsl   =model_get(m,"cgsl",   pp->cgsl);
+    pp->cgdl   =model_get(m,"cgdl",   pp->cgdl);
+    pp->ckappas=model_get(m,"ckappas",pp->ckappas);
+    pp->ckappad=model_get(m,"ckappad",pp->ckappad);
+    pp->cf     =model_get(m,"cf",     pp->cf);
+    /* --- Junction diode (13) --- */
+    pp->jss  =model_get(m,"jss",  pp->jss);   pp->jsws =model_get(m,"jsws", pp->jsws);
+    pp->jswgs=model_get(m,"jswgs",pp->jswgs); pp->njs  =model_get(m,"njs",  pp->njs);
+    pp->bvs  =model_get(m,"bvs",  pp->bvs);   pp->xjbvs=model_get(m,"xjbvs",pp->xjbvs);
+    pp->jsd  =model_get(m,"jsd",  pp->jsd);   pp->jswd =model_get(m,"jswd", pp->jswd);
+    pp->jswgd=model_get(m,"jswgd",pp->jswgd); pp->njd  =model_get(m,"njd",  pp->njd);
+    pp->bvd  =model_get(m,"bvd",  pp->bvd);   pp->xjbvd=model_get(m,"xjbvd",pp->xjbvd);
+    pp->mj   =model_get(m,"mj",   pp->mj);
+    /* --- Noise (4) --- */
     pp->noia=model_get(m,"noia",pp->noia); pp->noib=model_get(m,"noib",pp->noib);
+    pp->fnoimod=model_get(m,"fnoimod",pp->fnoimod);
+    pp->tnoimod=model_get(m,"tnoimod",pp->tnoimod);
     /* --- Physical / process (4) --- */
     pp->xj=model_get(m,"xj",pp->xj); pp->ndep=model_get(m,"ndep",pp->ndep);
     pp->nsd=model_get(m,"nsd",pp->nsd); pp->at=model_get(m,"at",pp->at);
+    /* --- Gate resistance (1) --- */
+    pp->rgatemod=model_get(m,"rgatemod",pp->rgatemod);
+    /* --- Body resistance network (6) --- */
+    pp->rbodymod=model_get(m,"rbodymod",pp->rbodymod);
+    pp->rbdb    =model_get(m,"rbdb",    pp->rbdb);
+    pp->rbsb    =model_get(m,"rbsb",    pp->rbsb);
+    pp->rbpb    =model_get(m,"rbpb",    pp->rbpb);
+    pp->rbps    =model_get(m,"rbps",    pp->rbps);
+    pp->rbpd    =model_get(m,"rbpd",    pp->rbpd);
 }
 static void parse_model_line(Circuit *c, const char *line) {
     Model m; memset(&m,0,sizeof(m)); char rest[MAX_LINE];
@@ -1380,6 +1553,8 @@ static void compute_nc(REAL *v, Circuit *c, BSIM4Param *const *pp_arr,
         if(weff<R(1e-8)) weff=R(1e-8);if(leff<R(1e-9)) leff=R(1e-9);
         BSIM4Out o=bsim4_eval(vgs,vds,vbs,weff,leff,pp,c->temp);
         nc[m->d]-=o.ids; nc[m->s]+=o.ids;
+        /* P2.3: Junction diode currents — KCL check */
+        nc[m->b]-=o.ibs+o.ibd; nc[m->s]+=o.ibs; nc[m->d]+=o.ibd;
         /* P4.2: MOSFET intrinsic capacitance currents (TRAN companion model) */
         if(c->tran_dt>R(0.0) && c->tran_mos_v_prev && c->tran_mos_cap_i){
             REAL inv_dt=R(1.0)/c->tran_dt;
@@ -1519,6 +1694,7 @@ static int diode_stamp(REAL *a, REAL *rhs, int p, int n, REAL Vd,
 static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
                     int max_iter, REAL abstol) {
     int n=c->nn, gnd=c->ngnd;
+    (void)max_iter; /* P2.8: replaced by per-ramp adaptive max_iter_ramp */
 
     /* --- Classify Vsrcs: grounded (simple fix) vs floating (MNA) --- */
     int *vfixed=calloc(n,sizeof(int));
@@ -1546,13 +1722,20 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
     REAL *rhs=calloc(N,sizeof(REAL));
     REAL *dx=calloc(N,sizeof(REAL));
 
+    REAL gm_base=c->opt_gmin>R(0.0)?c->opt_gmin:R(1e-12);
+
     /* Gmin stepping: 3 stages from large (easy convergence) to small (accurate).
      * Cmin stepping (P2.3): diagonal-only damping, no DC bias.  Provides
      * "clean" matrix conditioning complementary to gmin's RHS-biased damping. */
-    REAL gm_base=c->opt_gmin>R(0.0)?c->opt_gmin:R(1e-12);
-    REAL gmin_stages[] = {gm_base*R(1e3), gm_base*R(1e2), gm_base};
-    REAL cmin_vals [] = {R(1e-6), R(1e-9), R(0.0)};   /* Cmin tied to gmin stage */
-    int n_stages = 3;
+    /* P2.8: 5-stage gmin + cmin stepping.
+     * Stage 0 (1e-7 gmin): 10MΩ to GND per node — strong diagonal dominance.
+     * Stage 4 (1e-12 gmin): effectively no artificial load — high accuracy.
+     * Each stage starts from previous stage's converged solution.
+     * Cmin provides "clean" diagonal damping (no DC bias, unlike gmin). */
+    REAL gmin_stages[] = {gm_base*R(1e5), gm_base*R(1e4), gm_base*R(1e3),
+                          gm_base*R(1e2), gm_base};
+    REAL cmin_vals [] = {R(1e-5), R(1e-6), R(1e-7), R(1e-9), R(0.0)};
+    int n_stages = 5;
     int total_iters = 0;
 
     /* ---- Source stepping (P2.1): ramp sources 0 → full value ----
@@ -1562,14 +1745,24 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
      * for circuits with strong MOSFET nonlinearities.
      */
     REAL *dc_orig=calloc(c->nv,sizeof(REAL));
+    REAL *idc_orig=calloc(c->ni,sizeof(REAL));
     for(int j=0;j<c->nv;j++) dc_orig[j]=c->vsrc[j].dc;
-    REAL src_ramp[] = {R(1e-3), R(1e-2), R(1e-1), R(1.0)};
-    int n_ramp = 4, ramp_failed = 0;
+    for(int j=0;j<c->ni;j++) idc_orig[j]=c->isrc[j].dc;
+    /* P2.8: 9-stage source ramp — ~3× per step for gentle multi-transistor startup.
+     * Coarse 10× jumps cause complementary MOSFET pairs to swing wildly → Newton fails.
+     * Finer granularity keeps each ramp step within the Newton basin of attraction. */
+    REAL src_ramp[] = {R(1e-4), R(3e-4), R(1e-3), R(3e-3), R(1e-2),
+                       R(3e-2), R(1e-1), R(3e-1), R(1.0)};
+    int n_ramp = 9, ramp_failed = 0;
 
   for(int ramp=0; ramp < n_ramp; ramp++){  /* === SOURCE RAMP OUTER LOOP === */
     REAL alpha = src_ramp[ramp];
-    /* Scale all source DC values for this ramp step */
+    /* P2.8: Scale ALL sources — Vsrc DC + Isrc DC — for this ramp step.
+     * Current sources must scale with voltage sources, otherwise full bias
+     * currents fight near-zero supply at low ramp, making convergence
+     * impossible for current-biased circuits (OTA, opamp, bandgap). */
     for(int j=0;j<c->nv;j++) c->vsrc[j].dc = dc_orig[j] * alpha;
+    for(int j=0;j<c->ni;j++) c->isrc[j].dc = idc_orig[j] * alpha;
     /* Re-init grounded Vsrc fixed node voltages to scaled value.
      * Free node voltages are KEPT from previous ramp as initial guess. */
     for(int j=0;j<c->nv;j++){
@@ -1581,7 +1774,10 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
     }
 
     int stage_converged = 0;  /* scoped here for ramp-loop failure check */
-    REAL vlim_stage = R(0.5);  /* adaptive vlim, reset each source ramp */
+    /* P2.8: adaptive max_iter — low ramp needs more iterations to build up solution;
+     * high ramp can use tighter limit since starting from near-converged state. */
+    int max_iter_ramp = (alpha < R(0.1)) ? 200 : 150;
+    REAL vlim_stage = R(0.1);  /* P2.8: start very conservative, iter-based ramp */
     for(int stage=0; stage < n_stages; stage++){
         REAL gmin = gmin_stages[stage];
         REAL cmin_val = cmin_vals[stage];  /* Cmin provides clean diagonal damping (P2.3) */
@@ -1591,13 +1787,21 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
          * conservative 0.5V limit. Tighten/relax based on convergence. */
         REAL vlim = vlim_stage;
 
-        for(int iter=0; iter < max_iter; iter++){
+        for(int iter=0; iter < max_iter_ramp; iter++){
             int lu_ok = 0;
             REAL effective_gmin = gmin;
             REAL effective_cmin = cmin_val;  /* bumped alongside gmin in recovery */
 
             /* --- Recovery cascade: retry assembly+solve with stronger damping --- */
-            for(int recovery=0; recovery < 5; recovery++){
+            for(int recovery=0; recovery < 6; recovery++){  /* P2.8: +1 recovery level for voltage reset */
+                /* P2.8: Recovery 5 — reset all free node voltages to 0, restart from scratch */
+                if(recovery==5){
+                    for(int jj=0;jj<n;jj++) if(jj!=gnd && !vfixed[jj]) v[jj]=R(0.0);
+                    for(int jj=0;jj<c->nv;jj++) if(vs_mna[jj]>=0) iv[jj]=R(0.0);
+                    effective_gmin = gmin * R(100.0);
+                    effective_cmin = cmin_val * R(100.0);
+                    vlim = R(0.1);
+                }
                 memset(a,0,N*N*sizeof(REAL)); memset(rhs,0,N*sizeof(REAL));
 
                 /* Gmin + Cmin (P2.3): diagonal damping from each free node to GND.
@@ -1648,9 +1852,50 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
                         if(!vfixed[m->b]) a[m->s+m->b*N]-=gmbs;
                         rhs[m->s]+=ids;
                     }
+                    /* P2.3: Junction diode currents b↔s, b↔d (Newton linearization) */
+                    {
+                        REAL Vbs=v[m->b]-v[m->s], Vbd=v[m->b]-v[m->d];
+                        REAL Ieq_bs=o.ibs-o.gbs*Vbs;
+                        REAL Ieq_bd=o.ibd-o.gbd*Vbd;
+                        /* Body-Source junction: I flows from body to source */
+                        if(fabsf(o.gbs)>R(1e-18)){
+                            if(!vfixed[m->b]){
+                                a[m->b+m->b*N]+=o.gbs;
+                                if(!vfixed[m->s]) a[m->b+m->s*N]-=o.gbs;
+                                rhs[m->b]-=Ieq_bs;
+                            }
+                            if(!vfixed[m->s]){
+                                a[m->s+m->s*N]+=o.gbs;
+                                if(!vfixed[m->b]) a[m->s+m->b*N]-=o.gbs;
+                                rhs[m->s]+=Ieq_bs;
+                            }
+                        }
+                        /* Body-Drain junction: I flows from body to drain */
+                        if(fabsf(o.gbd)>R(1e-18)){
+                            if(!vfixed[m->b]){
+                                a[m->b+m->b*N]+=o.gbd;
+                                if(!vfixed[m->d]) a[m->b+m->d*N]-=o.gbd;
+                                rhs[m->b]-=Ieq_bd;
+                            }
+                            if(!vfixed[m->d]){
+                                a[m->d+m->d*N]+=o.gbd;
+                                if(!vfixed[m->b]) a[m->d+m->b*N]-=o.gbd;
+                                rhs[m->d]+=Ieq_bd;
+                            }
+                        }
+                    }
+                    /* P2.4: Body resistance network stamping.
+                     * When rbodymod>0.5, the body node has a finite-impedance
+                     * path to GND through the equivalent body resistance rbody.
+                     * This helps convergence for NMOS body tied to GND. */
+                    if(o.rbody > R(1e-6)) {
+                        REAL gb = R(1.0)/o.rbody;  /* body conductance */
+                        if(!vfixed[m->b]) {
+                            a[m->b + m->b*N] += gb;
+                            rhs[m->b] -= gb * v[m->b];
+                        }
+                    }
                 }
-
-                /* P5.5: Diodes — exponential I-V stamp */
                 REAL Vt=R(0.02585);  /* thermal voltage at 300K */
                 for(int j=0;j<c->nd;j++){
                     Diode *d=&c->dio[j];
@@ -1768,7 +2013,9 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
                 if(lu_solve(N,a,rhs,dx) >= 0){ lu_ok=1; break; }
 
                 /* Recovery: escalate damping to fix singular matrix */
-                if(recovery < 3){
+                if(recovery==5){
+                    /* Already set above (voltage reset + max damping) — no further escalation */
+                } else if(recovery < 3){
                     effective_gmin *= R(10.0);
                     effective_cmin *= R(10.0);  /* bump Cmin alongside gmin (P2.3) */
                 } else {
@@ -1838,26 +2085,37 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
                 }
             }
             total_iters++;
+            /* P2.8: Soft convergence — only at final gmin stages (3+ of 5).
+             * Early stages with strong gmin must converge properly to provide
+             * a good initial guess.  Accepting loose solutions at early stages
+             * propagates garbage through the entire stage cascade.
+             * At final stages (near-zero gmin), multi-transistor circuits may
+             * oscillate near the solution — relaxed tolerance prevents infinite loops. */
+            if(!had_nan && !stage_converged && stage >= 3 && iter > 50
+               && max_dv < R(10.0)*abstol){
+                stage_converged = 1;
+                printf("  [soft_converge] ramp=%.0e stage=%d iter=%d\n",
+                       (double)alpha, stage, iter);
+                break;
+            }
             if(!had_nan && max_dv<abstol){ stage_converged=1; break; }
 
-            /* --- Adaptive voltage limiting (P2.2) ---
-             * Adjust vlim based on convergence behavior:
-             * - Tighten when steps are large or NaN occurred
-             * - Relax when steps are small (close to solution)
-             * Clamped to [0.01, 5.0] to prevent extreme values. */
-            if(!had_nan){
-                if(max_dv < abstol * R(10.0)){
-                    vlim *= R(2.0);           /* close to convergence: relax */
-                } else if(max_dv > vlim * R(0.5)){
-                    vlim *= R(0.5);           /* many nodes hitting clamp: tighten */
-                } else {
-                    vlim *= R(1.5);           /* moderate relaxation */
-                }
-            } else {
-                vlim *= R(0.25);              /* NaN detected: aggressive tightening */
-            }
-            if(vlim < R(0.01)) vlim = R(0.01);
-            if(vlim > R(5.0))  vlim = R(5.0);
+            /* --- Adaptive voltage limiting (P2.8: iter-based ramp) ---
+             * Very conservative early (0.1V) to avoid overshoot in complementary
+             * MOSFET circuits. Relaxes as Newton settles into convergence basin.
+             * Updates vlim_stage (not local vlim) to persist across iterations.
+             * iter < 5:  0.1V — aggressive damping for initial transient
+             * iter < 15: 0.2V — moderate damping for approach
+             * iter < 30: 0.4V — relaxed for fine convergence
+             * else:      0.5V — full step when near solution
+             * NaN still triggers aggressive tightening. */
+            if(iter < 5)        vlim_stage = R(0.1);
+            else if(iter < 15)  vlim_stage = R(0.2);
+            else if(iter < 30)  vlim_stage = R(0.4);
+            else                vlim_stage = R(0.5);
+            if(had_nan) vlim_stage *= R(0.25);
+            if(vlim_stage < R(0.01)) vlim_stage = R(0.01);
+            if(vlim_stage > R(5.0))  vlim_stage = R(5.0);
         }
 
         if(!stage_converged){
@@ -1874,9 +2132,13 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
   }  /* === END SOURCE RAMP LOOP === */
 
 dc_cleanup:
-  /* Restore original Vsrc DC values (were scaled during source stepping) */
+  /* Restore original source DC values (were scaled during source stepping) */
   for(int j=0;j<c->nv;j++) c->vsrc[j].dc = dc_orig[j];
-  free(dc_orig);
+  for(int j=0;j<c->ni;j++) c->isrc[j].dc = idc_orig[j];
+  /* Re-sync grounded Vsrc node voltages to restored DC values.
+   * Without this, v[] may hold stale ramp-step voltages → prints VDD=0. */
+  for(int j=0;j<c->nv;j++) if(vs_mna[j] < 0) v[c->vsrc[j].p] = c->vsrc[j].dc;
+  free(dc_orig); free(idc_orig);
 
   /* Compute Vsrc currents: best-effort KCL (ramp failed) or
    * full post-convergence KCL (all ramps succeeded).
@@ -2182,9 +2444,9 @@ static void tran_solve(Circuit *c, BSIM4Param *const *pp_arr, REAL tstop, REAL t
  * printf("%f", x) forces float→double promotion (cvtss2sd).
  * Using %s with this helper avoids ALL such conversions. */
 static const char *real_to_str(REAL v, char fmt, int prec) {
-    static char buf[4][32];  /* ring buffer: 4 slots cover any single printf */
+    static char buf[8][32];  /* ring buffer: 8 slots cover any single printf (max 5) */
     static int idx = 0;
-    char *b = buf[idx]; idx = (idx + 1) & 3;  /* round-robin */
+    char *b = buf[idx]; idx = (idx + 1) & 7;  /* round-robin */
     if(IS_NAN(v)){strcpy(b,"NaN");return b;}
     int sign=0;
     if(v<R(0.0)){sign=1;v=-v;}
@@ -2224,7 +2486,7 @@ int main(int argc, char **argv) {
     c->nn=1;strcpy(c->nmap[0],"0");c->ngnd=0;
     /* Default options (overridden by .option lines) */
     c->opt_gmin=R(1e-12); c->opt_abstol=R(1e-6); c->opt_reltol=R(1e-3);
-    c->opt_maxiter=100; c->temp=R(300.15);
+    c->opt_maxiter=200; c->temp=R(300.15);  /* P2.8: 100→200 for multi-transistor circuits */
 
     parse_netlist(c,argv[1]);
     printf("Circuit: %s\n  Nodes: %d  Res: %d  MOSFETs: %d  Vsrcs: %d  Caps: %d\n",
