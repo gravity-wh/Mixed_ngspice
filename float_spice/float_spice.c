@@ -259,7 +259,7 @@ static BSIM4Param bsim4_default(void) {
     /* --- Short-channel Vth (BSIM4v5 UG defaults) --- */
     p.dvt0=R(2.2); p.dvt1=R(0.53); p.dvt2=R(-0.032);
     p.dvt0w=R(0.0); p.dvt1w=R(5.3e6); p.dvt2w=R(-0.032);
-    p.dsub=R(0.56); p.k3=R(80.0); p.k3b=R(0.0); p.w0=R(2.5e-6); p.nlx=R(1.74e-7);
+    p.dsub=R(0.56); p.k3=R(80.0); p.k3b=R(0.0); p.w0=R(2.5e-6); p.nlx=R(0.0);
     p.etab=R(-0.07);
     /* --- Rds --- */
     /* rdsw,rsw,rdw,prwg,prwb,prt = 0 (from calloc) */
@@ -325,69 +325,188 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
     REAL ub_T=pp->ub + pp->ub1*dT_Tnom;
     REAL uc_T=pp->uc + pp->uc1*dT_Tnom;
     REAL coxe=R(3.9)*R(8.854187817e-12)/toxe_safe;
-    REAL phis=R(0.6), sqrt_phis=sqrtf(phis);
-    REAL vbs_c=(vbs<R(0.0))?vbs:R(0.0);
-    REAL sq=sqrtf(phis-vbs_c+R(1e-12));
+    /* P2.8 fix: PMOS sign convention.  BSIM4 is NMOS-formulated (Vgs>0→ON).
+     * For PMOS (vth0<0), negate Vgs/Vds/Vbs so the model sees forward bias,
+     * then negate Ids on output.  gm/gds/gmbs magnitudes are unchanged.
+     * Junction currents (ibs/ibd) are symmetric for Vbs=0 (body tied to source). */
+    int is_pmos = (pp->vth0 < R(0.0));
+    if (is_pmos) {
+        vgs = -vgs;
+        vds = -vds;
+        vbs = -vbs;
+    }
+    /* === BSIM4v5 Physical Surface Potential (Sec 2.1) ===
+     * phis = 2*Vt*ln(Ndep/ni) — temperature-dependent, replaces hardcoded 0.6V.
+     * Clamped to [0.4, 1.2] for numerical safety.                     */
+    REAL ni_si  = R(1.45e10);
+    REAL Ndep   = pp->ndep > R(1e10) ? pp->ndep : R(1.7e17);
+    REAL phis   = R(2.0) * vt * logf(Ndep / (ni_si + R(1e-30)));
+    if (phis < R(0.4)) phis = R(0.4);
+    if (phis > R(1.2)) phis = R(1.2);
+    REAL sqrt_phis = sqrtf(phis);
+    REAL vbs_c = (vbs < R(0.0)) ? vbs : R(0.0);
+    REAL sq = sqrtf(phis - vbs_c + R(1e-12));  /* body-bias sqrt for Vth, gmbs */
 
-    /* === BSIM4v5 Full Threshold Voltage (P1.2) ===
-     * Vth = vth0 + body - SCE - DIBL + narrow-width + nlx
+    /* === BSIM4v5 Vbseff: 3-segment smooth body-bias transition (Sec 2.2.2) ===
+     * Classical Vbseff smooth-flat near Vbs=0, linear at larger |Vbs|.
+     * Forward body-bias (Vbs>0) uses JX correction to prevent blow-up.    */
+    REAL Vbseff;
+    {
+        REAL Vbsc = R(-0.5) * phis;
+        REAL T0   = vbs - Vbsc - R(0.001);
+        REAL T1   = sqrtf(T0*T0 - R(0.004)*Vbsc + R(1e-30));
+        if (T0 >= R(0.0)) {
+            Vbseff = Vbsc + R(0.5)*(T0 + T1);
+        } else {
+            REAL T2 = R(-0.002) / (T1 - T0 + R(1e-30));
+            Vbseff = Vbsc * (R(1.0) + T2);
+        }
+    }
+    /* Forward body-bias JX correction */
+    {
+        REAL T9 = R(0.95) * phis;
+        REAL T0 = T9 - Vbseff - R(0.001);
+        REAL T1 = sqrtf(T0*T0 + R(0.004)*T9 + R(1e-30));
+        Vbseff = T9 - R(0.5)*(T0 + T1);
+    }
+    REAL Phis_eff     = phis - Vbseff;
+    REAL sqrtPhis_eff = sqrtf(Phis_eff + R(1e-30));
+
+    /* === BSIM4v5 Full Threshold Voltage (P1.2, Sec 2.1–2.5) ===
+     * Vth = vth0 + body - SCE(length) - SCE(width) - DIBL + NW + nlx
      *
-     * SCE:  short-channel roll-off via dvt0,dvt1  (lowers Vth)
-     * DIBL: drain-induced barrier lowering via dsub,eta0  (lowers Vth)
-     * NW:   narrow-width increase via k3,w0  (raises Vth)
-     * nlx:  pocket-implant body-effect correction
+     * SCE:     short-channel roll-off via dvt0,dvt1,dvt2  (lowers Vth)
+     * SCE_w:   width-dependent narrow-width roll-off via dvt0w,dvt1w,dvt2w
+     * DIBL:    drain-induced barrier lowering via dsub,eta0,etab
+     * NW:      narrow-width increase via k3,k3b,w0         (raises Vth)
+     * nlx:     pocket-implant body-effect correction
+     * Temp:    KT1L length-dependent + KT2 bias-dependent thermal shift
      */
     {
         /* Physical constants (cm-based for BSIM4 compatibility) */
-        REAL eps_si =R(1.035e-12);  /* F/cm */
-        REAL eps_ox =R(3.453e-13);  /* F/cm = 3.9*ε0 in F/cm */
-        REAL q_el   =R(1.602e-19);
-        REAL ni_si  =R(1.45e10);    /* cm^-3 */
-        REAL NSUB   =pp->ndep>R(1e10)?pp->ndep:R(6.0e16);
-        REAL NSD    =pp->nsd >R(1e15)?pp->nsd :R(1.0e20);
-        REAL Vbi=vt*logf(NSUB*NSD/(ni_si*ni_si+R(1e-30)));
-        if(Vbi<R(0.5))Vbi=R(0.5); if(Vbi>R(1.2))Vbi=R(1.2);
+        REAL eps_si = R(1.035e-12);  /* F/cm */
+        REAL eps_ox = R(3.453e-13);  /* F/cm = 3.9*eps0 in F/cm */
+        REAL q_el   = R(1.602e-19);
+        REAL NSUB   = pp->ndep > R(1e10) ? pp->ndep : R(6.0e16);
+        REAL NSD    = pp->nsd  > R(1e15) ? pp->nsd  : R(1.0e20);
+        REAL Vbi    = vt * logf(NSUB * NSD / (ni_si * ni_si + R(1e-30)));
+        if (Vbi < R(0.5)) Vbi = R(0.5); if (Vbi > R(1.2)) Vbi = R(1.2);
 
-        /* Depletion width & characteristic lengths (cm) */
-        REAL toxe_cm=toxe_safe*R(100.0);
-        REAL xdep=sqrtf(R(2.0)*eps_si*(phis-vbs_c+R(0.01))
-                         /(q_el*NSUB+R(1e-30)));
-        if(xdep<R(1e-10))xdep=R(1e-10);
-        REAL lt=sqrtf(eps_si*toxe_cm*xdep/(eps_ox+R(1e-30)));
-        if(lt<R(1e-10))lt=R(1e-10);
-        REAL lto=sqrtf(eps_si*toxe_cm
-                        *sqrtf(R(2.0)*eps_si*phis/(q_el*NSUB+R(1e-30)))
-                        /(eps_ox+R(1e-30)));
-        if(lto<R(1e-10))lto=R(1e-10);
-        REAL Lcm=leff*R(100.0);
+        /* Depletion width & characteristic lengths (cm, Sec 2.3) */
+        REAL toxe_cm = toxe_safe * R(100.0);
+        REAL Xdep0   = sqrtf(R(2.0)*eps_si*phis / (q_el*NSUB + R(1e-30)));
+        REAL Xdep    = Xdep0 * sqrtPhis_eff / sqrt_phis;
+        if (Xdep < R(1e-10)) Xdep = R(1e-10);
+        REAL factor1 = sqrtf(eps_si * toxe_cm / (eps_ox + R(1e-30)));
+        REAL Lcm     = leff * R(100.0);
 
-        /* SCE: BSIM4v5 short-channel Vth roll-off
-         * θ = DVT0 * exp(-DVT1 * Leff / lt)
-         * ΔVth = -θ * (Vbi - phis)                      */
-        REAL L_lt=Lcm/(lt+R(1e-30));
-        REAL dVth_sce=pp->dvt0*expf(-pp->dvt1*L_lt)*(Vbi-phis);
-        /* P5.5: dvt2 body-bias dependence of SCE */
-        dVth_sce*=(R(1.0)+pp->dvt2*vbs_c);
+        /* lto: long-channel reference (no dvt2 correction) */
+        REAL lto = factor1 * sqrtf(Xdep0 + R(1e-30));
+        if (lto < R(1e-10)) lto = R(1e-10);
 
-        /* DIBL: θ_dibl = exp(-DSUB * Leff / lto)
-         * ΔVth = -θ_dibl * eta0 * Vds  (etab≈0)       */
-        REAL L_lto=Lcm/(lto+R(1e-30));
-        REAL dVth_dibl=expf(-pp->dsub*L_lto)*pp->eta0*vds;
+        /* ---- Length-direction SCE: dvt0,dvt1,dvt2 (Sec 2.5.1) ---- */
+        /* dvt2 lives inside lt -- body-bias modulates channel length scaling */
+        REAL T0_dvt2 = pp->dvt2 * Vbseff;
+        REAL lt_factor;
+        if (T0_dvt2 >= R(-0.5)) {
+            lt_factor = R(1.0) + T0_dvt2;
+        } else {
+            REAL T4  = R(1.0) / (R(3.0) + R(8.0)*T0_dvt2 + R(1e-30));
+            lt_factor = (R(1.0) + R(3.0)*T0_dvt2) * T4;
+        }
+        REAL lt = factor1 * sqrtf(Xdep + R(1e-30)) * lt_factor;
+        if (lt < R(1e-10)) lt = R(1e-10);
 
-        /* Narrow-width: ΔVth = (K3+K3b*Vbs)*toxe/(Weff+W0)*phis */
-        REAL k3b=pp->k2*R(0.5);
-        REAL dVth_nw=(pp->k3+k3b*vbs_c)
-                     *(toxe_safe/(weff+pp->w0+R(1e-30)))*phis;
+        /* Theta0: tanh-like smooth transition (T1/(T2*T2+2*T1*MIN_EXP)) */
+        REAL T0_lt = pp->dvt1 * Lcm / (lt + R(1e-30));
+        REAL Theta0;
+        if (T0_lt < R(80.0)) {
+            REAL T1 = expf(T0_lt);
+            REAL T2 = T1 - R(1.0);
+            REAL T3 = T2 * T2;
+            REAL T4 = T3 + R(2.0)*T1*R(1e-3) + R(1e-30);
+            Theta0 = T1 / T4;
+        } else {
+            Theta0 = R(1.0) / (R(1e3) - R(2.0) + R(1e-30));
+        }
+        REAL Delt_vth = pp->dvt0 * Theta0 * (Vbi - phis);
 
-        /* LPE / pocket implant: nlx correction inside body-effect sqrt */
-        REAL nlx_r=pp->nlx/(leff+R(1e-30));
-        REAL dVth_nlx=pp->k1*(sqrtf(R(1.0)+nlx_r)-R(1.0))*sqrt_phis;
+        /* ---- Width-direction SCE: dvt0w,dvt1w,dvt2w (Sec 2.5.2) ---- */
+        REAL T0_w = pp->dvt2w * Vbseff;
+        REAL ltw_factor;
+        if (T0_w >= R(-0.5)) {
+            ltw_factor = R(1.0) + T0_w;
+        } else {
+            REAL T4w  = R(1.0) / (R(3.0) + R(8.0)*T0_w + R(1e-30));
+            ltw_factor = (R(1.0) + R(3.0)*T0_w) * T4w;
+        }
+        REAL ltw = factor1 * sqrtf(Xdep + R(1e-30)) * ltw_factor;
+        if (ltw < R(1e-10)) ltw = R(1e-10);
 
-        /* Full Vth */
-        REAL vth_body=vth0_T+pp->k1*(sq-sqrt_phis)-pp->k2*vbs_c;
-        REAL vth=vth_body-dVth_sce-dVth_dibl+dVth_nw+dVth_nlx;
-        if(vth<R(0.02))vth=R(0.02);
-        o.vth=vth;
+        /* T0w = dvt1w * Weff * Leff / ltw  (note Weff factor for narrow devices) */
+        REAL T0_ltw = pp->dvt1w * weff * Lcm / (ltw + R(1e-30));
+        REAL Theta0w;
+        if (T0_ltw < R(80.0)) {
+            REAL T1w = expf(T0_ltw);
+            REAL T2w = T1w - R(1.0);
+            REAL T3w = T2w * T2w;
+            REAL T4w = T3w + R(2.0)*T1w*R(1e-3) + R(1e-30);
+            Theta0w = T1w / T4w;
+        } else {
+            Theta0w = R(1.0) / (R(1e3) - R(2.0) + R(1e-30));
+        }
+        REAL Delt_vth_w = pp->dvt0w * Theta0w * (Vbi - phis);
+
+        /* ---- DIBL: (eta0 + etab*Vbseff) * exp(-dsub*L/lto) * Vds (Sec 2.4) ---- */
+        REAL theta0vb0 = expf(-pp->dsub * Lcm / (lto + R(1e-30)));
+        REAL eta_total = pp->eta0 + pp->etab * Vbseff;
+        /* Smooth eta near zero to prevent sign flip at tiny values */
+        REAL eta_smooth;
+        if (eta_total < R(1e-4)) {
+            REAL T9    = R(1.0) / (R(3.0) - R(2.0e4)*eta_total + R(1e-30));
+            eta_smooth = (R(2.0e-4) - eta_total) * T9;
+        } else {
+            eta_smooth = eta_total;
+        }
+        REAL dVth_dibl = eta_smooth * theta0vb0 * vds;
+
+        /* ---- Narrow-width: (k3 + k3b*Vbseff) * toxe/(Weff+W0) * phis (Sec 2.5.3) ---- */
+        REAL Vth_NW = (pp->k3 + pp->k3b * Vbseff)
+                    * (toxe_safe / (weff + pp->w0 + R(1e-30))) * phis;
+
+        /* ---- LPE / pocket implant: nlx correction (Sec 2.5.4) ---- */
+        REAL nlx_r    = pp->nlx / (leff + R(1e-30));
+        REAL T0_lpe   = sqrtf(R(1.0) + nlx_r + R(1e-30));
+        REAL dVth_nlx = pp->k1 * (T0_lpe - R(1.0)) * sqrt_phis;
+
+        /* ---- Full Vth synthesis (Eq 2.1) ---- */
+        REAL vth_body = vth0_T
+                      + pp->k1 * (sqrtPhis_eff - sqrt_phis)
+                      - pp->k2 * Vbseff;
+        REAL vth = vth_body
+                 - Delt_vth
+                 - Delt_vth_w
+                 - dVth_dibl
+                 + Vth_NW
+                 + dVth_nlx;
+
+        /* Temperature LPE correction (kt1l length-dependent, kt2 bias-dependent) */
+        {
+            REAL TempRatio = T_ratio - R(1.0);
+            vth += (pp->kt1 + pp->kt1l / (leff + R(1e-30)) + pp->kt2 * Vbseff)
+                 * TempRatio;
+        }
+
+        /* P2.8 fix: only clamp Vth floor for NMOS (vth0>0).
+         * PMOS (vth0<0) must keep negative Vth for correct operation.
+         * Clamp NMOS Vth ≥ 0.02V to prevent divide-by-zero in gm/gds;
+         * clamp PMOS Vth to ≤ -0.01V (away from zero) for symmetry. */
+        if (pp->vth0 > R(0.0)) {
+            if (vth < R(0.02)) vth = R(0.02);
+        } else {
+            if (vth > R(-0.01)) vth = R(-0.01);
+        }
+        o.vth = vth;
     }
     REAL vth=o.vth;  /* lift out of Vth block for use in Vgsteff calc */
 
@@ -797,6 +916,14 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
         o.rbody=R(0.0);
     }
 
+    /* P2.8: PMOS sign convention — negate Ids (current flows source→drain).
+     * gm/gds/gmbs magnitudes are unchanged by Vgs/Vds/Vbs negation. */
+    if (is_pmos) {
+        o.ids = -o.ids;
+        o.ibs = -o.ibs;  /* body-source diode polarity flips for PMOS */
+        o.ibd = -o.ibd;  /* body-drain diode polarity flips for PMOS */
+    }
+
     return o;
 }
 
@@ -1073,10 +1200,19 @@ static void bsim4_from_model(BSIM4Param *pp, const Model *m) {
     pp->rbpd    =model_get(m,"rbpd",    pp->rbpd);
 }
 static void parse_model_line(Circuit *c, const char *line) {
-    Model m; memset(&m,0,sizeof(m)); char rest[MAX_LINE];
-    if(sscanf(line,".model %31s %15s %[^\n]",m.name,m.type,rest)<2) return;
+    Model m; memset(&m,0,sizeof(m));
+    /* P2.8 fix: read name+type via sscanf; locate param start via pointer
+     * arithmetic instead of %[^\n] which overflows rest[MAX_LINE] when
+     * accumulated .model text exceeds 4096 bytes (PTM .lib up to 5KB). */
+    if(sscanf(line,".model %31s %15s",m.name,m.type)<2) return;
     for(char *p=m.type;*p;p++) *p=(char)tolower((unsigned char)*p);
-    char *tok=rest;
+    /* Find start of parameters: skip ".model", name, type tokens.
+     * Cast is safe — line always points to mutable acc[] buffer. */
+    char *tok=(char*)line+6;  /* skip ".model" */
+    while(*tok==' '||*tok=='\t') tok++;
+    while(*tok&&*tok!=' '&&*tok!='\t') tok++;  /* skip name */
+    while(*tok==' '||*tok=='\t') tok++;
+    while(*tok&&*tok!=' '&&*tok!='\t') tok++;  /* skip type */
     while(*tok){
         while(*tok==' '||*tok=='\t') tok++;
         char *eq=strchr(tok,'='); if(!eq) break;
@@ -1125,8 +1261,15 @@ static void parse_include(Circuit *c, const char *line, const char *pdir) {
             if(in_model&&acc[0]){parse_model_line(c,acc);in_model=0;}
             parse_include(c,s,idir);
         }else{
-            /* comment, blank, or other non-model line: flush pending model */
-            if(in_model&&acc[0]){parse_model_line(c,acc);in_model=0;}
+            /* P2.8 fix: blank lines do NOT terminate an ongoing .model block.
+             * PTM .lib files have blank lines between .model header and
+             * first +continuation lines.  Skipping blank lines keeps the
+             * model accumulator open so all parameters are collected. */
+            if(!in_model) continue;  /* skip blank/comments before first .model */
+            if(*s=='\0'||*s=='\n'||*s=='\r') continue;  /* blank line inside .model */
+            if(*s=='*') continue;  /* comment line inside .model block */
+            /* Real non-model content: flush pending model */
+            parse_model_line(c,acc); acc[0]=0; in_model=0;
         }
     }
     if(in_model&&acc[0]) parse_model_line(c,acc); /* flush model at EOF */
@@ -1249,7 +1392,7 @@ static void param_subst(Circuit *c, char *s) {
             char key[32]; strncpy(key,open+1,kn); key[kn]=0;
             for(int i=0;i<c->nparam;i++){
                 if(!strcmp(c->param_names[i],key)){
-                    char rep[32]; snprintf(rep,32,"%s",real_to_str(c->param_vals[i],'e',6));
+                    char rep[32]; snprintf(rep,32,"%s",real_to_str(c->param_vals[i],'g',7));
                     int rl=(int)strlen(rep);
                     int rest=(int)strlen(close+1);
                     int oldl=(int)(close-s+1);
@@ -1289,12 +1432,22 @@ static void parse_param(Circuit *c, const char *s) {
     while(*s && c->nparam<256){
         while(*s==' '||*s=='\t') s++;
         const char *eq=strchr(s,'='); if(!eq) break;
-        int kl=(int)(eq-s); if(kl>31) kl=31;
+        int kl=(int)(eq-s);
+        /* P2.8 fix: strip trailing whitespace before '=' so key
+         * matches {param} substitution exactly (PTM format "key  =val"). */
+        while(kl>0 && (s[kl-1]==' '||s[kl-1]=='\t')) kl--;
+        if(kl>31) kl=31;
         if(kl>0){
             strncpy(c->param_names[c->nparam],s,kl);
             c->param_names[c->nparam][kl]=0;
             c->param_vals[c->nparam]=parse_eng(eq+1);
             c->nparam++;
+            /* P2.9: warn if param name collides with an existing Vsrc name */
+            for(int j=0;j<c->nv;j++){
+                if(!strcmp(c->param_names[c->nparam-1],c->vsrc[j].name))
+                    printf("[WARN] .param %s conflicts with Vsrc %s — DC may be wrong\n",
+                           c->param_names[c->nparam-1],c->vsrc[j].name);
+            }
         }
         s=eq+1; while(*s&&*s!=' ') s++;
     }
@@ -1732,52 +1885,39 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
      * Stage 4 (1e-12 gmin): effectively no artificial load — high accuracy.
      * Each stage starts from previous stage's converged solution.
      * Cmin provides "clean" diagonal damping (no DC bias, unlike gmin). */
+    /* P2.8: 9-stage source ramp + 5-stage gmin stepping.
+     * Source ramping scales all independent sources 0→100% so
+     * complementary MOSFET pairs (OTA, opamp) start near zero
+     * and converge gradually.  Gmin provides conductance to GND
+     * that is reduced as the solution improves. */
     REAL gmin_stages[] = {gm_base*R(1e5), gm_base*R(1e4), gm_base*R(1e3),
                           gm_base*R(1e2), gm_base};
     REAL cmin_vals [] = {R(1e-5), R(1e-6), R(1e-7), R(1e-9), R(0.0)};
     int n_stages = 5;
     int total_iters = 0;
 
-    /* ---- Source stepping (P2.1): ramp sources 0 → full value ----
-     * 4-stage exponential ramp: 0.1% → 1% → 10% → 100%.
-     * Each ramp uses the previous ramp's converged solution as its
-     * initial guess, ensuring Newton starts near the solution even
-     * for circuits with strong MOSFET nonlinearities.
-     */
     REAL *dc_orig=calloc(c->nv,sizeof(REAL));
     REAL *idc_orig=calloc(c->ni,sizeof(REAL));
     for(int j=0;j<c->nv;j++) dc_orig[j]=c->vsrc[j].dc;
     for(int j=0;j<c->ni;j++) idc_orig[j]=c->isrc[j].dc;
-    /* P2.8: 9-stage source ramp — ~3× per step for gentle multi-transistor startup.
-     * Coarse 10× jumps cause complementary MOSFET pairs to swing wildly → Newton fails.
-     * Finer granularity keeps each ramp step within the Newton basin of attraction. */
     REAL src_ramp[] = {R(1e-4), R(3e-4), R(1e-3), R(3e-3), R(1e-2),
                        R(3e-2), R(1e-1), R(3e-1), R(1.0)};
     int n_ramp = 9, ramp_failed = 0;
 
-  for(int ramp=0; ramp < n_ramp; ramp++){  /* === SOURCE RAMP OUTER LOOP === */
+  for(int ramp=0; ramp < n_ramp; ramp++){
     REAL alpha = src_ramp[ramp];
-    /* P2.8: Scale ALL sources — Vsrc DC + Isrc DC — for this ramp step.
-     * Current sources must scale with voltage sources, otherwise full bias
-     * currents fight near-zero supply at low ramp, making convergence
-     * impossible for current-biased circuits (OTA, opamp, bandgap). */
     for(int j=0;j<c->nv;j++) c->vsrc[j].dc = dc_orig[j] * alpha;
     for(int j=0;j<c->ni;j++) c->isrc[j].dc = idc_orig[j] * alpha;
-    /* Re-init grounded Vsrc fixed node voltages to scaled value.
-     * Free node voltages are KEPT from previous ramp as initial guess. */
     for(int j=0;j<c->nv;j++){
         if(vs_mna[j] < 0) v[c->vsrc[j].p] = c->vsrc[j].dc;
     }
-    /* Reset floating Vsrc branch currents (MNA variables) for fresh ramp */
     for(int j=0;j<c->nv;j++){
         if(vs_mna[j] >= 0) iv[j] = R(0.0);
     }
 
-    int stage_converged = 0;  /* scoped here for ramp-loop failure check */
-    /* P2.8: adaptive max_iter — low ramp needs more iterations to build up solution;
-     * high ramp can use tighter limit since starting from near-converged state. */
+    int stage_converged = 0;
     int max_iter_ramp = (alpha < R(0.1)) ? 200 : 150;
-    REAL vlim_stage = R(0.1);  /* P2.8: start very conservative, iter-based ramp */
+    REAL vlim_stage = R(0.1);
     for(int stage=0; stage < n_stages; stage++){
         REAL gmin = gmin_stages[stage];
         REAL cmin_val = cmin_vals[stage];  /* Cmin provides clean diagonal damping (P2.3) */
@@ -2462,6 +2602,35 @@ static const char *real_to_str(REAL v, char fmt, int prec) {
         int fpart=(int)(frac*s+R(0.5));
         if(fpart>=(int)s){ipart++;fpart=0;if(ipart>=10){ipart=1;exp++;}}
         snprintf(b,32,"%s%d.%0*de%+03d",sign?"-":"",ipart,prec,fpart,exp);
+    }else if(fmt=='g'){
+        if(v==R(0.0)||(v>=R(1e-4)&&v<R(1e6))){
+            /* fixed-point for normal-range numbers (and zero) */
+            int ipart=(int)v;
+            REAL frac=v-(REAL)ipart;
+            REAL s=R(1.0);for(int i=0;i<prec;i++)s*=R(10.0);
+            int fpart=(int)(frac*s+R(0.5));
+            if(fpart>=(int)s){ipart++;fpart=0;}
+            int len=snprintf(b,32,"%s%d.%0*d",sign?"-":"",ipart,prec,fpart);
+            while(len>0&&b[len-1]=='0') len--;
+            if(len>0&&b[len-1]=='.') len--;
+            b[len]=0;
+        }else{
+            /* scientific for very small/large numbers */
+            int exp=0;
+            if(v>R(0.0)){
+                while(v>=R(10.0)){v/=R(10.0);exp++;}
+                while(v<R(1.0)){v*=R(10.0);exp--;}
+            }
+            int ipart=(int)v;
+            REAL frac=v-(REAL)ipart;
+            REAL s=R(1.0);for(int i=0;i<prec;i++)s*=R(10.0);
+            int fpart=(int)(frac*s+R(0.5));
+            if(fpart>=(int)s){ipart++;fpart=0;if(ipart>=10){ipart=1;exp++;}}
+            int len=snprintf(b,32,"%s%d.%0*de%+03d",sign?"-":"",ipart,prec,fpart,exp);
+            while(len>0&&b[len-1]=='0') len--;
+            if(len>0&&b[len-1]=='.') len--;
+            b[len]=0;
+        }
     }else{
         int ipart=(int)v;
         REAL frac=v-(REAL)ipart;
