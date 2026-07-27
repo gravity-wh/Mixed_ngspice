@@ -321,6 +321,11 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
     REAL dT_Tnom=T_ratio-R(1.0);  /* T/Tnom - 1 */
     REAL vth0_T=pp->vth0 + pp->kt1*dT_Tnom + pp->kt2*dT_Tnom*dT_Tnom;
     REAL u0_T=pp->u0 * powf(T_ratio, pp->ute);
+    /* P2.8 fix: mobmod=0 (BSIM3 convention) uses cm²/V·s for U0.
+     * Convert to m²/V·s (×1e-4) so mobility units are consistent.
+     * mobmod>=1 uses m²/V·s natively — no conversion needed. */
+    if (pp->mobmod < R(0.5)) u0_T *= R(1e-4);
+    {static int once=0;if(!once){fprintf(stderr,"MOBMOD=%f U0=%e U0_T=%e\n",(double)pp->mobmod,(double)pp->u0,(double)u0_T);once=1;}}
     REAL ua_T=pp->ua + pp->ua1*dT_Tnom;
     REAL ub_T=pp->ub + pp->ub1*dT_Tnom;
     REAL uc_T=pp->uc + pp->uc1*dT_Tnom;
@@ -569,29 +574,73 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
     }
     o.vgsteff=vgsteff;
 
-    /* Mobility degradation (P1.5: mobMod=0/1/2 + Coulomb scattering) */
-    REAL Eeff=(vgsteff+R(2.0)*vth+pp->vth0)/(R(6.0)*pp->toxe+R(1e-12));
+    /* === BSIM4v5 Mobility Degradation (P1.3: mobMod=0/1/2 + Coulomb) ===
+     * Reference: b4v5ld.c lines 1367-1418.
+     *
+     * mobMod=0 (default): phonon + surface roughness scattering
+     *   Eeff = (Vgsteff + 2*Vth) / toxe
+     *   T5 = Eeff*(Ua + Ub*Eeff) + ud*(Vth/Eeff_toxe)^2
+     *
+     * mobMod=1: body-bias factor outside mobility term
+     *   T5 = Eeff*(Ua + Ub*Eeff)*(1 + Uc*Vbseff) + Coulomb
+     *
+     * mobMod=2: simplified with eu exponent
+     *   T0 = (Vgsteff + vtfbphi1) / toxe  (vtfbphi1 ≈ Vth + Vth0)
+     *   T5 = T0^eu * Ua_total + Coulomb
+     */
     REAL ueff;
-    /* P5.4: temperature-corrected ua/ub/uc */
-    REAL Ua_total=ua_T+uc_T*vbs_c+R(1e-30);
-    /* Base denominator: mobility degradation from vertical field */
-    REAL denom=R(1.0)+Ua_total*Eeff+ub_T*Eeff*Eeff;
-    if(pp->mobmod>R(1.5)){
-        /* mobMod=2: same as mobMod=0 base but with EU-controlled Coulomb term */
-        denom=R(1.0)+Ua_total*Eeff+ub_T*Eeff*Eeff;
-    }else if(pp->mobmod>R(0.5)){
-        /* mobMod=1: linear degradation U0/(1+Ua*Eeff) — simplified, no UB term */
-        denom=R(1.0)+Ua_total*Eeff;
+    {
+        /* P5.4: temperature-corrected Ua (ua_T, ub_T, uc_T pre-computed) */
+        REAL Ua_total = ua_T + uc_T * vbs_c;
+        REAL T5;  /* total mobility degradation term */
+        REAL T0, T3;  /* Eeff-related intermediates */
+
+        if (pp->mobmod > R(1.5)) {
+            /* ---- mobMod=2: T0^eu * Ua_total + Coulomb (b4v5ld.c:1392) ---- */
+            REAL vtfbphi1 = vth + pp->vth0;  /* approx flatband+phi1 */
+            T0 = (vgsteff + vtfbphi1) / (toxe_safe + R(1e-30));
+            if (T0 < R(1e-8)) T0 = R(1e-8);
+            REAL T1 = powf(T0, pp->eu);
+            T3 = T0 / (toxe_safe + R(1e-30));
+            REAL T6 = pp->ud / (T3*T3 + R(1e-30)) * vth * vth;
+            T5 = T1 * Ua_total + T6;
+        } else {
+            /* ---- mobMod=0/1: shared Eeff = (Vgsteff + 2*Vth)/toxe ---- */
+            T0 = vgsteff + R(2.0) * vth;
+            if (T0 < R(1e-8)) T0 = R(1e-8);
+            T3 = T0 / (toxe_safe + R(1e-30));  /* Eeff */
+            /* Coulomb: ud * (Vth / T3)^2 = ud * (Vth*toxe/(Vgsteff+2*Vth))^2 */
+            REAL T6 = pp->ud / (T3*T3 + R(1e-30)) * vth * vth;
+
+            if (pp->mobmod > R(0.5)) {
+                /* mobMod=1: Eeff*(Ua+Ub*Eeff)*(1+Uc*Vbseff) + Coulomb */
+                REAL T2 = R(1.0) + pp->uc * vbs_c;
+                REAL T4 = T3 * (ua_T + ub_T * T3);
+                T5 = T4 * T2 + T6;
+            } else {
+                /* mobMod=0: Eeff*(Ua+Ub*Eeff) + Coulomb */
+                T5 = T3 * (Ua_total + ub_T * T3) + T6;
+            }
+        }
+
+        /* ---- Denomi smoothing: prevent negative denominator (b4v5ld.c:1406) ---- */
+        REAL Denomi;
+        if (T5 >= R(-0.8)) {
+            Denomi = R(1.0) + T5;
+        } else {
+            REAL T9 = R(1.0) / (R(7.0) + R(10.0) * T5 + R(1e-30));
+            Denomi = (R(0.6) + T5) * T9;
+        }
+        if (Denomi < R(1e-4)) Denomi = R(1e-4);
+
+        ueff = u0_T / Denomi;
+
+        /* ---- Safety clamps ---- */
+        if (ueff < R(1e-4)) ueff = R(1e-4);
+        /* Upper bound: mobility cannot exceed low-field value by >20% */
+        if (ueff > u0_T * R(1.2)) ueff = u0_T * R(1.2);
+        o.ueff = ueff;
     }
-    /* Coulomb scattering (ud): adds remote-charge impurity scattering term.
-     * Active when ud>0 regardless of mobMod.  Typical: ud~0.5, eu~1.0 */
-    if(pp->ud>R(0.0)){
-        REAL Ec=Eeff/R(1e6);
-        denom+=pp->ud*powf(Ec,pp->eu);
-    }
-    ueff=u0_T/denom;
-    if(ueff<R(1e-4)) ueff=R(1e-4);
-    o.ueff=ueff;
 
     /* Abulk */
     REAL Ab0=R(1.0)+pp->k1/(R(2.0)*sqrt_phis+R(1e-12));
@@ -599,8 +648,10 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
     if(Abulk<R(1.0)) Abulk=R(1.0);
     o.Abulk=Abulk;
 
-    /* EsatL */
-    REAL EsatL=R(2.0)*pp->vsat/ueff*leff;
+    /* EsatL — with temperature-corrected vsat (P1.8) */
+    REAL vsat_T = pp->vsat - pp->at * dT_Tnom;
+    if (vsat_T < R(1.0e3)) vsat_T = R(1.0e3);
+    REAL EsatL = R(2.0) * vsat_T / ueff * leff;
     o.EsatL=EsatL;
 
     /* Vdsat */
@@ -737,8 +788,10 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
     if(pp->rdsw>R(0.0)||pp->rsw>R(0.0)||pp->rdw>R(0.0)){
         REAL weff_clamp=weff>R(1e-9)?weff:R(1e-9);
         REAL vgst4rds=vgsteff>R(0.0)?vgsteff:R(0.0);
-        /* Base rdsw per-side with gate-bias dependence */
-        REAL rs_rdsw=pp->rdsw/(weff_clamp*(R(1.0)+pp->prwg*vgst4rds)+R(1e-30));
+        /* Base rdsw per-side with gate-bias dependence — temperature-corrected (P1.8) */
+        REAL rdsw_T = pp->rdsw + pp->prt * dT_Tnom;
+        if (rdsw_T < R(0.0)) rdsw_T = R(0.0);
+        REAL rs_rdsw = rdsw_T / (weff_clamp * (R(1.0) + pp->prwg * vgst4rds) + R(1e-30));
         /* P5.5: rsw/rdw — independent source/drain resistance.
          * Use max of rdsw-based and rsw/rdw per terminal. */
         REAL rs_source=fmaxf(rs_rdsw, pp->rsw/(weff_clamp+R(1e-30)));
@@ -1900,9 +1953,12 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
     REAL *idc_orig=calloc(c->ni,sizeof(REAL));
     for(int j=0;j<c->nv;j++) dc_orig[j]=c->vsrc[j].dc;
     for(int j=0;j<c->ni;j++) idc_orig[j]=c->isrc[j].dc;
-    REAL src_ramp[] = {R(1e-4), R(3e-4), R(1e-3), R(3e-3), R(1e-2),
-                       R(3e-2), R(1e-1), R(3e-1), R(1.0)};
-    int n_ramp = 9, ramp_failed = 0;
+    /* P2.8: 3-stage source ramp — skips ultra-low α where gmin
+     * dominates and MOSFET stays off, producing false convergence.
+     * α=0.01 provides enough current (~100nA) for the NMOS diode
+     * to reach near-Vth (~0.5V) at gmin=1e-7 in ~50 iterations. */
+    REAL src_ramp[] = {R(1e-2), R(1e-1), R(1.0)};
+    int n_ramp = 3, ramp_failed = 0;
 
   for(int ramp=0; ramp < n_ramp; ramp++){
     REAL alpha = src_ramp[ramp];
@@ -1944,12 +2000,13 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
                 }
                 memset(a,0,N*N*sizeof(REAL)); memset(rhs,0,N*sizeof(REAL));
 
-                /* Gmin + Cmin (P2.3): diagonal damping from each free node to GND.
-                 * Gmin adds both a[j+j*N] AND rhs bias (DC leakage to GND).
-                 * Cmin adds ONLY a[j+j*N] — clean diagonal dominance, no DC bias. */
+                /* Gmin + Cmin: both contribute to Jacobian AND RHS.
+                 * Consistent linearization → 1-iter convergence for linear
+                 * stages.  Without RHS consistency, Newton rate is
+                 * ~cmin/(gmin+cmin) ≈ 0.99/iter → >1000 iters needed. */
                 for(int j=0;j<n;j++) if(j!=gnd && !vfixed[j]){
                     a[j+j*N]=effective_gmin + effective_cmin;
-                    rhs[j]=-effective_gmin*v[j];
+                    rhs[j]=-(effective_gmin + effective_cmin)*v[j];
                 }
 
                 /* Resistors */
