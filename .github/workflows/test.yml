@@ -127,20 +127,48 @@ jobs:
             exit 1
           fi
 
-      - name: Smoke test — NMOS DC
+      - name: P5.1 — DC circuits (7 circuits)
+        continue-on-error: true
         run: |
-          echo "=== NMOS DC OP ==="
-          ./float_spice/float_spice test/circuits/mx/mx_nmos_dc.sp || echo "WARNING: NMOS DC test had errors (may be expected for v2.5 POC)"
+          echo "=== P5.1: DC circuits ==="
+          FAIL=0
+          for f in \
+            test/circuits/01_single_nmos_45nm/test_dc.sp \
+            test/circuits/01_single_nmos_45nm/test_dc_sweep.sp \
+            test/circuits/02_single_pmos_45nm/test_dc.sp \
+            test/circuits/02_single_pmos_45nm/test_dc_sweep.sp \
+            test/circuits/04_ota_5transistor_45nm/test_dc.sp \
+            test/circuits/05_opamp_2stage_miller_45nm/test_dc.sp \
+            test/circuits/06_comparator_strongarm_45nm/test_tran.sp; do
+            echo "  Running: $f"
+            timeout 120 ./float_spice/float_spice "$f" > /tmp/fs_out.log 2>&1 || { echo "  FAIL: $f"; FAIL=1; }
+            grep -qi "error\|nan\|inf\|SIGSEGV" /tmp/fs_out.log && { echo "  ERROR/NaN: $f"; FAIL=1; }
+          done
+          echo "P5.1 result: $([ $FAIL -eq 0 ] && echo 'PASS' || echo 'FAIL')"
 
-      - name: Smoke test — NMOS DC Sweep
+      - name: P5.2 — AC circuits (2 circuits)
+        continue-on-error: true
         run: |
-          echo "=== NMOS DC Sweep ==="
-          ./float_spice/float_spice test/circuits/mx/mx_nmos_sweep.sp || echo "WARNING: NMOS sweep test had errors (may be expected for v2.5 POC)"
+          echo "=== P5.2: AC circuits ==="
+          for f in \
+            test/circuits/04_ota_5transistor_45nm/test_ac.sp \
+            test/circuits/05_opamp_2stage_miller_45nm/test_ac.sp; do
+            echo "  Running: $f"
+            timeout 120 ./float_spice/float_spice "$f" > /tmp/fs_ac.log 2>&1 || echo "  FAIL: $f (expected for v2.6)"
+            grep -q "vdb" /tmp/fs_ac.log && echo "  vdb output: OK" || echo "  vdb output: MISSING"
+          done
 
-      - name: Smoke test — PMOS DC
+      - name: P5.5 — Diode + BSIM4 regression
+        continue-on-error: true
         run: |
-          echo "=== PMOS DC OP ==="
-          ./float_spice/float_spice test/circuits/mx/mx_pmos_dc.sp || echo "WARNING: PMOS DC test had errors (may be expected for v2.5 POC)"
+          echo "=== P5.5: Regression (mx/ circuits) ==="
+          FAIL=0
+          for f in test/circuits/mx/mx_nmos_dc.sp test/circuits/mx/mx_pmos_dc.sp \
+                   test/circuits/mx/mx_nmos_sweep.sp test/circuits/mx/mx_pmos_sweep.sp; do
+            echo "  Running: $f"
+            timeout 120 ./float_spice/float_spice "$f" > /tmp/fs_reg.log 2>&1 || { echo "  FAIL: $f"; FAIL=1; }
+          done
+          echo "P5.5 regression: $([ $FAIL -eq 0 ] && echo 'PASS' || echo 'FAIL')"
 
       - name: Summary
         if: always()

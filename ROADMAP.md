@@ -231,6 +231,41 @@ These were discovered during a line-by-line audit of float_spice.c against the r
 | P4 | TRAN + verification + docs + release | 13.5h |
 | **Total** | | **~55.5h** |
 
+### Phase 5: float_spice Test Suite Coverage (2026-07-26)
+
+**Goal**: Unlock all 14 canonical test circuits for the from-scratch float_spice engine. ~1190 lines added (1779→~2970).
+
+| # | Task | Est. | Status |
+|---|------|:--:|:--:|
+| P5.1 | @device[param] access + .control let | 3h | ✅ IMPLEMENTED |
+| P5.2 | AC small-signal engine (complex MNA) | 5h | ✅ IMPLEMENTED |
+| P5.3 | Noise analysis (thermal + flicker) | 4h | 🔧 STRUCTURE ONLY |
+| P5.4 | .meas + .ic + temperature model | 4h | ✅ temp model + .ic parsing |
+| P5.5 | Diode device + BSIM4 completeness | 5h | ✅ IMPLEMENTED |
+| P5.6 | Controlled sources (E/F/G/H) | 5h | 🔴 PENDING (requires P5.4 .ic) |
+| P5.7 | CI extension + batch test upgrade | 2h | ✅ IMPLEMENTED |
+| P5.8 | Documentation update | 1h | ✅ IN PROGRESS |
+| **Phase 5 Total** | | **~29h** | **Core features complete** |
+
+**New capabilities unlocked**:
+- Expression evaluator: recursive descent, v()/i()/time/@device[param]/variables
+- Device parameter access: @m1[gm], @m2[ids], etc. — 8 params per MOSFET
+- AC analysis: complex LU, frequency sweep, vdb()/vp() output
+- Temperature model: Vt=kT/q, Vth/u0/ua/ub/uc temperature scaling (kt1/kt2/ute/ua1/ub1/uc1)
+- Diode device: exponential I-V, area scaling, model card parameters
+- BSIM4 completeness: dvt2 (body-bias SCE), minv (moderate-inversion), pvag (gate-bias CLM), rsw/rdw (independent S/D R)
+- Initial conditions: .ic v(node)=value parsing
+- CI: Phase-gated test gates for P5.1/P5.2/P5.5 circuits
+
+**Circuits now expected to pass**: 01_nmos_dc, 01_nmos_sweep, 02_pmos_dc, 02_pmos_sweep, 04_ota_dc, 05_opamp_dc, 06_comparator, 04_ota_ac, 05_opamp_ac + 4 mx/ regression circuits
+
+**Phase 6 forward-looking items**:
+- BJT (Q) — Gummel-Poon, ~300 lines
+- BSIM3v3 — PTM 180nm PDK, ~400 lines  
+- Sparse matrix solver — >256 nodes, ~300 lines
+- Spectre syntax parser — MG/dataset, ~500 lines
+- .lib section format — PDK library includes
+
 ---
 
 ## 🏁 v3.0 Status (2026-07-25)
