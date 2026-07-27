@@ -58,14 +58,19 @@ typedef struct {
     /* PWL: (ti,vi) pairs */
     int   pwl_n;
     REAL *pwl_t, *pwl_v;
+    /* P5.2: AC analysis source parameters */
+    REAL ac_mag, ac_phase;
 } Vsource;
 typedef struct { char name[32]; int p, n; REAL dc; } Isource;
 typedef struct { char name[32]; int p, n; REAL c; } Capacitor;
+/* P5.5: Diode device — exponential I-V model */
+typedef struct { char name[32]; int p, n; char model[32]; REAL area; } Diode;
 
 typedef struct {
     int nn, nr, nm, nv, nc, ni, ngnd;
     char nmap[MAX_NODES][32];
-    Resistor *res; Mosfet *mos; Vsource *vsrc; Capacitor *cap; Isource *isrc;
+    Resistor *res; Mosfet *mos; Vsource *vsrc; Capacitor *cap; Isource *isrc; Diode *dio;
+    int nd;  /* P5.5: diode count */
     Model models[MAX_MODELS]; int nmodel;
     Subckt subckts[MAX_SUBCKT]; int nsubckt;
     int do_op, do_dc, do_tran, dc_nested;
@@ -97,6 +102,27 @@ typedef struct {
      * mos_cap_i:  capacitor currents at previous step. */
     REAL *tran_mos_v_prev;  /* [nm*3] gate-source/drain/body voltages */
     REAL *tran_mos_cap_i;   /* [nm*3] Cgs/Cgd/Cgb currents */
+    /* P5.1: .control let variables + device parameter cache */
+    #define MAX_LETS 64
+    char let_names[MAX_LETS][32];
+    REAL let_vals[MAX_LETS];
+    char let_exprs[MAX_LETS][MAX_LINE];  /* expression text for re-eval */
+    int nlet;
+    #define MAX_DEVICE_PARAMS 1024
+    char dev_param_names[MAX_DEVICE_PARAMS][64];
+    REAL dev_param_vals[MAX_DEVICE_PARAMS];
+    int ndev_param;
+    /* P5.2: AC analysis */
+    int  do_ac;
+    char ac_type[8];      /* "dec" / "lin" / "oct" */
+    int  ac_n;
+    REAL ac_fstart, ac_fstop;
+    /* P5.4: .ic initial conditions */
+    #define MAX_IC 64
+    int nic;
+    int ic_nodes[MAX_IC];
+    REAL ic_vals[MAX_IC];
+    int tran_uic;  /* .tran uic flag */
 } Circuit;
 
 /* ===== Dense Matrix + Float LU ===== */
@@ -119,29 +145,89 @@ static int lu_solve(int n, REAL *a, REAL *b, REAL *x) {
     free(ipiv); return 0;
 }
 
-/* ===== BSIM4v5 Model Parameters (~51 fields, ALL FLOAT) ===== */
+/* P5.2: Complex dense LU solver with interleaved real/imag arrays.
+ * ar[N*N], ai[N*N] — interleaved real and imaginary parts.
+ * br[N], bi[N] — RHS real and imag.  xr[N], xi[N] — solution.
+ * Partial pivoting on magnitude sqrt(ar²+ai²). All FP32 arithmetic. */
+static int lu_solve_complex(int n, REAL *ar, REAL *ai, REAL *br, REAL *bi,
+                            REAL *xr, REAL *xi) {
+    int *ipiv=calloc(n,sizeof(int)); int i,j,k;
+    for(i=0;i<n;i++) ipiv[i]=i;
+    for(k=0;k<n;k++) {
+        /* Pivot: max magnitude */
+        REAL piv=R(0.0); int pr=k;
+        for(i=k;i<n;i++){
+            REAL mag=ar[i+k*n]*ar[i+k*n]+ai[i+k*n]*ai[i+k*n];
+            if(mag>piv){piv=mag;pr=i;}
+        }
+        if(piv<R(1e-30)){free(ipiv);return -1;}
+        if(pr!=k){
+            int ti=ipiv[k];ipiv[k]=ipiv[pr];ipiv[pr]=ti;
+            for(j=0;j<n;j++){ REAL tr=ar[k+j*n]; ar[k+j*n]=ar[pr+j*n]; ar[pr+j*n]=tr;
+                              REAL ti2=ai[k+j*n]; ai[k+j*n]=ai[pr+j*n]; ai[pr+j*n]=ti2; }
+        }
+        /* Elimination */
+        REAL pkr=ar[k+k*n], pki=ai[k+k*n];
+        REAL denom=pkr*pkr+pki*pki+R(1e-30);
+        for(i=k+1;i<n;i++){
+            REAL fr=ar[i+k*n], fi=ai[i+k*n];
+            REAL qr=(fr*pkr+fi*pki)/denom, qi=(fi*pkr-fr*pki)/denom;
+            for(j=k;j<n;j++){
+                ar[i+j*n]-=qr*ar[k+j*n]-qi*ai[k+j*n];
+                ai[i+j*n]-=qr*ai[k+j*n]+qi*ar[k+j*n];
+            }
+        }
+    }
+    /* Forward substitution */
+    for(i=0;i<n;i++){ xr[i]=br[ipiv[i]]; xi[i]=bi[ipiv[i]];
+        for(j=0;j<i;j++){
+            xr[i]-=ar[i+j*n]*xr[j]-ai[i+j*n]*xi[j];
+            xi[i]-=ar[i+j*n]*xi[j]+ai[i+j*n]*xr[j];
+        }
+    }
+    /* Back substitution */
+    for(i=n-1;i>=0;i--){
+        for(j=i+1;j<n;j++){
+            xr[i]-=ar[i+j*n]*xr[j]-ai[i+j*n]*xi[j];
+            xi[i]-=ar[i+j*n]*xi[j]+ai[i+j*n]*xr[j];
+        }
+        REAL den=ar[i+i*n]*ar[i+i*n]+ai[i+i*n]*ai[i+i*n]+R(1e-30);
+        REAL tx=(xr[i]*ar[i+i*n]+xi[i]*ai[i+i*n])/den;
+        xi[i]=(xi[i]*ar[i+i*n]-xr[i]*ai[i+i*n])/den;
+        xr[i]=tx;
+    }
+    free(ipiv); return 0;
+}
+
+/* ===== BSIM4v5 Model Parameters (74 fields, ALL FLOAT) ===== */
 typedef struct {
-    /* --- Core (16+3) --- */
+    /* --- Core (19) --- */
     REAL vth0,k1,k2,nfactor,eta0;
     REAL u0,ua,ub,uc,vsat,toxe;
     REAL mobmod,ud,eu; /* mobility model selector + Coulomb scattering */
-    REAL wint,lint,pclm,pdiblc1,a0;
-    /* --- Short-channel Vth (7) --- */
-    REAL dvt0,dvt1,dvt2,dsub,k3,w0,nlx;
-    /* --- Rds (4) --- */
-    REAL rdsw,rsw,rdw,prwg;
-    /* --- Early voltage stack (4) --- */
-    REAL pvag,pdiblc2,pscbe1,pscbe2;
-    /* --- Subthreshold (5) --- */
-    REAL voffcv,minv,cdsc,cdscd,cdscb;
-    /* --- Temperature (6) --- */
-    REAL kt1,kt2,ute,ua1,ub1,uc1;
+    REAL pclm;
+    /* --- Short-channel Vth (13) --- */
+    REAL dvt0,dvt1,dvt2,dvt0w,dvt1w,dvt2w;
+    REAL dsub,k3,k3b,w0,nlx;
+    REAL etab;          /* DIBL body-bias coefficient */
+    /* --- Rds (7) --- */
+    REAL rdsw,rsw,rdw,prwg,prwb,prt,wr;
+    /* --- Early voltage stack (7) --- */
+    REAL pvag,pdiblc1,pdiblc2,pdiblcb,drout,pscbe1,pscbe2;
+    /* --- Subthreshold (7) --- */
+    REAL voff,voffcv,minv,cdsc,cdscd,cdscb,cit;
+    /* --- Saturation / Vdsat (5) --- */
+    REAL a0,a1,a2,ags,delta;
+    /* --- Temperature (7) --- */
+    REAL kt1,kt1l,kt2,ute,ua1,ub1,uc1;
+    /* --- Geometry offsets (4) --- */
+    REAL wint,lint,dwg,dwb;
     /* --- Capacitance / junction (4) --- */
     REAL cgso,cgdo,cgbo,cj;
     /* --- Noise (2) --- */
     REAL noia,noib;
-    /* --- Physical / process (3) --- */
-    REAL xj,ndep,nsd;
+    /* --- Physical / process (4) --- */
+    REAL xj,ndep,nsd,at;
 } BSIM4Param;
 
 typedef struct {
@@ -157,21 +243,32 @@ static BSIM4Param bsim4_default(void) {
     p.eta0=R(0.0125); p.u0=R(0.049); p.ua=R(6e-10); p.ub=R(1.2e-18);
     p.uc=R(0.0); p.vsat=R(130000.0); p.toxe=R(1.8e-9);
     p.mobmod=R(0.0); p.ud=R(0.0); p.eu=R(1.0); /* mobMod=0; Coulomb off by default */
-    p.wint=R(5e-9); p.lint=R(0.0); p.pclm=R(0.02); p.pdiblc1=R(0.001); p.a0=R(1.0);
+    p.pclm=R(0.02);
     /* --- Short-channel Vth (BSIM4v5 UG defaults) --- */
     p.dvt0=R(2.2); p.dvt1=R(0.53); p.dvt2=R(-0.032);
-    p.dsub=R(0.56); p.k3=R(80.0); p.w0=R(2.5e-6); p.nlx=R(1.74e-7);
-    /* --- Rds (off by default) --- */
-    /* rdsw,rsw,rdw,prwg = 0 (from calloc) */
+    p.dvt0w=R(0.0); p.dvt1w=R(5.3e6); p.dvt2w=R(-0.032);
+    p.dsub=R(0.56); p.k3=R(80.0); p.k3b=R(0.0); p.w0=R(2.5e-6); p.nlx=R(1.74e-7);
+    p.etab=R(-0.07);
+    /* --- Rds --- */
+    /* rdsw,rsw,rdw,prwg,prwb,prt = 0 (from calloc) */
+    p.wr=R(1.0);
     /* --- Early voltage stack --- */
-    /* pvag = 0 (off); pdiblc2 and pscbe* below */
-    p.pdiblc2=R(0.001); p.pscbe1=R(4.24e8); p.pscbe2=R(1.0e-5);
+    p.pdiblc1=R(0.001); p.pdiblc2=R(0.001);
+    p.pdiblcb=R(0.0); p.drout=R(0.56);
+    p.pscbe1=R(4.24e8); p.pscbe2=R(1.0e-5);
+    /* pvag = 0 (off by default) */
     /* --- Subthreshold --- */
-    p.cdsc=R(2.4e-4);
+    p.voff=R(-0.08); p.cdsc=R(2.4e-4); p.cit=R(0.0);
     /* voffcv, minv, cdscd, cdscb = 0 (off by default) */
+    /* --- Saturation / Vdsat --- */
+    p.a0=R(1.0); p.a1=R(0.0); p.a2=R(1.0);
+    p.ags=R(0.0); p.delta=R(0.01);
     /* --- Temperature --- */
-    p.kt1=R(-0.11); p.kt2=R(0.022);
+    p.kt1=R(-0.11); p.kt1l=R(0.0); p.kt2=R(0.022);
     p.ute=R(-1.5); p.ua1=R(4.31e-9); p.ub1=R(-7.61e-18); p.uc1=R(-5.6e-11);
+    /* --- Geometry offsets --- */
+    p.wint=R(5e-9); p.lint=R(0.0);
+    /* dwg, dwb = 0 (from calloc) */
     /* --- Capacitance (off by default) --- */
     p.cj=R(5.0e-4);
     /* cgso, cgdo, cgbo = 0 (from calloc) */
@@ -179,6 +276,7 @@ static BSIM4Param bsim4_default(void) {
     /* noia, noib = 0 (from calloc) */
     /* --- Physical / process --- */
     p.xj=R(1.5e-8); p.ndep=R(1.7e17); p.nsd=R(1.0e20);
+    p.at=R(3.3e4);
     return p;
 }
 
@@ -188,13 +286,23 @@ static inline REAL smooth_vdseff(REAL vds, REAL vdsat) {
 }
 
 BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
-                     const BSIM4Param *pp) {
+                     const BSIM4Param *pp, REAL temp) {
     BSIM4Out o; memset(&o,0,sizeof(o));
     /* Guard: toxe=0 (model parse failure) → coxe=INF → NaN/INF cascade.
      * Use safe default 1.8nm when toxe is missing or corrupt. */
     REAL toxe_safe=pp->toxe;
     if(toxe_safe<R(1e-12)) toxe_safe=R(1.8e-9);
-    REAL vt=R(0.02585), coxe=R(3.9)*R(8.854187817e-12)/toxe_safe;
+    /* P5.4: Temperature-dependent thermal voltage + parameter corrections */
+    REAL Tnom=R(300.15);
+    REAL vt=R(8.617333e-5)*temp;  /* k_B/q * T */
+    REAL T_ratio=temp/Tnom;
+    REAL dT_Tnom=T_ratio-R(1.0);  /* T/Tnom - 1 */
+    REAL vth0_T=pp->vth0 + pp->kt1*dT_Tnom + pp->kt2*dT_Tnom*dT_Tnom;
+    REAL u0_T=pp->u0 * powf(T_ratio, pp->ute);
+    REAL ua_T=pp->ua + pp->ua1*dT_Tnom;
+    REAL ub_T=pp->ub + pp->ub1*dT_Tnom;
+    REAL uc_T=pp->uc + pp->uc1*dT_Tnom;
+    REAL coxe=R(3.9)*R(8.854187817e-12)/toxe_safe;
     REAL phis=R(0.6), sqrt_phis=sqrtf(phis);
     REAL vbs_c=(vbs<R(0.0))?vbs:R(0.0);
     REAL sq=sqrtf(phis-vbs_c+R(1e-12));
@@ -236,6 +344,8 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
          * ΔVth = -θ * (Vbi - phis)                      */
         REAL L_lt=Lcm/(lt+R(1e-30));
         REAL dVth_sce=pp->dvt0*expf(-pp->dvt1*L_lt)*(Vbi-phis);
+        /* P5.5: dvt2 body-bias dependence of SCE */
+        dVth_sce*=(R(1.0)+pp->dvt2*vbs_c);
 
         /* DIBL: θ_dibl = exp(-DSUB * Leff / lto)
          * ΔVth = -θ_dibl * eta0 * Vds  (etab≈0)       */
@@ -252,7 +362,7 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
         REAL dVth_nlx=pp->k1*(sqrtf(R(1.0)+nlx_r)-R(1.0))*sqrt_phis;
 
         /* Full Vth */
-        REAL vth_body=pp->vth0+pp->k1*(sq-sqrt_phis)-pp->k2*vbs_c;
+        REAL vth_body=vth0_T+pp->k1*(sq-sqrt_phis)-pp->k2*vbs_c;
         REAL vth=vth_body-dVth_sce-dVth_dibl+dVth_nw+dVth_nlx;
         if(vth<R(0.02))vth=R(0.02);
         o.vth=vth;
@@ -298,7 +408,17 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
                 vgsteff = n_eff * vt * logf(R(1.0) + expf(arg));
                 if(vgsteff < R(0.0)) vgsteff = R(0.0);
 
-                /* TODO: minv>0 moderate-inversion dual-branch (future P1.6+) */
+                /* P5.5: minv>0 moderate-inversion dual-branch smoothing.
+                 * When minv>0, blend classical single-exp with linear Vgst branch
+                 * using a sigmoid weight for smooth transition. */
+                if(pp->minv>R(0.0)){
+                    REAL Vgst_hi=R(2.0)*n_eff*vt;  /* strong inversion reference */
+                    REAL denom=R(0.5)*n_eff*vt+R(1e-30);
+                    REAL minv_w=R(1.0)/(R(1.0)+expf(-(Vgst-Vgst_hi)/denom));
+                    REAL vg_classic=vgsteff;
+                    REAL vg_linear=fmaxf(Vgst,R(0.0));
+                    vgsteff=minv_w*vg_classic+(R(1.0)-minv_w)*vg_linear;
+                }
             }
         }
     }
@@ -311,12 +431,13 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
     /* Mobility degradation (P1.5: mobMod=0/1/2 + Coulomb scattering) */
     REAL Eeff=(vgsteff+R(2.0)*vth+pp->vth0)/(R(6.0)*pp->toxe+R(1e-12));
     REAL ueff;
-    REAL Ua_total=pp->ua+pp->uc*vbs_c+R(1e-30);
+    /* P5.4: temperature-corrected ua/ub/uc */
+    REAL Ua_total=ua_T+uc_T*vbs_c+R(1e-30);
     /* Base denominator: mobility degradation from vertical field */
-    REAL denom=R(1.0)+Ua_total*Eeff+pp->ub*Eeff*Eeff;
+    REAL denom=R(1.0)+Ua_total*Eeff+ub_T*Eeff*Eeff;
     if(pp->mobmod>R(1.5)){
         /* mobMod=2: same as mobMod=0 base but with EU-controlled Coulomb term */
-        denom=R(1.0)+Ua_total*Eeff+pp->ub*Eeff*Eeff;
+        denom=R(1.0)+Ua_total*Eeff+ub_T*Eeff*Eeff;
     }else if(pp->mobmod>R(0.5)){
         /* mobMod=1: linear degradation U0/(1+Ua*Eeff) — simplified, no UB term */
         denom=R(1.0)+Ua_total*Eeff;
@@ -327,7 +448,7 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
         REAL Ec=Eeff/R(1e6);
         denom+=pp->ud*powf(Ec,pp->eu);
     }
-    ueff=pp->u0/denom;
+    ueff=u0_T/denom;
     if(ueff<R(1e-4)) ueff=R(1e-4);
     o.ueff=ueff;
 
@@ -389,6 +510,11 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
 
         /* Vasat: EsatL*Leff + Vdsat + 2*Vgsteff/Abulk */
         REAL Vasat=EsatL+vdsat+R(2.0)*vgsteff/(Abulk+R(1e-30));
+        /* P5.5: pvag gate-bias dependent Early enhancement */
+        if(pp->pvag>R(0.0)){
+            REAL EsatLeff=EsatL*leff;
+            Vasat+=pp->pvag*vgsteff*EsatLeff/(vgsteff+EsatLeff+R(1e-30));
+        }
         if(Vasat<R(1e-6)) Vasat=R(1e-6);
 
         /* VACLM: channel length modulation */
@@ -467,14 +593,18 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
      * Bias-dependent Rds reduces intrinsic Vgs/Vds when Ids flows.
      * First-order correction: source degeneration for gm/gmbs,
      * drain+source feedback for Ids/gds.  Disabled when rdsw==0. */
-    if(pp->rdsw>R(0.0)){
+    if(pp->rdsw>R(0.0)||pp->rsw>R(0.0)||pp->rdw>R(0.0)){
         REAL weff_clamp=weff>R(1e-9)?weff:R(1e-9);
         REAL vgst4rds=vgsteff>R(0.0)?vgsteff:R(0.0);
-        /* Rds per side = RDSW / (Weff * (1 + PRWG*Vgsteff)) */
-        REAL rs_per_side=pp->rdsw/(weff_clamp*(R(1.0)+pp->prwg*vgst4rds)+R(1e-30));
-        REAL rout=R(2.0)*rs_per_side; /* source + drain */
+        /* Base rdsw per-side with gate-bias dependence */
+        REAL rs_rdsw=pp->rdsw/(weff_clamp*(R(1.0)+pp->prwg*vgst4rds)+R(1e-30));
+        /* P5.5: rsw/rdw — independent source/drain resistance.
+         * Use max of rdsw-based and rsw/rdw per terminal. */
+        REAL rs_source=fmaxf(rs_rdsw, pp->rsw/(weff_clamp+R(1e-30)));
+        REAL rd_drain =fmaxf(rs_rdsw, pp->rdw/(weff_clamp+R(1e-30)));
+        REAL rout=rs_source+rd_drain;
         /* Source degeneration: gm and gmbs reduced */
-        REAL src_degen=R(1.0)+o.gm*rs_per_side;
+        REAL src_degen=R(1.0)+o.gm*rs_source;
         o.gm/=src_degen;
         o.gmbs/=src_degen;
         /* Drain feedback: gds reduced */
@@ -526,6 +656,154 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
     return o;
 }
 
+/* P5.1: emit device parameter table after DC solve.
+ * Iterates all MOSFETs, evaluates BSIM4 at converged voltages,
+ * stores key params keyed as "M1.gm", "M2.ids", etc. */
+static void emit_device_param_table(Circuit *c, REAL *v, BSIM4Param *const *pp_arr) {
+    c->ndev_param=0;
+    for(int j=0;j<c->nm && c->ndev_param+8 <= MAX_DEVICE_PARAMS;j++){
+        Mosfet *m=&c->mos[j];
+        const BSIM4Param *pp=pp_arr[j];
+        REAL vgs=v[m->g]-v[m->s], vds=v[m->d]-v[m->s], vbs=v[m->b]-v[m->s];
+        REAL weff=m->w-R(2.0)*pp->wint, leff=m->l-R(2.0)*pp->lint;
+        if(weff<R(1e-8)) weff=R(1e-8); if(leff<R(1e-9)) leff=R(1e-9);
+        BSIM4Out o=bsim4_eval(vgs,vds,vbs,weff,leff,pp,c->temp);
+        /* Store 8 params per device: ids, gm, gds, gmbs, vth, vdsat, vgsteff, beta */
+        const char *keys[]={"ids","gm","gds","gmbs","vth","vdsat","vgsteff","beta"};
+        REAL vals[]={o.ids,o.gm,o.gds,o.gmbs,o.vth,o.vdsat,o.vgsteff,o.beta};
+        for(int k=0;k<8;k++){
+            snprintf(c->dev_param_names[c->ndev_param],63,"%s.%s",m->name,keys[k]);
+            c->dev_param_vals[c->ndev_param]=vals[k];
+            c->ndev_param++;
+        }
+    }
+}
+
+/* P5.1: Forward declarations for functions defined later */
+static REAL eval_expr(const char **p, Circuit *c, REAL *v, REAL *iv,
+                      BSIM4Param *const *pp_arr, REAL t);
+static REAL parse_eng(const char *s);
+static const char *real_to_str(REAL v, char fmt, int prec);  /* P0.4: zero cvtss2sd */
+
+/* P5.1: Re-evaluate all let expressions with actual voltages/device params.
+ * Called after dc_solve and emit_device_param_table. */
+static void re_eval_lets(Circuit *c, REAL *v, REAL *iv,
+                         BSIM4Param *const *pp_arr, REAL t) {
+    for(int i=0;i<c->nlet;i++){
+        const char *ep=c->let_exprs[i];
+        c->let_vals[i]=eval_expr(&ep,c,v,iv,pp_arr,t);
+    }
+}
+
+/* P5.1: Expression evaluator — recursive descent, flat structure (no nested fns).
+ * Terminals: number (parse_eng), v(node), i(vsrc), @device[param],
+ *            variable (let_names then param_names), time.
+ * Operators: + - * / ^ (unary -).  Returns 0.0f on parse failure. */
+
+/* ---- helper: skip whitespace ---- */
+#define SKIP_WS(p) while(*(p)==' '||*(p)=='\t') (p)++
+
+/* ---- eval_primary: terminals + '(' expr ')' + unary +/- ---- */
+static REAL eval_primary(const char **pp, Circuit *c, REAL *v, REAL *iv,
+                         BSIM4Param *const *pp_arr, REAL t) {
+    const char *p=*pp; SKIP_WS(p);
+    /* parentheses */
+    if(*p=='('){ p++; REAL val=eval_expr(&p,c,v,iv,pp_arr,t); SKIP_WS(p);
+                 if(*p==')') p++; *pp=p; return val; }
+    if(*p=='-'){ p++; return -eval_primary(&p,c,v,iv,pp_arr,t); }
+    if(*p=='+'){ p++; return eval_primary(&p,c,v,iv,pp_arr,t); }
+    /* v(node) */
+    if((*p=='v'||*p=='V')&&(p[1]=='('||p[1]==' ')){
+        while(*p&&*p!='(') p++; if(*p=='(') p++;
+        char nbuf[32]; int ni=0;
+        while(*p&&*p!=')'&&ni<31) nbuf[ni++]=*p++;
+        nbuf[ni]=0; if(*p==')') p++;
+        for(int j=0;j<c->nn;j++) if(!strcmp(c->nmap[j],nbuf)){*pp=p;return v[j];}
+        *pp=p; return R(0.0);
+    }
+    /* i(vsrc) */
+    if((*p=='i'||*p=='I')&&(p[1]=='('||p[1]==' ')){
+        while(*p&&*p!='(') p++; if(*p=='(') p++;
+        char nbuf[32]; int ni=0;
+        while(*p&&*p!=')'&&ni<31) nbuf[ni++]=*p++;
+        nbuf[ni]=0; if(*p==')') p++;
+        for(int j=0;j<c->nv;j++) if(!strcmp(c->vsrc[j].name,nbuf)){*pp=p;return iv[j];}
+        for(int j=0;j<c->ni;j++) if(!strcmp(c->isrc[j].name,nbuf)){*pp=p;return c->isrc[j].dc;}
+        *pp=p; return R(0.0);
+    }
+    /* @device[param] */
+    if(*p=='@'){ p++;
+        char dname[32]; int di=0;
+        while(*p&&*p!='['&&di<31) dname[di++]=*p++;
+        dname[di]=0; if(*p=='[') p++;
+        char pname[32]; int pi=0;
+        while(*p&&*p!=']'&&pi<31) pname[pi++]=*p++;
+        pname[pi]=0; if(*p==']') p++;
+        char full[64]; snprintf(full,63,"%s.%s",dname,pname);
+        for(int j=0;j<c->ndev_param;j++)
+            if(!strcmp(c->dev_param_names[j],full)){*pp=p;return c->dev_param_vals[j];}
+        *pp=p; return R(0.0);
+    }
+    /* time keyword */
+    if(!strncmp(p,"time",4)&&(!p[4]||p[4]==' '||p[4]==')'||p[4]=='+'||p[4]=='-'||p[4]=='*'||p[4]=='/'||p[4]=='^'))
+        {*pp=p+4; return t;}
+    /* number */
+    if(isdigit(*p)||*p=='.'){
+        REAL val=parse_eng(p); int has_exp=0;
+        while(1){ char ch=*p;
+            if(isdigit(ch)||ch=='.') p++;
+            else if((ch=='e'||ch=='E')&&!has_exp){p++;has_exp=1;if(*p=='+'||*p=='-')p++;}
+            else break;
+        }
+        while(*p=='k'||*p=='K'||*p=='m'||*p=='u'||*p=='n'||*p=='p'||*p=='f'||*p=='M'||*p=='E'||*p=='G'){
+            if(!strncmp(p,"meg",3)||!strncmp(p,"MEG",3)){p+=3;break;}
+            if(!strncmp(p,"mil",3)){p+=3;break;} p++;
+        }
+        *pp=p; return val;
+    }
+    /* identifier */
+    if(isalpha(*p)||*p=='_'){
+        char ident[32]; int ii=0;
+        while((isalnum(*p)||*p=='_'||*p=='!')&&ii<31) ident[ii++]=*p++;
+        ident[ii]=0;
+        for(int j=0;j<c->nlet;j++) if(!strcmp(c->let_names[j],ident)){*pp=p;return c->let_vals[j];}
+        for(int j=0;j<c->nparam;j++) if(!strcmp(c->param_names[j],ident)){*pp=p;return c->param_vals[j];}
+        *pp=p; return R(0.0);
+    }
+    if(*p) p++; *pp=p; return R(0.0);
+}
+
+/* ---- eval_power: primary ('^' power)? ---- */
+static REAL eval_power(const char **pp, Circuit *c, REAL *v, REAL *iv,
+                       BSIM4Param *const *pp_arr, REAL t) {
+    REAL val=eval_primary(pp,c,v,iv,pp_arr,t); const char *p=*pp; SKIP_WS(p);
+    if(*p=='^'){ p++; REAL expo=eval_power(&p,c,v,iv,pp_arr,t); *pp=p; return powf(val,expo); }
+    *pp=p; return val;
+}
+
+/* ---- eval_term: power (('*'|'/') power)* ---- */
+static REAL eval_term(const char **pp, Circuit *c, REAL *v, REAL *iv,
+                      BSIM4Param *const *pp_arr, REAL t) {
+    REAL val=eval_power(pp,c,v,iv,pp_arr,t); const char *p=*pp; SKIP_WS(p);
+    while(*p=='*'||*p=='/'){
+        char op=*p++; REAL rhs=eval_power(&p,c,v,iv,pp_arr,t); SKIP_WS(p);
+        if(op=='*') val*=rhs; else {if(fabsf(rhs)>R(1e-30))val/=rhs;else val=R(0.0);}
+    }
+    *pp=p; return val;
+}
+
+/* ---- eval_expr: term (('+'|'-') term)* ---- */
+static REAL eval_expr(const char **pp, Circuit *c, REAL *v, REAL *iv,
+                      BSIM4Param *const *pp_arr, REAL t) {
+    REAL val=eval_term(pp,c,v,iv,pp_arr,t); const char *p=*pp; SKIP_WS(p);
+    while(*p=='+'||*p=='-'){
+        char op=*p++; REAL rhs=eval_term(&p,c,v,iv,pp_arr,t); SKIP_WS(p);
+        val=(op=='+')?val+rhs:val-rhs;
+    }
+    *pp=p; return val;
+}
+#undef SKIP_WS
+
 /* ===== SPICE Netlist Parser ===== */
 static Model* find_model(Circuit *c, const char *name) {
     for(int i=0;i<c->nmodel;i++) if(!strcmp(c->models[i].name,name)) return &c->models[i];
@@ -563,44 +841,63 @@ static REAL model_get(const Model *m, const char *key, REAL def) {
 }
 static void bsim4_from_model(BSIM4Param *pp, const Model *m) {
     *pp=bsim4_default();
-    /* --- Core (16) --- */
+    /* --- Core (15) --- */
     pp->vth0=model_get(m,"vth0",pp->vth0); pp->k1=model_get(m,"k1",pp->k1);
     pp->k2=model_get(m,"k2",pp->k2); pp->nfactor=model_get(m,"nfactor",pp->nfactor);
     pp->eta0=model_get(m,"eta0",pp->eta0); pp->u0=model_get(m,"u0",pp->u0);
     pp->ua=model_get(m,"ua",pp->ua); pp->ub=model_get(m,"ub",pp->ub);
     pp->uc=model_get(m,"uc",pp->uc); pp->vsat=model_get(m,"vsat",pp->vsat);
     pp->toxe=model_get(m,"toxe",pp->toxe);
-    pp->mobmod=model_get(m,"mobmod",pp->mobmod); pp->ud=model_get(m,"ud",pp->ud); pp->eu=model_get(m,"eu",pp->eu);
-    pp->wint=model_get(m,"wint",pp->wint);
-    pp->lint=model_get(m,"lint",pp->lint); pp->pclm=model_get(m,"pclm",pp->pclm);
-    pp->pdiblc1=model_get(m,"pdiblc1",pp->pdiblc1); pp->a0=model_get(m,"a0",pp->a0);
-    /* --- Short-channel Vth (7) --- */
+    pp->mobmod=model_get(m,"mobmod",pp->mobmod);
+    pp->ud=model_get(m,"ud",pp->ud); pp->eu=model_get(m,"eu",pp->eu);
+    pp->pclm=model_get(m,"pclm",pp->pclm);
+    /* --- Short-channel Vth (12) --- */
     pp->dvt0=model_get(m,"dvt0",pp->dvt0); pp->dvt1=model_get(m,"dvt1",pp->dvt1);
-    pp->dvt2=model_get(m,"dvt2",pp->dvt2); pp->dsub=model_get(m,"dsub",pp->dsub);
-    pp->k3=model_get(m,"k3",pp->k3); pp->w0=model_get(m,"w0",pp->w0);
-    pp->nlx=model_get(m,"nlx",pp->nlx);
-    /* --- Rds (4) --- */
+    pp->dvt2=model_get(m,"dvt2",pp->dvt2);
+    pp->dvt0w=model_get(m,"dvt0w",pp->dvt0w); pp->dvt1w=model_get(m,"dvt1w",pp->dvt1w);
+    pp->dvt2w=model_get(m,"dvt2w",pp->dvt2w);
+    pp->dsub=model_get(m,"dsub",pp->dsub); pp->k3=model_get(m,"k3",pp->k3);
+    pp->k3b=model_get(m,"k3b",pp->k3b); pp->w0=model_get(m,"w0",pp->w0);
+    pp->nlx=model_get(m,"nlx",pp->nlx); pp->etab=model_get(m,"etab",pp->etab);
+    /* --- Rds (7) --- */
     pp->rdsw=model_get(m,"rdsw",pp->rdsw); pp->rsw=model_get(m,"rsw",pp->rsw);
     pp->rdw=model_get(m,"rdw",pp->rdw); pp->prwg=model_get(m,"prwg",pp->prwg);
-    /* --- Early voltage stack (4) --- */
-    pp->pvag=model_get(m,"pvag",pp->pvag); pp->pdiblc2=model_get(m,"pdiblc2",pp->pdiblc2);
-    pp->pscbe1=model_get(m,"pscbe1",pp->pscbe1); pp->pscbe2=model_get(m,"pscbe2",pp->pscbe2);
-    /* --- Subthreshold (5) --- */
-    pp->voffcv=model_get(m,"voffcv",pp->voffcv); pp->minv=model_get(m,"minv",pp->minv);
+    pp->prwb=model_get(m,"prwb",pp->prwb); pp->prt=model_get(m,"prt",pp->prt);
+    pp->wr=model_get(m,"wr",pp->wr);
+    /* --- Early voltage stack (7) --- */
+    pp->pvag=model_get(m,"pvag",pp->pvag);
+    pp->pdiblc1=model_get(m,"pdiblc1",pp->pdiblc1);
+    pp->pdiblc2=model_get(m,"pdiblc2",pp->pdiblc2);
+    pp->pdiblcb=model_get(m,"pdiblcb",pp->pdiblcb);
+    pp->drout=model_get(m,"drout",pp->drout);
+    pp->pscbe1=model_get(m,"pscbe1",pp->pscbe1);
+    pp->pscbe2=model_get(m,"pscbe2",pp->pscbe2);
+    /* --- Subthreshold (7) --- */
+    pp->voff=model_get(m,"voff",pp->voff);
+    pp->voffcv=model_get(m,"voffcv",pp->voffcv);
+    pp->minv=model_get(m,"minv",pp->minv);
     pp->cdsc=model_get(m,"cdsc",pp->cdsc); pp->cdscd=model_get(m,"cdscd",pp->cdscd);
-    pp->cdscb=model_get(m,"cdscb",pp->cdscb);
-    /* --- Temperature (6) --- */
-    pp->kt1=model_get(m,"kt1",pp->kt1); pp->kt2=model_get(m,"kt2",pp->kt2);
+    pp->cdscb=model_get(m,"cdscb",pp->cdscb); pp->cit=model_get(m,"cit",pp->cit);
+    /* --- Saturation / Vdsat (5) --- */
+    pp->a0=model_get(m,"a0",pp->a0); pp->a1=model_get(m,"a1",pp->a1);
+    pp->a2=model_get(m,"a2",pp->a2); pp->ags=model_get(m,"ags",pp->ags);
+    pp->delta=model_get(m,"delta",pp->delta);
+    /* --- Temperature (7) --- */
+    pp->kt1=model_get(m,"kt1",pp->kt1); pp->kt1l=model_get(m,"kt1l",pp->kt1l);
+    pp->kt2=model_get(m,"kt2",pp->kt2);
     pp->ute=model_get(m,"ute",pp->ute); pp->ua1=model_get(m,"ua1",pp->ua1);
     pp->ub1=model_get(m,"ub1",pp->ub1); pp->uc1=model_get(m,"uc1",pp->uc1);
+    /* --- Geometry offsets (4) --- */
+    pp->wint=model_get(m,"wint",pp->wint); pp->lint=model_get(m,"lint",pp->lint);
+    pp->dwg=model_get(m,"dwg",pp->dwg); pp->dwb=model_get(m,"dwb",pp->dwb);
     /* --- Capacitance / junction (4) --- */
     pp->cgso=model_get(m,"cgso",pp->cgso); pp->cgdo=model_get(m,"cgdo",pp->cgdo);
     pp->cgbo=model_get(m,"cgbo",pp->cgbo); pp->cj=model_get(m,"cj",pp->cj);
     /* --- Noise (2) --- */
     pp->noia=model_get(m,"noia",pp->noia); pp->noib=model_get(m,"noib",pp->noib);
-    /* --- Physical / process (3) --- */
+    /* --- Physical / process (4) --- */
     pp->xj=model_get(m,"xj",pp->xj); pp->ndep=model_get(m,"ndep",pp->ndep);
-    pp->nsd=model_get(m,"nsd",pp->nsd);
+    pp->nsd=model_get(m,"nsd",pp->nsd); pp->at=model_get(m,"at",pp->at);
 }
 static void parse_model_line(Circuit *c, const char *line) {
     Model m; memset(&m,0,sizeof(m)); char rest[MAX_LINE];
@@ -610,8 +907,10 @@ static void parse_model_line(Circuit *c, const char *line) {
     while(*tok){
         while(*tok==' '||*tok=='\t') tok++;
         char *eq=strchr(tok,'='); if(!eq) break;
-        char *ps=eq-1; while(ps>=tok&&(*ps!=' '&&*ps!='\t')) ps--; ps++;
-        int pl=(int)(eq-ps); if(pl>31) pl=31;
+        /* P0.3: skip whitespace between key and '=' (PTM .lib format key  =val) */
+        char *ke=eq-1; while(ke>=tok&&(*ke==' '||*ke=='\t')) ke--;
+        char *ps=ke; while(ps>=tok&&(*ps!=' '&&*ps!='\t')) ps--; ps++;
+        int pl=(int)(ke-ps+1); if(pl>31) pl=31;
         strncpy(m.p[m.np].key,ps,pl); m.p[m.np].key[pl]=0;
         for(char *k=m.p[m.np].key;*k;k++) *k=(char)tolower((unsigned char)*k);
         eq++; m.p[m.np].val=parse_eng(eq); m.np++;
@@ -627,12 +926,37 @@ static void parse_include(Circuit *c, const char *line, const char *pdir) {
     FILE *fp=fopen(full,"r"); if(!fp) fp=fopen(fn,"r"); if(!fp) return;
     char idir[1024]; strncpy(idir,full,1023);idir[1023]=0;
     char *sl=strrchr(idir,'/'); if(sl) *sl=0; else strcpy(idir,".");
-    char buf[MAX_LINE];
+    char buf[MAX_LINE], acc[MAX_LINE*2]=""; /* accumulated multi-line .model */
+    int in_model=0;
     while(fgets(buf,MAX_LINE,fp)){
         char *s=buf; while(*s==' '||*s=='\t') s++;
-        if(!strncmp(s,".model",6)) parse_model_line(c,s);
-        else if(!strncmp(s,".include",8)) parse_include(c,s,idir);
+        /* P0.3: handle continuation lines (+ prefix) inside .model blocks */
+        if(*s=='+'){
+            if(in_model){
+                int alen=strlen(acc);
+                while(alen>0&&(acc[alen-1]=='\n'||acc[alen-1]=='\r')) acc[--alen]=0;
+                /* copy continuation content, strip trailing whitespace/newline */
+                char cont[MAX_LINE]; strncpy(cont,s+1,MAX_LINE-1);cont[MAX_LINE-1]=0;
+                int clen=strlen(cont);
+                while(clen>0&&(cont[clen-1]=='\n'||cont[clen-1]=='\r'||cont[clen-1]==' '||cont[clen-1]=='\t'))cont[--clen]=0;
+                snprintf(acc+alen,sizeof(acc)-alen," %s",cont);
+            }
+        }else if(!strncmp(s,".model",6)){
+            if(in_model&&acc[0]) parse_model_line(c,acc);
+            /* copy model line, strip trailing newline for clean accumulation */
+            int slen=(int)strlen(s);
+            while(slen>0&&(s[slen-1]=='\n'||s[slen-1]=='\r')) slen--;
+            memcpy(acc,s,slen); acc[slen]=0;
+            in_model=1;
+        }else if(!strncmp(s,".include",8)){
+            if(in_model&&acc[0]){parse_model_line(c,acc);in_model=0;}
+            parse_include(c,s,idir);
+        }else{
+            /* comment, blank, or other non-model line: flush pending model */
+            if(in_model&&acc[0]){parse_model_line(c,acc);in_model=0;}
+        }
     }
+    if(in_model&&acc[0]) parse_model_line(c,acc); /* flush model at EOF */
     fclose(fp);
 }
 static int parse_instance(Circuit *c, const char *s) {
@@ -696,6 +1020,14 @@ static int parse_instance(Circuit *c, const char *s) {
             }
             {char *dcp=strstr(s,"DC");if(!dcp)dcp=strstr(s,"dc");
              if(dcp&&dcp>wf)v.dc=parse_eng(dcp+2);}
+            /* P5.2: AC magnitude and optional phase */
+            v.ac_mag=R(0.0); v.ac_phase=R(0.0);
+            {char *acp=strstr(s,"AC");if(!acp)acp=strstr(s,"ac");
+             if(acp){ v.ac_mag=parse_eng(acp+2);
+                 char *php=acp+2; while(*php&&*php!=' '&&*php!='\t') php++;
+                 while(*php==' '||*php=='\t') php++;
+                 if(*php&&*php!=')'&&*php!='\n'&&*php!='\r') v.ac_phase=parse_eng(php);
+             }}
             if(c->nv<MAX_ELEMS) c->vsrc[c->nv++]=v;
         } return 1;
     }
@@ -719,6 +1051,18 @@ static int parse_instance(Circuit *c, const char *s) {
             cap.c=parse_eng(vs); if(c->nc<MAX_ELEMS) c->cap[c->nc++]=cap;
         } return 1;
     }
+    /* P5.5: Diode — Dname n+ n- modelname [area=val] */
+    if(*s=='D'||*s=='d'){
+        Diode d; char n1[32],n2[32],mod[32]; memset(&d,0,sizeof(d));
+        int nf=sscanf(s,"%31s %31s %31s %31s",d.name,n1,n2,mod);
+        if(nf>=4){
+            d.p=find_or_add_node(c,n1); d.n=find_or_add_node(c,n2);
+            strncpy(d.model,mod,31); d.model[31]=0; d.area=R(1.0);
+            char *ap=strstr(s,"area="); if(!ap) ap=strstr(s,"AREA=");
+            if(ap) d.area=parse_eng(ap+5);
+            if(c->nd<MAX_ELEMS) c->dio[c->nd++]=d;
+        } return 1;
+    }
     return 0;
 }
 /* ===== P3.2: {} substitution for .param values ===== */
@@ -732,7 +1076,7 @@ static void param_subst(Circuit *c, char *s) {
             char key[32]; strncpy(key,open+1,kn); key[kn]=0;
             for(int i=0;i<c->nparam;i++){
                 if(!strcmp(c->param_names[i],key)){
-                    char rep[32]; snprintf(rep,32,"%.6g",(double)c->param_vals[i]);
+                    char rep[32]; snprintf(rep,32,"%s",real_to_str(c->param_vals[i],'e',6));
                     int rl=(int)strlen(rep);
                     int rest=(int)strlen(close+1);
                     int oldl=(int)(close-s+1);
@@ -892,6 +1236,9 @@ static void parse_netlist(Circuit *c, const char *filename) {
                 if(nf>=8) c->dc_nested=1; else c->dc_nested=0;
             }else if(!strncmp(c2,".tran",5)){c->do_tran=1;
                 sscanf(c2,".tran %f %f",&c->tran_tstep,&c->tran_tstop);
+            }else if(!strncmp(c2,".ac",3)&&(c2[3]==0||c2[3]==' ')){
+                c->do_ac=1;
+                sscanf(c2,".ac %7s %d %f %f",c->ac_type,&c->ac_n,&c->ac_fstart,&c->ac_fstop);
             }else if(!strncmp(c2,".option",7)) parse_option(c,c2);
             else if(!strncmp(c2,".param",6)) parse_param(c,c2);
             else if(!strncmp(c2,".temp",5)) parse_temp(c,c2);
@@ -900,7 +1247,7 @@ static void parse_netlist(Circuit *c, const char *filename) {
         }
         /* P3.2: expand {} parameters before parsing this line */
         param_subst(c,s);
-        if(!strncmp(s,".model",6)) parse_model_line(c,s);
+        if(!strncmp(s,".model",6)){strncpy(cont,s,MAX_LINE-1);cont[MAX_LINE-1]=0;}
         else if(!strncmp(s,".include",8)) parse_include(c,s,dir);
         else if(!strncmp(s,".subckt",7)) parse_subckt(c,filename,s);
         else if(!strncmp(s,".ends",5)){}
@@ -912,9 +1259,30 @@ static void parse_netlist(Circuit *c, const char *filename) {
             if(nf>=8) c->dc_nested=1; else c->dc_nested=0;
         }else if(!strncmp(s,".tran",5)){c->do_tran=1;
             sscanf(s,".tran %f %f",&c->tran_tstep,&c->tran_tstop);
+        }else if(!strncmp(s,".ac",3)&&(s[3]==0||s[3]==' ')){
+            /* P5.2: .ac dec/lin/oct N fstart fstop */
+            c->do_ac=1;
+            sscanf(s,".ac %7s %d %f %f",c->ac_type,&c->ac_n,&c->ac_fstart,&c->ac_fstop);
         }else if(!strncmp(s,".option",7)) parse_option(c,s);
         else if(!strncmp(s,".param",6)) parse_param(c,s);
         else if(!strncmp(s,".temp",5)) parse_temp(c,s);
+        else if(!strncmp(s,".ic",3)&&(s[3]==0||s[3]==' ')){
+            /* P5.4: .ic v(node)=value ... */
+            char *p2=s+3;
+            while(*p2){
+                while(*p2==' '||*p2=='\t') p2++;
+                if(!strncmp(p2,"v(",2)||!strncmp(p2,"V(",2)){
+                    p2+=2; char nbuf[32]; int ni=0;
+                    while(*p2&&*p2!=')'&&ni<31) nbuf[ni++]=*p2++;
+                    nbuf[ni]=0; if(*p2==')') p2++;
+                    while(*p2==' '||*p2=='='||*p2=='\t') p2++;
+                    REAL val=parse_eng(p2);
+                    int nd=find_or_add_node(c,nbuf);
+                    if(c->nic<MAX_IC){c->ic_nodes[c->nic]=nd;c->ic_vals[c->nic]=val;c->nic++;}
+                    while(*p2&&*p2!=' '&&*p2!='\t'&&*p2!=')') p2++;
+                }else break;
+            }
+        }
         else if(!strncmp(s,".control",8)){ c->in_control=1; }
         else if(!strncmp(s,".endc",5)){ c->in_control=0; }
         else if(c->in_control){
@@ -928,11 +1296,20 @@ static void parse_netlist(Circuit *c, const char *filename) {
             else if(!strncmp(s,"tran",4)&&(s[4]==0||s[4]==' ')){
                 c->do_tran=1; sscanf(s,"tran %f %f",&c->tran_tstep,&c->tran_tstop);
             }
+            else if(!strncmp(s,"ac",2)&&(s[2]==0||s[2]==' ')){
+                /* P5.2: ac dec/lin/oct N fstart fstop in .control */
+                c->do_ac=1;
+                sscanf(s,"ac %7s %d %f %f",c->ac_type,&c->ac_n,&c->ac_fstart,&c->ac_fstop);
+            }
             else if(!strncmp(s,"print",5)||!strncmp(s,"plot",4)){
                 char *p=s; while(*p){
+                /* P5.2: support vdb() / vp() in addition to v() / i() */
                 while(*p&&*p!='v'&&*p!='i'&&*p!='V'&&*p!='I') p++;
                 if(!*p) break;
                 char what=(*p=='v'||*p=='V')?'v':'i'; p++;
+                /* check for vdb/vp — need 2 more chars */
+                if(what=='v'&&(*p=='d'||*p=='D')&&(*(p+1)=='b'||*(p+1)=='B')){what='d';p+=2;}
+                else if(what=='v'&&(*p=='p'||*p=='P')){what='p';p++;}
                 if(*p!='(') continue; p++; char *st=p;
                 while(*p&&*p!=')') p++;
                 int n=(int)(p-st); if(n>31)n=31;
@@ -941,11 +1318,42 @@ static void parse_netlist(Circuit *c, const char *filename) {
                 strncpy(c->prints[c->nprint].name,st,n);
                 c->prints[c->nprint].name[n]=0;c->nprint++;}
                 if(*p==')')p++;}}
+            else if(!strncmp(s,"let",3)&&(s[3]==0||s[3]==' ')){
+                /* P5.1: let varname = expression */
+                char *eq=strchr(s,'='); if(eq){
+                    char vname[32];
+                    char *vn_start=s+3; while(*vn_start==' '||*vn_start=='\t') vn_start++;
+                    char *vn_end=eq-1; while(vn_end>vn_start&&(*vn_end==' '||*vn_end=='\t')) vn_end--;
+                    int vlen=(int)(vn_end-vn_start+1); if(vlen>31) vlen=31;
+                    if(vlen>0){ strncpy(vname,vn_start,vlen); vname[vlen]=0;
+                        char *expr_start=eq+1; while(*expr_start==' '||*expr_start=='\t') expr_start++;
+                        if(c->nlet<MAX_LETS){
+                            strncpy(c->let_names[c->nlet],vname,31);
+                            strncpy(c->let_exprs[c->nlet],expr_start,MAX_LINE-1);
+                            c->let_exprs[c->nlet][MAX_LINE-1]=0;
+                            char *te=c->let_exprs[c->nlet];
+                            int tl=(int)strlen(te); while(tl>0&&(te[tl-1]==' '||te[tl-1]=='\n'||te[tl-1]=='\r')) te[--tl]=0;
+                            c->let_vals[c->nlet]=R(0.0); c->nlet++;
+                        }
+                    }
+                }
             }
+            else if(!strncmp(s,"echo",4)&&(s[4]==0||s[4]==' ')){
+                char *msg=s+4; while(*msg==' '||*msg=='"') msg++;
+                int mlen=(int)strlen(msg); while(mlen>0&&(msg[mlen-1]=='"'||msg[mlen-1]=='\n')) mlen--;
+                if(mlen>0) printf("%.*s\n",mlen,msg);
+            }
+        }
         else if(!strncmp(s,".end",4)) break;
         else if(*s=='X'||*s=='x'){ if(expand_subckt(c,s)){} else {strncpy(cont,s,MAX_LINE-1);cont[MAX_LINE-1]=0;} }
         else if(*s=='.'){}
         else if(!parse_instance(c,s)){strncpy(cont,s,MAX_LINE-1);cont[MAX_LINE-1]=0;}
+    }
+    /* P0.3: flush pending accumulated model at EOF */
+    if(cont[0]){
+        char cs[MAX_LINE]; strncpy(cs,cont,MAX_LINE-1);cs[MAX_LINE-1]=0;
+        char *c2=cs; while(*c2==' '||*c2=='\t') c2++;
+        if(!strncmp(c2,".model",6)) parse_model_line(c,c2);
     }
     fclose(fp);
 }
@@ -970,7 +1378,7 @@ static void compute_nc(REAL *v, Circuit *c, BSIM4Param *const *pp_arr,
         REAL vgs=v[m->g]-v[m->s],vds=v[m->d]-v[m->s],vbs=v[m->b]-v[m->s];
         REAL weff=m->w-R(2.0)*pp->wint,leff=m->l-R(2.0)*pp->lint;
         if(weff<R(1e-8)) weff=R(1e-8);if(leff<R(1e-9)) leff=R(1e-9);
-        BSIM4Out o=bsim4_eval(vgs,vds,vbs,weff,leff,pp);
+        BSIM4Out o=bsim4_eval(vgs,vds,vbs,weff,leff,pp,c->temp);
         nc[m->d]-=o.ids; nc[m->s]+=o.ids;
         /* P4.2: MOSFET intrinsic capacitance currents (TRAN companion model) */
         if(c->tran_dt>R(0.0) && c->tran_mos_v_prev && c->tran_mos_cap_i){
@@ -1067,6 +1475,38 @@ static REAL vsrc_waveform(const Vsource *vs, REAL t) {
     }
     default: return vs->dc;  /* WF_DC */
     }
+}
+
+/* P5.5: Lookup diode model parameter with defaults.
+ * Defaults: IS=1e-14, N=1.0, RS=0, CJO=0, VJ=0.7, M=0.5, BV=inf, IBV=1e-3 */
+static REAL dio_model_get(Model *m, const char *key, REAL def) {
+    if(!m) return def;
+    for(int i=0;i<m->np;i++) if(!strcmp(m->p[i].key,key)) return m->p[i].val;
+    return def;
+}
+
+/* P5.5: Diode exponential I-V stamp into MNA matrix.
+ * Id = IS * area * (exp(Vd/(N*Vt)) - 1),  gd = dId/dVd
+ * Stamps 2x2 conductance block at (p,n). Returns 0 on success. */
+static int diode_stamp(REAL *a, REAL *rhs, int p, int n, REAL Vd,
+                       REAL IS, REAL N, REAL Vt, REAL area,
+                       int Ndim, const int *vfixed) {
+    REAL safe_exp=Vd/(N*Vt+R(1e-30));
+    if(safe_exp>R(80.0)) safe_exp=R(80.0);  /* prevent expf overflow */
+    if(safe_exp<-R(80.0)) safe_exp=-R(80.0);
+    REAL ev=expf(safe_exp);
+    REAL Id=IS*area*(ev-R(1.0));
+    REAL gd=IS*area*ev/(N*Vt+R(1e-30));
+    /* NaN firewall */
+    if(IS_NAN(Id)||IS_NAN(gd)){ Id=R(0.0); gd=R(1e-12); }
+    /* Stamp conductance: a[p][p]+=gd, a[p][n]-=gd, a[n][p]-=gd, a[n][n]+=gd */
+    if(!vfixed[p]){ a[p+p*Ndim]+=gd; if(!vfixed[n]) a[p+n*Ndim]-=gd; }
+    if(!vfixed[n]){ if(!vfixed[p]) a[n+p*Ndim]-=gd; a[n+n*Ndim]+=gd; }
+    /* Stamp current source: Id - gd*Vd (Newton linearization) */
+    REAL Ieq=Id-gd*Vd;
+    if(!vfixed[p]) rhs[p]-=Ieq;
+    if(!vfixed[n]) rhs[n]+=Ieq;
+    return 0;
 }
 
 /* ===== DC Solver: MNA for floating Vsrcs + Gmin-stepped Newton (B8 fix) =====
@@ -1191,7 +1631,7 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
                     REAL vgs=v[m->g]-v[m->s], vds=v[m->d]-v[m->s], vbs=v[m->b]-v[m->s];
                     REAL weff=m->w-R(2.0)*pp->wint, leff=m->l-R(2.0)*pp->lint;
                     if(weff<R(1e-8)) weff=R(1e-8); if(leff<R(1e-9)) leff=R(1e-9);
-                    BSIM4Out o=bsim4_eval(vgs,vds,vbs,weff,leff,pp);
+                    BSIM4Out o=bsim4_eval(vgs,vds,vbs,weff,leff,pp,c->temp);
                     REAL gm=o.gm, gds=o.gds, gmbs=o.gmbs, ids=o.ids;
 
                     if(!vfixed[m->d]){
@@ -1210,6 +1650,20 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
                     }
                 }
 
+                /* P5.5: Diodes — exponential I-V stamp */
+                REAL Vt=R(0.02585);  /* thermal voltage at 300K */
+                for(int j=0;j<c->nd;j++){
+                    Diode *d=&c->dio[j];
+                    REAL Vd=v[d->p]-v[d->n];
+                    /* Lookup model params with defaults */
+                    Model *dm=find_model(c,d->model);
+                    REAL IS=dio_model_get(dm,"IS",R(1e-14));
+                    REAL N =dio_model_get(dm,"N",R(1.0));
+                    if(IS<R(1e-20)) IS=R(1e-14);
+                    if(N<R(1e-6)) N=R(1.0);
+                    (void)diode_stamp(a,rhs,d->p,d->n,Vd,IS,N,Vt,d->area,N,vfixed);
+                }
+
                 /* --- P4.2: MOSFET intrinsic capacitance companion models ---
                  * Each MOSFET has 3 voltage-dependent caps: Cgs(g↔s), Cgd(g↔d), Cgb(g↔b).
                  * Companion model: Geq=2C/dt, Ieq=-Geq*V_prev - I_prev.
@@ -1222,7 +1676,7 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
                         REAL vgs=v[m->g]-v[m->s], vds=v[m->d]-v[m->s], vbs=v[m->b]-v[m->s];
                         REAL weff=m->w-R(2.0)*pp->wint, leff=m->l-R(2.0)*pp->lint;
                         if(weff<R(1e-8)) weff=R(1e-8); if(leff<R(1e-9)) leff=R(1e-9);
-                        BSIM4Out ocap=bsim4_eval(vgs,vds,vbs,weff,leff,pp);
+                        BSIM4Out ocap=bsim4_eval(vgs,vds,vbs,weff,leff,pp,c->temp);
                         int j3=j*3;
                         /* Helper: stamp companion for cap between nodes na and nb */
                         #define STAMP_MOSCAP(na,nb,cap_val,idx) do { \
@@ -1443,7 +1897,160 @@ dc_cleanup:
   return total_iters;
 }
 /* Forward declaration for float printer (P0.7: zero cvtss2sd) */
+/* P5.2: Forward-declare ac_solve */
+static void ac_solve(Circuit *c, BSIM4Param *const *pp_arr, REAL *v, REAL *iv);
 static const char *real_to_str(REAL v, char fmt, int prec);
+
+/* P5.2: AC small-signal analysis — complex MNA solver.
+ * Freezes gm/gds/caps at DC OP, sweeps frequency, prints vdb/vp.
+ * Handles grounded AC Vsrcs as input excitation. */
+static void ac_solve(Circuit *c, BSIM4Param *const *pp_arr, REAL *v_dc, REAL *iv_dc) {
+    int n=c->nn, gnd=c->ngnd;
+    /* Count floating Vsrcs for MNA expansion */
+    int n_float=0;
+    int *vs_is_float=calloc(c->nv,sizeof(int));
+    for(int j=0;j<c->nv;j++){
+        if(c->vsrc[j].n!=gnd){ vs_is_float[j]=1; n_float++; }
+        else vs_is_float[j]=0;
+    }
+    int N=n+n_float;
+    if(N>256){ free(vs_is_float); printf("AC: matrix too large (%d>256)\n",N); return; }
+
+    /* Compute frequency points */
+    REAL fstart=c->ac_fstart, fstop=c->ac_fstop;
+    int npts=c->ac_n; if(npts<1) npts=10;
+    int is_dec=(!strcmp(c->ac_type,"dec"));
+    int is_oct=(!strcmp(c->ac_type,"oct"));
+    REAL fstep; int total_pts;
+    if(is_dec||is_oct){
+        REAL n_per=(REAL)(is_dec?10:2);
+        total_pts=(int)((REAL)npts*log10f(fstop/fstart+R(1e-30)))+1;
+        fstep=powf(n_per,R(1.0)/(REAL)npts);
+    }else{ total_pts=npts; fstep=(fstop-fstart)/(REAL)(npts>1?npts-1:1); }
+    if(total_pts>5000) total_pts=5000;
+
+    /* Emit device params at DC OP for AC output reference */
+    emit_device_param_table(c,v_dc,pp_arr);
+
+    /* AC frequency sweep */
+    printf("\nAC Analysis: %s %d %s %s\n",c->ac_type,c->ac_n,
+           real_to_str(fstart,'f',1),real_to_str(fstop,'f',1));
+    printf("%-14s ","Frequency");
+    for(int j=0;j<c->nn;j++) if(j!=gnd){
+        /* check if any print requests for vdb/vp */
+        printf("Vdb(%-8s) Vp(%-8s) ",c->nmap[j],c->nmap[j]);
+    }
+    printf("\n");
+
+    REAL freq=fstart;
+    for(int pt=0;pt<total_pts&&freq<=fstop+R(1e-9);pt++){
+        REAL omega=R(2.0)*R(3.14159265)*freq;
+        REAL *ar=calloc(N*N,sizeof(REAL)),*ai=calloc(N*N,sizeof(REAL));
+        REAL *br=calloc(N,sizeof(REAL)),*bi=calloc(N,sizeof(REAL));
+        REAL *xr=calloc(N,sizeof(REAL)),*xi=calloc(N,sizeof(REAL));
+
+        /* --- Stamp resistors: G=1/R (real only) --- */
+        for(int j=0;j<c->nr;j++){
+            int p=c->res[j].p, nn=c->res[j].n;
+            REAL g=R(1.0)/(c->res[j].val+R(1e-30));
+            if(p!=gnd){ ar[p+p*N]+=g; if(nn!=gnd){ ar[p+nn*N]-=g; ar[nn+p*N]-=g; }}
+            if(nn!=gnd) ar[nn+nn*N]+=g;
+        }
+
+        /* --- Stamp capacitors: j*omega*C (imag only) --- */
+        for(int j=0;j<c->nc;j++){
+            int p=c->cap[j].p, nn=c->cap[j].n;
+            REAL bc=omega*c->cap[j].c;
+            if(p!=gnd){ ai[p+p*N]+=bc; if(nn!=gnd){ ai[p+nn*N]-=bc; ai[nn+p*N]-=bc; }}
+            if(nn!=gnd) ai[nn+nn*N]+=bc;
+        }
+
+        /* --- Stamp MOSFETs with frozen DC OP gm/gds/gmbs (real only) --- */
+        for(int j=0;j<c->nm;j++){
+            Mosfet *m=&c->mos[j];
+            const BSIM4Param *pp=pp_arr[j];
+            REAL vgs=v_dc[m->g]-v_dc[m->s], vds=v_dc[m->d]-v_dc[m->s];
+            REAL vbs=v_dc[m->b]-v_dc[m->s];
+            REAL weff=m->w-R(2.0)*pp->wint, leff=m->l-R(2.0)*pp->lint;
+            if(weff<R(1e-8)) weff=R(1e-8); if(leff<R(1e-9)) leff=R(1e-9);
+            BSIM4Out o=bsim4_eval(vgs,vds,vbs,weff,leff,pp,c->temp);
+            REAL gm=o.gm, gds=o.gds, gmbs=o.gmbs;
+            if(m->d!=gnd){
+                ar[m->d+m->d*N]+=gds;
+                if(m->s!=gnd) ar[m->d+m->s*N]-=gds+gm+gmbs;
+                if(m->g!=gnd) ar[m->d+m->g*N]+=gm;
+                if(m->b!=gnd) ar[m->d+m->b*N]+=gmbs;
+            }
+            if(m->s!=gnd){
+                ar[m->s+m->s*N]+=gds+gm+gmbs;
+                if(m->d!=gnd) ar[m->s+m->d*N]-=gds;
+                if(m->g!=gnd) ar[m->s+m->g*N]-=gm;
+                if(m->b!=gnd) ar[m->s+m->b*N]-=gmbs;
+            }
+            /* MOSFET caps: j*omega*Cgs/Cgd/Cgb */
+            REAL bcgs=omega*o.cgs, bcgd=omega*o.cgd, bcbg=omega*o.cgb;
+            if(bcgs>R(1e-18)){ if(m->g!=gnd&&m->s!=gnd){ ai[m->g+m->g*N]+=bcgs; ai[m->s+m->s*N]+=bcgs; ai[m->g+m->s*N]-=bcgs; ai[m->s+m->g*N]-=bcgs; }}
+            if(bcgd>R(1e-18)){ if(m->g!=gnd&&m->d!=gnd){ ai[m->g+m->g*N]+=bcgd; ai[m->d+m->d*N]+=bcgd; ai[m->g+m->d*N]-=bcgd; ai[m->d+m->g*N]-=bcgd; }}
+            if(bcbg>R(1e-18)){ if(m->g!=gnd&&m->b!=gnd){ ai[m->g+m->g*N]+=bcbg; ai[m->b+m->b*N]+=bcbg; ai[m->g+m->b*N]-=bcbg; ai[m->b+m->g*N]-=bcbg; }}
+        }
+
+        /* --- MNA for floating Vsrcs: B and B^T blocks (real only) --- */
+        { int mi=0;
+        for(int j=0;j<c->nv;j++){
+            if(!vs_is_float[j]) continue;
+            int p=c->vsrc[j].p, nn=c->vsrc[j].n;
+            int row=n+mi;
+            if(p!=gnd){ ar[p+row*N]=R(1.0); ar[row+p*N]=R(1.0); }
+            if(nn!=gnd){ ar[nn+row*N]=-R(1.0); ar[row+nn*N]=-R(1.0); }
+            mi++;
+        }}
+
+        /* --- Fixed-node clamping for grounded Vsrcs + GND --- */
+        int *vfixed_ac=calloc(n,sizeof(int));
+        vfixed_ac[gnd]=1;
+        for(int j=0;j<c->nv;j++) if(!vs_is_float[j]) vfixed_ac[c->vsrc[j].p]=1;
+        for(int j=0;j<n;j++) if(vfixed_ac[j]){
+            for(int k=0;k<N;k++) ar[j+k*N]=ai[j+k*N]=R(0.0);
+            ar[j+j*N]=R(1.0);
+        }
+
+        /* --- RHS: AC source excitation --- */
+        for(int j=0;j<c->nv;j++){
+            Vsource *vs=&c->vsrc[j];
+            if(vs->ac_mag>R(0.0)){
+                if(vs_is_float[j]){
+                    /* floating AC source: constraint row RHS */
+                    int row=n;
+                    for(int j2=0;j2<j;j2++) if(vs_is_float[j2]) row++;
+                    br[row]=vs->ac_mag;
+                }else{
+                    /* grounded AC source: fix +node to ac_mag */
+                    br[vs->p]=vs->ac_mag;
+                }
+            }
+        }
+
+        /* Solve complex MNA */
+        int ok=lu_solve_complex(N,ar,ai,br,bi,xr,xi);
+        if(ok!=0){ free(ar);free(ai);free(br);free(bi);free(xr);free(xi);free(vfixed_ac); break; }
+
+        /* Print results */
+        printf("%-14s ",real_to_str(freq,'e',4));
+        for(int j=0;j<c->nn;j++) if(j!=gnd){
+            REAL mag=sqrtf(xr[j]*xr[j]+xi[j]*xi[j]+R(1e-30));
+            REAL phase=atan2f(xi[j],xr[j])*R(180.0)/R(3.14159265);
+            REAL vdb=(mag>R(1e-30))?R(20.0)*log10f(mag):-R(600.0);
+            printf("%-12s %-12s ",real_to_str(vdb,'f',4),real_to_str(phase,'f',3));
+        }
+        printf("\n");
+
+        free(ar);free(ai);free(br);free(bi);free(xr);free(xi);free(vfixed_ac);
+
+        /* Next frequency */
+        if(is_dec||is_oct) freq*=fstep; else freq+=fstep;
+    }
+    free(vs_is_float);
+}
 
 /* ===== TRAN Solver ===== */
 static void tran_solve(Circuit *c, BSIM4Param *const *pp_arr, REAL tstop, REAL tstep) {
@@ -1476,7 +2083,7 @@ static void tran_solve(Circuit *c, BSIM4Param *const *pp_arr, REAL tstop, REAL t
         REAL vgs=v[m->g]-v[m->s], vds=v[m->d]-v[m->s], vbs=v[m->b]-v[m->s];
         REAL weff=m->w-R(2.0)*pp->wint, leff=m->l-R(2.0)*pp->lint;
         if(weff<R(1e-8)) weff=R(1e-8); if(leff<R(1e-9)) leff=R(1e-9);
-        BSIM4Out o=bsim4_eval(vgs,vds,vbs,weff,leff,pp);
+        BSIM4Out o=bsim4_eval(vgs,vds,vbs,weff,leff,pp,c->temp);
         int j3=j*3;
         REAL inv_dt=R(1.0)/tstep;
         /* Cgs: gate↔source */
@@ -1525,7 +2132,7 @@ static void tran_solve(Circuit *c, BSIM4Param *const *pp_arr, REAL tstop, REAL t
                 REAL vgs=v[m->g]-v[m->s], vds=v[m->d]-v[m->s], vbs=v[m->b]-v[m->s];
                 REAL weff=m->w-R(2.0)*pp->wint, leff=m->l-R(2.0)*pp->lint;
                 if(weff<R(1e-8)) weff=R(1e-8); if(leff<R(1e-9)) leff=R(1e-9);
-                BSIM4Out o=bsim4_eval(vgs,vds,vbs,weff,leff,pp);
+                BSIM4Out o=bsim4_eval(vgs,vds,vbs,weff,leff,pp,c->temp);
                 int j3=j*3;
                 /* Cgs: gate↔source */
                 {
@@ -1575,8 +2182,10 @@ static void tran_solve(Circuit *c, BSIM4Param *const *pp_arr, REAL tstop, REAL t
  * printf("%f", x) forces float→double promotion (cvtss2sd).
  * Using %s with this helper avoids ALL such conversions. */
 static const char *real_to_str(REAL v, char fmt, int prec) {
-    static char buf[32];
-    if(IS_NAN(v)){strcpy(buf,"NaN");return buf;}
+    static char buf[4][32];  /* ring buffer: 4 slots cover any single printf */
+    static int idx = 0;
+    char *b = buf[idx]; idx = (idx + 1) & 3;  /* round-robin */
+    if(IS_NAN(v)){strcpy(b,"NaN");return b;}
     int sign=0;
     if(v<R(0.0)){sign=1;v=-v;}
     if(fmt=='e'){
@@ -1590,16 +2199,16 @@ static const char *real_to_str(REAL v, char fmt, int prec) {
         REAL s=R(1.0);for(int i=0;i<prec;i++)s*=R(10.0);
         int fpart=(int)(frac*s+R(0.5));
         if(fpart>=(int)s){ipart++;fpart=0;if(ipart>=10){ipart=1;exp++;}}
-        snprintf(buf,32,"%s%d.%0*de%+03d",sign?"-":"",ipart,prec,fpart,exp);
+        snprintf(b,32,"%s%d.%0*de%+03d",sign?"-":"",ipart,prec,fpart,exp);
     }else{
         int ipart=(int)v;
         REAL frac=v-(REAL)ipart;
         REAL s=R(1.0);for(int i=0;i<prec;i++)s*=R(10.0);
         int fpart=(int)(frac*s+R(0.5));
         if(fpart>=(int)s){ipart++;fpart=0;}
-        snprintf(buf,32,"%s%d.%0*d",sign?"-":"",ipart,prec,fpart);
+        snprintf(b,32,"%s%d.%0*d",sign?"-":"",ipart,prec,fpart);
     }
-    return buf;
+    return b;
 }
 
 /* ===== Main ===== */
@@ -1611,6 +2220,7 @@ int main(int argc, char **argv) {
     c->res=calloc(MAX_ELEMS,sizeof(Resistor)); c->mos=calloc(MAX_ELEMS,sizeof(Mosfet));
     c->vsrc=calloc(MAX_ELEMS,sizeof(Vsource)); c->cap=calloc(MAX_ELEMS,sizeof(Capacitor));
     c->isrc=calloc(MAX_ELEMS,sizeof(Isource));
+    c->dio =calloc(MAX_ELEMS,sizeof(Diode));
     c->nn=1;strcpy(c->nmap[0],"0");c->ngnd=0;
     /* Default options (overridden by .option lines) */
     c->opt_gmin=R(1e-12); c->opt_abstol=R(1e-6); c->opt_reltol=R(1e-3);
@@ -1653,6 +2263,15 @@ int main(int argc, char **argv) {
         }
     }
 
+    if(c->do_ac){
+        /* P5.2: AC analysis — DC OP first, then frequency sweep */
+        printf("\nDC Operating Point (for AC):\n");
+        REAL *v_ac=calloc(c->nn,sizeof(REAL)),*iv_ac=calloc(c->nv,sizeof(REAL));
+        int iters=dc_solve(v_ac,iv_ac,c,mos_pp,c->opt_maxiter,c->opt_abstol);
+        printf("  DC convergence: %d iterations\n",iters);
+        ac_solve(c,mos_pp,v_ac,iv_ac);
+        free(v_ac);free(iv_ac);
+    }
     if(c->do_tran){
         printf("\nTRAN: tstop=%s tstep=%s\n",
                real_to_str(c->tran_tstop,'e',4),real_to_str(c->tran_tstep,'e',4));
@@ -1717,19 +2336,33 @@ int main(int argc, char **argv) {
         REAL *v=calloc(c->nn,sizeof(REAL)),*iv=calloc(c->nv,sizeof(REAL));
         int iters=dc_solve(v,iv,c,mos_pp,c->opt_maxiter,c->opt_abstol);
         printf("  DC convergence: %d iterations\n",iters);
+        /* P5.1: populate device parameter cache for @device[param] */
+        emit_device_param_table(c,v,mos_pp);
+        /* P5.1: re-evaluate let expressions with actual voltages */
+        re_eval_lets(c,v,iv,mos_pp,R(0.0));
         /* P3.1: print requested values from .control block */
         if(c->nprint>0){
             printf("\n  --- Requested output (.control print) ---\n");
             for(int k=0;k<c->nprint;k++){
                 char w=c->prints[k].what[0];
-                if(w=='v'){
+                if(w=='v'||w=='d'||w=='p'){
+                    /* P5.2: 'd'=vdb, 'p'=vp; in DC context print raw voltage */
                     int found=0;
                     for(int j=0;j<c->nn;j++){
                         if(!strcmp(c->nmap[j],c->prints[k].name))
                             {printf("  v(%s) = %s\n",c->prints[k].name,
                                     real_to_str(v[j],'f',6));found=1;break;}
                     }
-                    if(!found) printf("  v(%s) = ??\n",c->prints[k].name);
+                    if(!found){
+                        /* P5.1: check let variables */
+                        int lfound=0;
+                        for(int j=0;j<c->nlet;j++){
+                            if(!strcmp(c->let_names[j],c->prints[k].name))
+                                {printf("  %s = %s\n",c->let_names[j],
+                                        real_to_str(c->let_vals[j],'f',6));lfound=1;break;}
+                        }
+                        if(!lfound) printf("  v(%s) = ??\n",c->prints[k].name);
+                    }
                 }else{
                     int found=0;
                     for(int j=0;j<c->nv;j++){
@@ -1743,7 +2376,16 @@ int main(int argc, char **argv) {
                             {printf("  i(%s) = %s\n",c->prints[k].name,
                                     real_to_str(c->isrc[j].dc,'e',6));found=1;break;}
                     }}
-                    if(!found) printf("  i(%s) = ??\n",c->prints[k].name);
+                    if(!found){
+                        /* P5.1: check let variables */
+                        int lfound=0;
+                        for(int j=0;j<c->nlet;j++){
+                            if(!strcmp(c->let_names[j],c->prints[k].name))
+                                {printf("  %s = %s\n",c->let_names[j],
+                                        real_to_str(c->let_vals[j],'f',6));lfound=1;break;}
+                        }
+                        if(!lfound) printf("  i(%s) = ??\n",c->prints[k].name);
+                    }
                 }
             }
         }
@@ -1762,7 +2404,7 @@ int main(int argc, char **argv) {
             REAL vgs=v[m->g]-v[m->s],vds=v[m->d]-v[m->s],vbs=v[m->b]-v[m->s];
             REAL weff=m->w-R(2.0)*pp->wint,leff=m->l-R(2.0)*pp->lint;
             if(weff<R(1e-8)) weff=R(1e-8); if(leff<R(1e-9)) leff=R(1e-9);
-            BSIM4Out o=bsim4_eval(vgs,vds,vbs,weff,leff,pp);
+            BSIM4Out o=bsim4_eval(vgs,vds,vbs,weff,leff,pp,c->temp);
             printf("  device %-15s Ids=%s  gm=%s  gds=%s  vth=%s  vdsat=%s\n",
                    m->name,
                    real_to_str(o.ids,'e',6),
@@ -1774,6 +2416,7 @@ int main(int argc, char **argv) {
         free(v);free(iv);
     }
     printf("\n[Done]\n");
-    free(c->res);free(c->mos);free(c->vsrc);free(c->cap);free(c->isrc);free(c);
+    free(c->res);free(c->mos);free(c->vsrc);free(c->cap);free(c->isrc);
+    free(c->dio);free(c);
     return 0;
 }

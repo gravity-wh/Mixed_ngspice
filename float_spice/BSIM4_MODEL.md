@@ -1,10 +1,10 @@
 # BSIM4v5 Model Implementation in float_spice
 
-> 51 parameters, 15+ physical effects. All FP32 arithmetic. Compatible with PTM 45nm/HP/LP and standard BSIM4 model cards.
+> 74 parameters, 15+ physical effects. All FP32 arithmetic. Compatible with PTM 45nm/HP/LP and standard BSIM4 model cards.
 
 ## Parameter Catalog
 
-### Core Parameters (19)
+### Core Parameters (15)
 
 | Parameter | Default | Unit | Description |
 |-----------|---------|------|-------------|
@@ -22,25 +22,26 @@
 | `mobmod` | 0 | — | Mobility model selector (0/1/2) |
 | `ud` | 0.0 | m/V | Coulomb scattering coefficient |
 | `eu` | 1.0 | — | Coulomb scattering exponent |
-| `wint` | 5e-9 | m | Width offset (Weff = W − 2·wint) |
-| `lint` | 0.0 | m | Length offset (Leff = L − 2·lint) |
 | `pclm` | 0.02 | — | Channel length modulation parameter |
-| `pdiblc1` | 0.001 | — | DIBL effect on Rout (first) |
-| `a0` | 1.0 | — | Bulk charge coefficient |
 
-### Short-Channel Vth (7)
+### Short-Channel Vth (12)
 
 | Parameter | Default | Unit | Description |
 |-----------|---------|------|-------------|
 | `dvt0` | 2.2 | — | SCE coefficient (first) |
 | `dvt1` | 0.53 | — | SCE coefficient (second) |
 | `dvt2` | -0.032 | V⁻¹ | SCE body-bias dependence |
+| `dvt0w` | 0.0 | m⁻¹ | SCE width-dependence (first) |
+| `dvt1w` | 5.3e6 | m⁻¹ | SCE width-dependence (second) |
+| `dvt2w` | -0.032 | V⁻¹ | SCE body-bias width-dependence |
 | `dsub` | 0.56 | — | DIBL exponent coefficient |
 | `k3` | 80.0 | — | Narrow-width coefficient |
+| `k3b` | 0.0 | V⁻¹ | Narrow-width body-bias coefficient |
 | `w0` | 2.5e-6 | m | Narrow-width characteristic width |
 | `nlx` | 1.74e-7 | m | LPE (lateral pocket implant) length |
+| `etab` | -0.07 | V⁻¹ | DIBL body-bias coefficient |
 
-### Source/Drain Resistance (4)
+### Source/Drain Resistance (7)
 
 | Parameter | Default | Unit | Description |
 |-----------|---------|------|-------------|
@@ -48,36 +49,64 @@
 | `rsw` | 0.0 | Ω·m | Source-side resistance |
 | `rdw` | 0.0 | Ω·m | Drain-side resistance |
 | `prwg` | 0.0 | V⁻¹ | Gate-bias dependence of Rds |
+| `prwb` | 0.0 | V⁻¹ | Body-bias dependence of Rds |
+| `prt` | 0.0 | K⁻¹ | Temperature coefficient of Rds |
+| `wr` | 1.0 | — | Width exponent for Rds scaling |
 
-### Early Voltage Stack (4)
+### Early Voltage Stack (7)
 
 | Parameter | Default | Unit | Description |
 |-----------|---------|------|-------------|
 | `pvag` | 0.0 | — | Gate-bias dependent Early voltage |
+| `pdiblc1` | 0.001 | — | DIBL effect on Rout (first) |
 | `pdiblc2` | 0.001 | — | DIBL effect on Rout (second) |
+| `pdiblcb` | 0.0 | V⁻¹ | DIBL body-bias effect on Rout |
+| `drout` | 0.56 | — | DIBL Rout channel-length dependence |
 | `pscbe1` | 4.24e8 | V/m | SCBE coefficient 1 |
 | `pscbe2` | 1.0e-5 | m/V | SCBE coefficient 2 |
 
-### Subthreshold (5)
+### Subthreshold (7)
 
 | Parameter | Default | Unit | Description |
 |-----------|---------|------|-------------|
-| `voffcv` | 0.0 | V | Offset voltage in Vgsteff (shifts subthreshold I-V) |
-| `minv` | 0.0 | — | Moderate inversion parameter (reserved) |
+| `voff` | -0.08 | V | Offset voltage in subthreshold (shifts I-V) |
+| `voffcv` | 0.0 | V | Offset voltage in Vgsteff (CV model) |
+| `minv` | 0.0 | — | Moderate inversion parameter |
 | `cdsc` | 2.4e-4 | V⁻¹ | Drain coupling to subthreshold slope |
 | `cdscd` | 0.0 | V⁻² | Quadratic drain coupling |
 | `cdscb` | 0.0 | V⁻¹ | Body-bias coupling to subthreshold slope |
+| `cit` | 0.0 | F/m² | Interface trap capacitance |
 
-### Temperature (6)
+### Saturation / Vdsat (5)
+
+| Parameter | Default | Unit | Description |
+|-----------|---------|------|-------------|
+| `a0` | 1.0 | — | Bulk charge coefficient |
+| `a1` | 0.0 | V⁻¹ | First non-saturation factor |
+| `a2` | 1.0 | — | Second non-saturation factor |
+| `ags` | 0.0 | V⁻¹ | Gate-bias Abulk coefficient |
+| `delta` | 0.01 | — | Vdseff smoothing transition width |
+
+### Temperature (7)
 
 | Parameter | Default | Unit | Description |
 |-----------|---------|------|-------------|
 | `kt1` | -0.11 | V | Temperature coefficient of Vth |
+| `kt1l` | 0.0 | V·m | Length-dependent Vth temperature coeff |
 | `kt2` | 0.022 | — | Body-bias temperature coefficient |
 | `ute` | -1.5 | — | Mobility temperature exponent |
 | `ua1` | 4.31e-9 | m/V | Temperature coefficient of ua |
 | `ub1` | -7.61e-18 | m²/V² | Temperature coefficient of ub |
 | `uc1` | -5.6e-11 | m/V² | Temperature coefficient of uc |
+
+### Geometry Offsets (4)
+
+| Parameter | Default | Unit | Description |
+|-----------|---------|------|-------------|
+| `wint` | 5e-9 | m | Width offset (Weff = W − 2·wint) |
+| `lint` | 0.0 | m | Length offset (Leff = L − 2·lint) |
+| `dwg` | 0.0 | m/V | Gate width offset coefficient |
+| `dwb` | 0.0 | m/V | Substrate width offset coefficient |
 
 ### Capacitance & Junction (4)
 
@@ -95,13 +124,14 @@
 | `noia` | 0.0 | — | Flicker noise parameter A |
 | `noib` | 0.0 | — | Flicker noise parameter B |
 
-### Physical / Process (3)
+### Physical / Process (4)
 
 | Parameter | Default | Unit | Description |
 |-----------|---------|------|-------------|
 | `xj` | 1.5e-8 | m | Junction depth |
 | `ndep` | 1.7e17 | cm⁻³ | Channel doping concentration |
 | `nsd` | 1.0e20 | cm⁻³ | Source/drain doping concentration |
+| `at` | 3.3e4 | m/s·K | Temperature coefficient of vsat |
 
 ## Physical Effects
 
