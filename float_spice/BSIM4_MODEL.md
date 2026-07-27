@@ -226,29 +226,44 @@ Protection:
 - `arg < −40`: exponential underflow → `Vgsteff = 0` (deep subthreshold, Ids ≈ 0)
 - `Vgsteff < 0`: clamp to 0
 
-### 3. Mobility Degradation (P1.5)
+### 3. Mobility Degradation (P1.3)
 
-**Effective vertical field**:
-```
-Eeff = (Vgsteff + 2·Vth + Vth0) / (6·Toxe)
-```
+**Reference**: ngspice b4v5ld.c lines 1367-1418.
 
-**mobMod=0** (default): Surface-roughness dominated
+**Effective vertical field** (mobMod=0/1):
 ```
-ueff = u0 / (1 + (Ua + Uc·Vbs)·Eeff + Ub·Eeff² + ud·Eeff^eu)
+Eeff = (Vgsteff + 2·Vth) / Toxe
 ```
 
-**mobMod=1**: Linear degradation only
+**mobMod=0** (default): Phonon + surface roughness scattering
 ```
-ueff = u0 / (1 + (Ua + Uc·Vbs)·Eeff)
+T5 = Eeff · (Ua + Uc·Vbseff + Ub·Eeff) + Coulomb
+Coulomb = ud · (Vth / Eeff_toxe)² = ud · (Vth · Toxe / (Vgsteff + 2·Vth))²
+ueff  = u0 / Denomi
+Denomi = 1 + T5  (with smoothing for T5 < -0.8)
 ```
 
-**mobMod=2**: Same formula as mobMod=0.
+**mobMod=1**: Body-bias factor outside mobility term
+```
+T5 = Eeff · (Ua + Ub·Eeff) · (1 + Uc·Vbseff) + Coulomb
+```
 
-**Coulomb scattering** (`ud > 0`):
-An additional term `ud·Eeff^eu` captures remote-charge impurity scattering. Active regardless of mobMod.
+**mobMod=2**: Simplified with eu exponent
+```
+T0 = (Vgsteff + vtfbphi1) / Toxe   where vtfbphi1 ≈ Vth + Vth0
+T5 = T0^eu · (Ua + Uc·Vbseff) + Coulomb
+Coulomb = ud · (Vth / T0_toxe)²
+```
 
-Clamped: `ueff ≥ 1e-4` for numerical safety.
+**Denomi smoothing** (b4v5ld.c:1406):
+```
+If T5 ≥ -0.8:  Denomi = 1 + T5
+If T5 < -0.8:   Denomi = (0.6 + T5) / (7 + 10·T5)
+```
+
+Clamped: `1e-4 ≤ ueff ≤ u0_T · 1.2` (upper bound prevents mobility exceeding low-field value).
+
+Temperature correction (P5.4): `ua_T/ub_T/uc_T/u0_T` pre-computed with temperature coefficients.
 
 ### 4. Abulk — Bulk Charge Factor
 
