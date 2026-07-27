@@ -238,6 +238,13 @@ typedef struct {
     REAL rgatemod;
     /* --- Body resistance network (6) --- */
     REAL rbodymod, rbdb, rbsb, rbpb, rbps, rbpd;
+    /* --- Gate tunneling (P2.1) --- */
+    REAL igcmod,aigc,bigc,cigc,nigc,ntox,pigcd,poxedge,toxref;
+    /* --- GIDL gate-induced drain/source leakage (P2.2 / #50) --- */
+    REAL agidl;   /* GIDL pre-factor (A/m, default 0 = off) */
+    REAL bgidl;   /* GIDL field exponent (V/m, typical 2e9) */
+    REAL cgidl;   /* body-junction correction factor (V³, typical 0.5) */
+    REAL egidl;   /* band-bending offset voltage (V, typical 0.8) */
 } BSIM4Param;
 
 typedef struct {
@@ -246,6 +253,7 @@ typedef struct {
     REAL cgs,cgd,cgb;
     REAL ibs,ibd,gbs,gbd;  /* junction currents + conductances */
     REAL rbody;  /* equivalent body resistance Ω (simplified single-resistor model) */
+    REAL igc;    /* gate-to-channel tunneling current (P2.1) */
 } BSIM4Out;
 
 static BSIM4Param bsim4_default(void) {
@@ -299,6 +307,12 @@ static BSIM4Param bsim4_default(void) {
     p.at=R(3.3e4);
     /* rgatemod = 0 (off by default, from calloc) */
     /* rbodymod/rbdb/rbsb/rbpb/rbps/rbpd = 0 (off by default, from calloc) */
+    /* --- GIDL (P2.2 / #50): off by default ---
+     * agidl/bgidl/cgidl/egidl = 0 (from calloc) */
+    /* --- Gate tunneling (P2.1, igcMod=1) ---
+     * igcmod/aigc/bigc/cigc/ntox = 0 (from calloc);
+     * nigc=1, pigcd=0.5, poxedge=1, toxref=1.4e-9 */
+    p.nigc=R(1.0); p.pigcd=R(0.5); p.poxedge=R(1.0); p.toxref=R(1.4e-9);
     return p;
 }
 
@@ -321,10 +335,12 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
     REAL dT_Tnom=T_ratio-R(1.0);  /* T/Tnom - 1 */
     REAL vth0_T=pp->vth0 + pp->kt1*dT_Tnom + pp->kt2*dT_Tnom*dT_Tnom;
     REAL u0_T=pp->u0 * powf(T_ratio, pp->ute);
-    /* PTM 45nm models use U0 in m²/V·s (SI) even with mobmod=0.
-     * No cm²→m² conversion needed — foundry models ignore the
-     * BSIM4 spec convention.  Real "excess current" bug was the
-     * RDSW unit error (Ω·μm treated as Ω·m), now fixed below. */
+    /* BSIM4 mobMod=0 spec: u0 is in cm²/V·s. Convert to m²/V·s for SI.
+     * PTM 45nm models (u0=0.049 for NMOS, 0.021 for PMOS) follow the
+     * BSIM4 standard unit convention. Without this ×1e-4 conversion,
+     * Ids/gm/gds are inflated by 10,000×, causing Newton divergence
+     * in multi-device circuits (#44, #56). */
+    if (pp->mobmod < R(0.5)) u0_T *= R(1e-4);
     REAL ua_T=pp->ua + pp->ua1*dT_Tnom;
     REAL ub_T=pp->ub + pp->ub1*dT_Tnom;
     REAL uc_T=pp->uc + pp->uc1*dT_Tnom;
@@ -574,6 +590,7 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
     }
     if(vgsteff<=R(0.0)){
         o.vgsteff=R(0.0); o.ids=R(1e-15); o.gm=R(1e-15); o.gds=R(1e-15); o.gmbs=R(1e-15);
+        o.igc=R(0.0);
         return o;
     }
     o.vgsteff=vgsteff;
@@ -848,6 +865,34 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
     o.gmbs=-o.gm*dvth_dvb;
     if(fabsf(o.gmbs)<R(1e-15)) o.gmbs=R(0.0);
 
+    /* === P2.1: Gate-to-channel tunneling current (igcMod=1) ===
+     * BSIM4v5 §8.2. Igc flows from gate into the channel, partitioned
+     * between drain (pigcd) and source (1-pigcd).
+     * Igc = Weff*Leff * aigc * (Vgse/toxRatio)^bigc * exp(-cigc*toxRatio/Vgse) * nigc
+     * where toxRatio = toxe/toxref * poxedge, Vgse ≈ vgsteff (smooth Vgs-Vth) */
+    REAL Igc = R(0.0);
+    if (pp->igcmod > R(0.5)) {
+        REAL toxRatio = (toxe_safe / pp->toxref) * pp->poxedge;
+        if (toxRatio < R(1e-6)) toxRatio = R(1e-6);
+        REAL Vgse = vgsteff;
+        if (Vgse < R(1e-8)) Vgse = R(1e-8);
+        REAL Vgse_over_tox = Vgse / toxRatio;
+        REAL exp_arg = pp->cigc * toxRatio / (Vgse + R(1e-30));
+        if (exp_arg < R(80.0) && exp_arg > R(-40.0)) {
+            Igc = weff * leff * pp->aigc
+                * powf(Vgse_over_tox, pp->bigc)
+                * expf(-exp_arg)
+                * pp->nigc;
+        }
+        if (Igc < R(0.0)) Igc = R(0.0);
+        /* Merge Igc into o.ids: Igc_drain adds to drain current,
+         * Igc_source adds to source current (flows gate→channel→source).
+         * For symmetric partition (default pigcd=0.5), both are equal and
+         * o.ids += Igc_drain gives correct KCL for both terminals.
+         * When pigcd≠0.5, KCL error is Igc*(2*pigcd-1), which is <<1% Ids. */
+        o.ids += Igc * pp->pigcd;
+    }
+
     /* ===== Rds: source/drain series resistance (P1.3) =====
      * Bias-dependent Rds reduces intrinsic Vgs/Vds when Ids flows.
      * First-order correction: source degeneration for gm/gmbs,
@@ -1021,6 +1066,38 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
         if(fabsf(o.gbd)<R(1e-18)) o.gbd=R(0.0);
     }
 
+    /* === P2.2: GIDL — gate-induced drain/source leakage (BSIM4v5 §8.3) === */
+    REAL Igidl = R(0.0), Igisl = R(0.0);
+    if (pp->agidl > R(0.0) && pp->bgidl > R(0.0) && pp->cgidl > R(0.0)) {
+        REAL T0 = R(3.0) * toxe_safe;
+        /* ---- Drain-side GIDL ---- */
+        REAL T1_d = (vds - o.vgsteff - pp->egidl) / (T0 + R(1e-30));
+        REAL Vbd   = vbs_c - vds;
+        if (T1_d > R(0.0) && Vbd < R(0.0)) {
+            REAL T2 = pp->bgidl / (T1_d + R(1e-30));
+            if (T2 < R(100.0)) {
+                Igidl = pp->agidl * weff * T1_d * expf(-T2);
+                REAL Vbd3 = Vbd * Vbd * Vbd;
+                Igidl *= Vbd3 / (pp->cgidl + Vbd3 + R(1e-30));
+                if (Igidl < R(0.0)) Igidl = R(0.0);
+            }
+        }
+        /* ---- Source-side GIDL ---- */
+        REAL Vgd_eff = o.vgsteff - vds;  /* approximate Vgd */
+        REAL T1_s = (-vds - Vgd_eff - pp->egidl) / (T0 + R(1e-30));
+        if (T1_s > R(0.0) && vbs_c < R(0.0)) {
+            REAL T2 = pp->bgidl / (T1_s + R(1e-30));
+            if (T2 < R(100.0)) {
+                Igisl = pp->agidl * weff * T1_s * expf(-T2);
+                REAL Vbs3 = vbs_c * vbs_c * vbs_c;
+                Igisl *= Vbs3 / (pp->cgidl + Vbs3 + R(1e-30));
+                if (Igisl < R(0.0)) Igisl = R(0.0);
+            }
+        }
+    }
+    /* GIDL affects terminal currents: drain loses Igidl, source loses Igisl */
+    o.ids -= (Igidl + Igisl);
+
     /* === P2.4: Body resistance network ===
      * Simplified single-resistor model: rbody = rbdb||rbsb||rbpb
      * PTM LP: rbdb=15, rbsb=15, rbpb=5 → rbody ≈ 3.75Ω
@@ -1045,10 +1122,13 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
 
     /* P2.8: PMOS sign convention — negate Ids (current flows source→drain).
      * gm/gds/gmbs magnitudes are unchanged by Vgs/Vds/Vbs negation. */
+    o.igc = Igc;
+
     if (is_pmos) {
         o.ids = -o.ids;
         o.ibs = -o.ibs;  /* body-source diode polarity flips for PMOS */
         o.ibd = -o.ibd;  /* body-drain diode polarity flips for PMOS */
+        o.igc = -o.igc;  /* gate current polarity flips for PMOS */
     }
 
     return o;
@@ -1219,6 +1299,10 @@ static REAL parse_eng(const char *s) {
     char buf[64]; int j=0;
     for(const char *p=s;*p&&j<62;p++) if(*p!=' ') buf[j++]=*p;
     buf[j]=0; if(j==0) return R(0.0);
+    /* Guard: non-numeric tokens (e.g. "DC") would make strtof return 0
+     * via endptr==buf. Explicit check avoids silent fall-through. */
+    if(!isdigit((unsigned char)buf[0]) && buf[0]!='.' && buf[0]!='-' && buf[0]!='+')
+        return R(0.0);
     char *endptr=NULL;
     REAL val=strtof(buf,&endptr);
     if(endptr==buf) return R(0.0);
@@ -1327,6 +1411,17 @@ static void bsim4_from_model(BSIM4Param *pp, const Model *m) {
     pp->rbpb    =model_get(m,"rbpb",    pp->rbpb);
     pp->rbps    =model_get(m,"rbps",    pp->rbps);
     pp->rbpd    =model_get(m,"rbpd",    pp->rbpd);
+    /* --- Gate tunneling (P2.1) --- */
+    pp->igcmod=model_get(m,"igcmod",pp->igcmod);
+    pp->aigc=model_get(m,"aigc",pp->aigc); pp->bigc=model_get(m,"bigc",pp->bigc);
+    pp->cigc=model_get(m,"cigc",pp->cigc); pp->nigc=model_get(m,"nigc",pp->nigc);
+    pp->ntox=model_get(m,"ntox",pp->ntox); pp->pigcd=model_get(m,"pigcd",pp->pigcd);
+    pp->poxedge=model_get(m,"poxedge",pp->poxedge); pp->toxref=model_get(m,"toxref",pp->toxref);
+    /* --- GIDL (P2.2 / #50) --- */
+    pp->agidl=model_get(m,"agidl",pp->agidl);
+    pp->bgidl=model_get(m,"bgidl",pp->bgidl);
+    pp->cgidl=model_get(m,"cgidl",pp->cgidl);
+    pp->egidl=model_get(m,"egidl",pp->egidl);
 }
 static void parse_model_line(Circuit *c, const char *line) {
     Model m; memset(&m,0,sizeof(m));
@@ -1521,7 +1616,7 @@ static void param_subst(Circuit *c, char *s) {
             char key[32]; strncpy(key,open+1,kn); key[kn]=0;
             for(int i=0;i<c->nparam;i++){
                 if(!strcmp(c->param_names[i],key)){
-                    char rep[32]; snprintf(rep,32,"%s",real_to_str(c->param_vals[i],'g',7));
+                    char rep[32]; snprintf(rep,32,"%s",real_to_str(c->param_vals[i],'g',6));
                     int rl=(int)strlen(rep);
                     int rest=(int)strlen(close+1);
                     int oldl=(int)(close-s+1);
@@ -2833,6 +2928,17 @@ int main(int argc, char **argv) {
         }
     }
 
+    /* Case-insensitive substring search — used for DC sweep source name
+     * matching. Source names are ≤32 chars; called O(nv) at sweep setup,
+     * not in the inner loop, so stack copies are fine. */
+    #define stristr(haystack,needle) ( \
+        (haystack)&&(needle)&&*(needle)?( \
+            ({char _h[64],_n[64];int _i; \
+             for(_i=0;(haystack)[_i]&&_i<62;_i++)_h[_i]=(char)tolower((unsigned char)(haystack)[_i]); \
+             _h[_i]=0;for(_i=0;(needle)[_i]&&_i<62;_i++)_n[_i]=(char)tolower((unsigned char)(needle)[_i]); \
+             _n[_i]=0;strstr(_h,_n)!=NULL;}) \
+        ):0)
+
     if(c->do_ac){
         /* P5.2: AC analysis — DC OP first, then frequency sweep */
         printf("\nDC Operating Point (for AC):\n");
@@ -2849,11 +2955,11 @@ int main(int argc, char **argv) {
     } else if(c->do_dc && c->dc_src[0]){
         /* Find sweep source(s) */
         int sidx=-1, sidx2=-1;
-        for(int j=0;j<c->nv;j++){if(strstr(c->vsrc[j].name,c->dc_src)){sidx=j;break;}}
-        if(sidx<0) for(int j=0;j<c->nv;j++){if(strstr(c->dc_src,c->vsrc[j].name)){sidx=j;break;}}
+        for(int j=0;j<c->nv;j++){if(stristr(c->vsrc[j].name,c->dc_src)){sidx=j;break;}}
+        if(sidx<0) for(int j=0;j<c->nv;j++){if(stristr(c->dc_src,c->vsrc[j].name)){sidx=j;break;}}
         if(c->dc_nested && c->dc_src2[0]){
-            for(int j=0;j<c->nv;j++){if(strstr(c->vsrc[j].name,c->dc_src2)){sidx2=j;break;}}
-            if(sidx2<0) for(int j=0;j<c->nv;j++){if(strstr(c->dc_src2,c->vsrc[j].name)){sidx2=j;break;}}
+            for(int j=0;j<c->nv;j++){if(stristr(c->vsrc[j].name,c->dc_src2)){sidx2=j;break;}}
+            if(sidx2<0) for(int j=0;j<c->nv;j++){if(stristr(c->dc_src2,c->vsrc[j].name)){sidx2=j;break;}}
         }
         if(c->dc_nested && sidx2>=0){
             /* --- Nested DC sweep (P3.5): outer=src1, inner=src2 --- */
