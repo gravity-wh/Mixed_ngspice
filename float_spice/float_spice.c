@@ -205,7 +205,7 @@ typedef struct {
     REAL vth0,k1,k2,nfactor,eta0;
     REAL u0,ua,ub,uc,vsat,toxe;
     REAL mobmod,ud,eu; /* mobility model selector + Coulomb scattering */
-    REAL pclm;
+    REAL pclm,keta,b0,b1;
     /* --- Short-channel Vth (13) --- */
     REAL dvt0,dvt1,dvt2,dvt0w,dvt1w,dvt2w;
     REAL dsub,k3,k3b,w0,nlx;
@@ -255,7 +255,7 @@ static BSIM4Param bsim4_default(void) {
     p.eta0=R(0.0125); p.u0=R(0.049); p.ua=R(6e-10); p.ub=R(1.2e-18);
     p.uc=R(0.0); p.vsat=R(130000.0); p.toxe=R(1.8e-9);
     p.mobmod=R(0.0); p.ud=R(0.0); p.eu=R(1.0); /* mobMod=0; Coulomb off by default */
-    p.pclm=R(0.02);
+    p.pclm=R(0.02); p.keta=R(0.04); p.b0=R(0.0); p.b1=R(0.0);
     /* --- Short-channel Vth (BSIM4v5 UG defaults) --- */
     p.dvt0=R(2.2); p.dvt1=R(0.53); p.dvt2=R(-0.032);
     p.dvt0w=R(0.0); p.dvt1w=R(5.3e6); p.dvt2w=R(-0.032);
@@ -321,11 +321,10 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
     REAL dT_Tnom=T_ratio-R(1.0);  /* T/Tnom - 1 */
     REAL vth0_T=pp->vth0 + pp->kt1*dT_Tnom + pp->kt2*dT_Tnom*dT_Tnom;
     REAL u0_T=pp->u0 * powf(T_ratio, pp->ute);
-    /* P2.8 fix: mobmod=0 (BSIM3 convention) uses cm²/V·s for U0.
-     * Convert to m²/V·s (×1e-4) so mobility units are consistent.
-     * mobmod>=1 uses m²/V·s natively — no conversion needed. */
-    if (pp->mobmod < R(0.5)) u0_T *= R(1e-4);
-    {static int once=0;if(!once){fprintf(stderr,"MOBMOD=%f U0=%e U0_T=%e\n",(double)pp->mobmod,(double)pp->u0,(double)u0_T);once=1;}}
+    /* PTM 45nm models use U0 in m²/V·s (SI) even with mobmod=0.
+     * No cm²→m² conversion needed — foundry models ignore the
+     * BSIM4 spec convention.  Real "excess current" bug was the
+     * RDSW unit error (Ω·μm treated as Ω·m), now fixed below. */
     REAL ua_T=pp->ua + pp->ua1*dT_Tnom;
     REAL ub_T=pp->ub + pp->ub1*dT_Tnom;
     REAL uc_T=pp->uc + pp->uc1*dT_Tnom;
@@ -631,22 +630,71 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
             REAL T9 = R(1.0) / (R(7.0) + R(10.0) * T5 + R(1e-30));
             Denomi = (R(0.6) + T5) * T9;
         }
-        if (Denomi < R(1e-4)) Denomi = R(1e-4);
+        if (Denomi < R(0.1)) Denomi = R(0.1);
 
         ueff = u0_T / Denomi;
 
         /* ---- Safety clamps ---- */
-        if (ueff < R(1e-4)) ueff = R(1e-4);
+        /* Lower bound: relative to u0_T to avoid amplifying ueff when Denomi
+         * degenerates. u0_T×1e-6 = 4.9e-8 for NMOS, 2.3e-8 for PMOS.
+         * Absolute clamp 1e-4 was too large for PMOS (W=2μm, Vgs=-0.55V)
+         * where Denomi>490 → ueff amplified 50× → Ids=851A. */
+        if (ueff < u0_T * R(1e-6)) ueff = u0_T * R(1e-6);
         /* Upper bound: mobility cannot exceed low-field value by >20% */
         if (ueff > u0_T * R(1.2)) ueff = u0_T * R(1.2);
         o.ueff = ueff;
     }
 
-    /* Abulk */
-    REAL Ab0=R(1.0)+pp->k1/(R(2.0)*sqrt_phis+R(1e-12));
-    REAL Abulk=Ab0+pp->a0*leff/(leff+R(2.0)*sqrtf(R(1.4e-8)*pp->toxe+R(1e-24)));
-    if(Abulk<R(1.0)) Abulk=R(1.0);
-    o.Abulk=Abulk;
+    /* === BSIM4v5 Abulk — bulk charge factor with gate-bias + body-bias dependence ===
+     * Reference: b4v5ld.c lines 1311-1365.
+     * Abulk0 = 1 + T1*T2   where T1≈K1ox/(2√φs)+K2ox, T2≈a0*Leff/(Leff+2√(xj*Xdep))+b0/(Weff+b1)
+     * Abulk  = Abulk0 - T1*ags*a0*(Leff/(Leff+2√(xj*Xdep)))^3 * Vgsteff
+     * keta modulation: Abulk *= 1/(1+keta*Vbseff)                                   */
+    REAL Abulk;
+    {
+        /* Compute Xdep in cm (consistent with Vth block Sec 2.3) */
+        REAL eps_si = R(1.035e-12);
+        REAL q_el   = R(1.602e-19);
+        REAL NSUB   = pp->ndep > R(1e10) ? pp->ndep : R(6.0e16);
+        REAL Xdep0  = sqrtf(R(2.0)*eps_si*phis/(q_el*NSUB + R(1e-30)));
+        REAL xdep_cm = Xdep0 * sqrtPhis_eff / (sqrt_phis + R(1e-30));
+        if (xdep_cm < R(1e-10)) xdep_cm = R(1e-10);
+
+        REAL T9 = R(0.5) * pp->k1 / (sqrt_phis + R(1e-30));
+        REAL T1 = T9 + pp->k2;  /* K1ox/(2√φs) + K2ox */
+        REAL T9_xj = sqrtf(pp->xj * xdep_cm + R(1e-30));
+        REAL tmp1  = leff + R(2.0) * T9_xj;
+        REAL T5    = leff / (tmp1 + R(1e-30));
+        REAL T2    = pp->a0 * T5 + pp->b0 / (weff + pp->b1 + R(1e-30));  /* b0/b1 width term */
+        REAL Abulk0 = R(1.0) + T1 * T2;
+
+        /* Gate-bias dependence via ags */
+        REAL T8 = pp->ags * pp->a0 * T5 * T5 * T5;  /* ags*a0*(Leff/tmp1)^3 */
+        Abulk = Abulk0 - T1 * T8 * vgsteff;
+
+        /* Smoothing: prevents <0.1 (b4v5ld.c:1343) */
+        if (Abulk0 < R(0.1)) {
+            REAL T9a = R(1.0)/(R(3.0)-R(20.0)*Abulk0+R(1e-30));
+            Abulk0 = (R(0.2)-Abulk0)*T9a;
+        }
+        if (Abulk < R(0.1)) {
+            REAL T9b = R(1.0)/(R(3.0)-R(20.0)*Abulk+R(1e-30));
+            Abulk  = (R(0.2)-Abulk)*T9b;
+        }
+
+        /* keta body-bias modulation (b4v5ld.c:1354-1365) */
+        REAL T2_keta = pp->keta * Vbseff;
+        REAL T0_keta;
+        if (T2_keta >= R(-0.9)) {
+            T0_keta = R(1.0)/(R(1.0) + T2_keta + R(1e-30));
+        } else {
+            REAL T1k = R(1.0)/(R(0.8) + T2_keta + R(1e-30));
+            T0_keta = (R(17.0) + R(20.0)*T2_keta) * T1k;
+        }
+        Abulk *= T0_keta;
+        if (Abulk < R(1.0)) Abulk = R(1.0);
+        o.Abulk = Abulk;
+    }
 
     /* EsatL — with temperature-corrected vsat (P1.8) */
     REAL vsat_T = pp->vsat - pp->at * dT_Tnom;
@@ -680,72 +728,91 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
      * Combined via harmonic sum: 1/Vaeff = Σ 1/Vi */
     REAL vd_diff=vds-vdseff; if(vd_diff<R(0.0)) vd_diff=R(0.0);
     {
-        /* Physical constants (local; originals from Vth scope are out of scope) */
-        REAL ev_epsi=R(1.035e-12), ev_epox=R(3.453e-13);
-        REAL ev_toxe_cm=toxe_safe*R(100.0);
-        REAL ev_xj_cm=pp->xj*R(100.0);
-        if(ev_xj_cm<R(1e-8)) ev_xj_cm=R(1.5e-7);
-        REAL ev_Lcm=leff*R(100.0);
-        /* xdep for lt estimate */
-        REAL ev_q=R(1.602e-19);
-        REAL ev_NSUB=pp->ndep>R(1e10)?pp->ndep:R(6.0e16);
-        REAL ev_xdep=sqrtf(R(2.0)*ev_epsi*(phis-vbs_c+R(0.01))
+        /* Physical constants — all in SI (meters) for consistency with leff */
+        REAL ev_epsi = R(1.035e-10);  /* ε_si = 11.7*ε0 F/m */
+        REAL ev_epox = R(3.453e-11);  /* ε_ox = 3.9*ε0  F/m */
+        REAL ev_q    = R(1.602e-19);
+        REAL ev_NSUB = pp->ndep>R(1e10)?pp->ndep:R(6.0e16);
+        /* xdep for lt estimate (m) */
+        REAL ev_xdep = sqrtf(R(2.0)*ev_epsi*(phis-vbs_c+R(0.01))
                           /(ev_q*ev_NSUB+R(1e-30)));
-        if(ev_xdep<R(1e-10)) ev_xdep=R(1e-10);
+        if(ev_xdep<R(1e-12)) ev_xdep=R(1e-12);
+        /* Xj clamp for numerical safety */
+        REAL ev_xj_m = pp->xj;
+        if(ev_xj_m<R(1e-10)) ev_xj_m=R(1.4e-8);
 
-        /* litl: CLM characteristic length sqrt(epsi*Toxe*Xj/epox) */
-        REAL litl=sqrtf(ev_epsi*ev_toxe_cm*ev_xj_cm/(ev_epox+R(1e-30)));
-        if(litl<R(1e-10)) litl=R(1e-10);
-        /* lt_est: thermal length sqrt(epsi*Toxe*Xdep/epox) */
-        REAL lt_est=sqrtf(ev_epsi*ev_toxe_cm*ev_xdep/(ev_epox+R(1e-30)));
-        if(lt_est<R(1e-10)) lt_est=R(1e-10);
+        /* litl: CLM characteristic length (m) —  BSIM4v5: sqrt(ε_si*Toxe*Xj/ε_ox) */
+        REAL litl = sqrtf(ev_epsi*toxe_safe*ev_xj_m/(ev_epox+R(1e-30)));
+        if(litl<R(1e-12)) litl=R(1e-12);
+        /* lt_est: thermal length (m) — sqrt(ε_si*Toxe*Xdep/ε_ox) */
+        REAL lt_est = sqrtf(ev_epsi*toxe_safe*ev_xdep/(ev_epox+R(1e-30)));
+        if(lt_est<R(1e-12)) lt_est=R(1e-12);
 
-        /* Vasat: EsatL*Leff + Vdsat + 2*Vgsteff/Abulk */
-        REAL Vasat=EsatL+vdsat+R(2.0)*vgsteff/(Abulk+R(1e-30));
+        REAL Esat  = R(2.0) * vsat_T / (ueff + R(1e-30));  /* lateral field V/m */
+        /* EsatL_v = Esat*Leff is the voltage-scale product (V) */
+        REAL EsatL_v = Esat * leff;
+
+        /* ---- Vasat: velocity saturation Early voltage (V) ---- */
+        REAL Vasat = EsatL_v + vdsat + R(2.0) * vgsteff / (Abulk + R(1e-30));
         /* P5.5: pvag gate-bias dependent Early enhancement */
         if(pp->pvag>R(0.0)){
-            REAL EsatLeff=EsatL*leff;
-            Vasat+=pp->pvag*vgsteff*EsatLeff/(vgsteff+EsatLeff+R(1e-30));
+            REAL EsatLeff = EsatL_v;
+            Vasat += pp->pvag * vgsteff * EsatLeff / (vgsteff + EsatLeff + R(1e-30));
         }
         if(Vasat<R(1e-6)) Vasat=R(1e-6);
 
-        /* VACLM: channel length modulation */
+        /* ---- VACLM: channel length modulation (BSIM4v5 §7.2.1) ----
+         * Cclm = (Leff + Vdsat/Esat) / (PCLM * litl)   [dimensionless]
+         * VACLM = Cclm * (Vds - Vdseff)                [V]            */
         REAL VACLM=R(1e12);
-        if(pp->pclm>R(1e-20)){
-            REAL Fp=Abulk*EsatL*leff+vgsteff;
-            VACLM=Fp*litl/(pp->pclm*Abulk*EsatL*leff+R(1e-30));
+        if(pp->pclm>R(1e-20) && litl>R(1e-20)){
+            REAL T1 = leff + vdsat / (Esat + R(1e-30));
+            REAL Cclm = T1 / (pp->pclm * litl + R(1e-30));
+            VACLM = Cclm * vd_diff;
             if(VACLM<R(1e-6)) VACLM=R(1e-6);
         }
 
-        /* VADIBL: DIBL effect on Rout */
+        /* ---- VADIBL: DIBL effect on Rout (BSIM4v5 §7.2.2) ----
+         * theta_rout = pdiblc2*exp(-dsub*Leff/(drout*lt_est)) + pdiblcb*Vbseff
+         * VADIBL = Vgst2Vt² / ((Abulk*Vdsat+Vgst2Vt) * theta_rout)          */
         REAL VADIBL=R(1e12);
         if(pp->pdiblc2>R(1e-20)){
-            REAL L2lt=ev_Lcm/(R(2.0)*lt_est+R(1e-30));
-            REAL theta_rout=pp->pdiblc2
-                *(expf(-pp->dsub*L2lt)+R(2.0)*expf(-pp->dsub*L2lt*R(2.0)));
+            REAL L_drout = leff / (pp->drout * lt_est + R(1e-30));
+            REAL theta_rout = pp->pdiblc2 * expf(-pp->dsub * L_drout)
+                            + pp->pdiblcb * Vbseff;
             if(theta_rout<R(1e-20)) theta_rout=R(1e-20);
-            REAL Vgst2Vt=vgsteff+R(2.0)*vt;
-            REAL F_dibl=R(1.0)
-                -Abulk*vdsat/(Abulk*vdsat+Vgst2Vt+R(1e-30));
-            if(F_dibl<R(1e-6)) F_dibl=R(1e-6);
-            VADIBL=Vgst2Vt/theta_rout*F_dibl;
+            REAL Vgst2Vt = vgsteff + R(2.0) * vt;
+            REAL T8 = Abulk * vdsat;
+            REAL T0 = Vgst2Vt * T8;
+            REAL T1_den = Vgst2Vt + T8;
+            VADIBL = (Vgst2Vt - T0 / (T1_den + R(1e-30))) / theta_rout;
             if(VADIBL<R(1e-6)) VADIBL=R(1e-6);
         }
 
-        /* VADITS: drain-induced threshold shift (absorbs pdiblc1) */
+        /* ---- VADITS: drain-induced threshold shift (BSIM4v5 §7.2.3) ----
+         * T0_dits = pdiblc1 * exp(-dsub*Leff/(2*lt_est))
+         * VADITS ≈ Vgst2Vt / (T0_dits * Abulk * Vdsat) * F_dibl            */
         REAL VADITS=R(1e12);
         if(pp->pdiblc1>R(1e-20)){
-            VADITS=R(1.0)/(pp->pdiblc1+R(1e-30));
-            if(VADITS<R(1e-6)) VADITS=R(1e-6);
+            REAL T0_dits = pp->pdiblc1 * expf(-pp->dsub * leff / (R(2.0) * lt_est + R(1e-30)));
+            if(T0_dits>R(1e-20)){
+                REAL Vgst2Vt = vgsteff + R(2.0) * vt;
+                VADITS = Vgst2Vt / (T0_dits * Abulk * vdsat + R(1e-30))
+                       * (R(1.0) - Abulk * vdsat / (Abulk * vdsat + Vgst2Vt + R(1e-30)));
+                if(VADITS<R(1e-6)) VADITS=R(1e-6);
+            }
         }
 
-        /* VASCBE: substrate current induced body effect */
+        /* ---- VASCBE: substrate current body effect (BSIM4v5 §7.2.4) ---- */
         REAL VASCBE=R(1e12);
         if(pp->pscbe1>R(0.0)&&pp->pscbe2>R(1e-30)&&vd_diff>R(1e-6)){
-            REAL exp_arg=pp->pscbe1*litl/(vd_diff+R(1e-30));
-            if(exp_arg<R(80.0)){
-                VASCBE=leff*expf(exp_arg)/(pp->pscbe2+R(1e-30));
-                if(VASCBE<R(1e-6)) VASCBE=R(1e-6);
+            REAL exp_arg1=pp->pscbe1*litl/(vd_diff+R(1e-30));
+            if(exp_arg1<R(80.0)){
+                REAL exp_arg2=pp->pscbe2*vd_diff/(litl+R(1e-30));
+                if(exp_arg2<R(80.0)){
+                    VASCBE=leff*expf(exp_arg1)/(pp->pscbe2*expf(-exp_arg2)+R(1e-30));
+                    if(VASCBE<R(1e-6)) VASCBE=R(1e-6);
+                }
             }
         }
 
@@ -762,16 +829,10 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
         o.ids=ids0*(R(1.0)+vd_diff/(Vaeff+R(1e-30)));
         if(o.ids<R(0.0)) o.ids=R(0.0);
 
-        /* Analytical gm/gds/gmbs */
-        if(vds<vdsat){
-            REAL dnl=R(1.0)+vds/EsatL;
-            o.gm=beta0*vds/dnl;
-            o.gds=beta0*(vgsteff-Abulk*vds)/(dnl*dnl+R(1e-30));
-        }else{
-            o.gm=beta0*vdsat/(R(1.0)+vdsat/EsatL)
-                 *(R(1.0)+vd_diff/(Vaeff+R(1e-30)));
-            o.gds=o.ids/(Vaeff+R(1e-30));
-        }
+        /* Analytical gm/gds using Vdseff smooth transition (no if/else discontinuity) */
+        REAL dnl=R(1.0)+vdseff/(EsatL+R(1e-12));
+        o.gm=beta0*vdseff/dnl*(R(1.0)+vd_diff/(Vaeff+R(1e-30)));
+        o.gds=o.ids/(Vaeff+R(1e-30));
     }
     if(vgsteff<R(0.05)){ o.gm=o.ids/(pp->nfactor*vt+R(1e-15)); }
     if(o.gm<R(1e-15)) o.gm=R(1e-15);
@@ -787,15 +848,20 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
      * drain+source feedback for Ids/gds.  Disabled when rdsw==0. */
     if(pp->rdsw>R(0.0)||pp->rsw>R(0.0)||pp->rdw>R(0.0)){
         REAL weff_clamp=weff>R(1e-9)?weff:R(1e-9);
+        /* P2.8 fix: BSIM4 RDSW/RSW/RDW units are Ω·μm.  Convert weff
+         * from meters to μm so R_eff = RDSW / Weff[μm] ≈ Ω, not MΩ.
+         * Without this, R_eff is 1e6× too large → Ids divided by ~20,000×
+         * → MOSFET appears to have zero current at any Vgs. */
+        REAL weff_um = weff_clamp * R(1e6);
         REAL vgst4rds=vgsteff>R(0.0)?vgsteff:R(0.0);
         /* Base rdsw per-side with gate-bias dependence — temperature-corrected (P1.8) */
         REAL rdsw_T = pp->rdsw + pp->prt * dT_Tnom;
         if (rdsw_T < R(0.0)) rdsw_T = R(0.0);
-        REAL rs_rdsw = rdsw_T / (weff_clamp * (R(1.0) + pp->prwg * vgst4rds) + R(1e-30));
+        REAL rs_rdsw = rdsw_T / (weff_um * (R(1.0) + pp->prwg * vgst4rds) + R(1e-30));
         /* P5.5: rsw/rdw — independent source/drain resistance.
          * Use max of rdsw-based and rsw/rdw per terminal. */
-        REAL rs_source=fmaxf(rs_rdsw, pp->rsw/(weff_clamp+R(1e-30)));
-        REAL rd_drain =fmaxf(rs_rdsw, pp->rdw/(weff_clamp+R(1e-30)));
+        REAL rs_source=fmaxf(rs_rdsw, pp->rsw/(weff_um+R(1e-30)));
+        REAL rd_drain =fmaxf(rs_rdsw, pp->rdw/(weff_um+R(1e-30)));
         REAL rout=rs_source+rd_drain;
         /* Source degeneration: gm and gmbs reduced */
         REAL src_degen=R(1.0)+o.gm*rs_source;
@@ -1175,6 +1241,8 @@ static void bsim4_from_model(BSIM4Param *pp, const Model *m) {
     pp->mobmod=model_get(m,"mobmod",pp->mobmod);
     pp->ud=model_get(m,"ud",pp->ud); pp->eu=model_get(m,"eu",pp->eu);
     pp->pclm=model_get(m,"pclm",pp->pclm);
+    pp->keta=model_get(m,"keta",pp->keta); pp->b0=model_get(m,"b0",pp->b0);
+    pp->b1=model_get(m,"b1",pp->b1);
     /* --- Short-channel Vth (12) --- */
     pp->dvt0=model_get(m,"dvt0",pp->dvt0); pp->dvt1=model_get(m,"dvt1",pp->dvt1);
     pp->dvt2=model_get(m,"dvt2",pp->dvt2);
@@ -1924,41 +1992,41 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
     }
     int N=n+n_float;  /* total system: node voltages + floating-Vsrc branch currents */
 
+    /* P2.10: Compute Vmax = maximum grounded DC source voltage for absolute
+     * node voltage clamping in Newton update (prevents VBIAS fly-away). */
+    REAL Vmax=R(0.0);
+    for(int j=0;j<c->nv;j++){
+        if(c->vsrc[j].n==gnd && c->vsrc[j].dc > Vmax) Vmax=c->vsrc[j].dc;
+    }
+
     REAL *a=calloc(N*N,sizeof(REAL));
     REAL *rhs=calloc(N,sizeof(REAL));
     REAL *dx=calloc(N,sizeof(REAL));
 
     REAL gm_base=c->opt_gmin>R(0.0)?c->opt_gmin:R(1e-12);
 
-    /* Gmin stepping: 3 stages from large (easy convergence) to small (accurate).
-     * Cmin stepping (P2.3): diagonal-only damping, no DC bias.  Provides
-     * "clean" matrix conditioning complementary to gmin's RHS-biased damping. */
-    /* P2.8: 5-stage gmin + cmin stepping.
-     * Stage 0 (1e-7 gmin): 10MΩ to GND per node — strong diagonal dominance.
-     * Stage 4 (1e-12 gmin): effectively no artificial load — high accuracy.
-     * Each stage starts from previous stage's converged solution.
-     * Cmin provides "clean" diagonal damping (no DC bias, unlike gmin). */
-    /* P2.8: 9-stage source ramp + 5-stage gmin stepping.
-     * Source ramping scales all independent sources 0→100% so
-     * complementary MOSFET pairs (OTA, opamp) start near zero
-     * and converge gradually.  Gmin provides conductance to GND
-     * that is reduced as the solution improves. */
-    REAL gmin_stages[] = {gm_base*R(1e5), gm_base*R(1e4), gm_base*R(1e3),
-                          gm_base*R(1e2), gm_base};
-    REAL cmin_vals [] = {R(1e-5), R(1e-6), R(1e-7), R(1e-9), R(0.0)};
-    int n_stages = 5;
+    /* P2.10: Pure gmin stepping, single full-power source ramp.
+     * Source scaling was REMOVED — low-α ramps (α=0.01, Ibias=100nA) at
+     * gmin=1e-7 produced equilibrium ~0.01V << Vth, MOSFET stayed OFF,
+     * Newton converged to gmin-dominated false solution.  Starting from
+     * full power with strong gmin (1e-5 S = 100kΩ) ensures 10μA bias
+     * produces ~1V drive, turning MOSFETs on from iteration 1.
+     * Stage 0: gmin=1e-5 S (100kΩ to GND) — strong diagonal dominance.
+     * Stage 1: gmin=1e-7 S (10MΩ) — moderate damping.
+     * Stage 2: gmin=1e-9 S (1GΩ) — light damping.
+     * Stage 3: gm_base (~1e-12 S) — high accuracy. */
+    REAL gmin_stages[] = {R(1e-5), R(1e-7), R(1e-9), gm_base};
+    REAL cmin_vals [] = {R(1e-9), R(1e-9), R(1e-9), R(0.0)};
+    int n_stages = 4;
     int total_iters = 0;
 
     REAL *dc_orig=calloc(c->nv,sizeof(REAL));
     REAL *idc_orig=calloc(c->ni,sizeof(REAL));
     for(int j=0;j<c->nv;j++) dc_orig[j]=c->vsrc[j].dc;
     for(int j=0;j<c->ni;j++) idc_orig[j]=c->isrc[j].dc;
-    /* P2.8: 3-stage source ramp — skips ultra-low α where gmin
-     * dominates and MOSFET stays off, producing false convergence.
-     * α=0.01 provides enough current (~100nA) for the NMOS diode
-     * to reach near-Vth (~0.5V) at gmin=1e-7 in ~50 iterations. */
-    REAL src_ramp[] = {R(1e-2), R(1e-1), R(1.0)};
-    int n_ramp = 3, ramp_failed = 0;
+    /* Single full-power source ramp only (P2.10). */
+    REAL src_ramp[] = {R(1.0)};
+    int n_ramp = 1, ramp_failed = 0;
 
   for(int ramp=0; ramp < n_ramp; ramp++){
     REAL alpha = src_ramp[ramp];
@@ -1972,7 +2040,7 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
     }
 
     int stage_converged = 0;
-    int max_iter_ramp = (alpha < R(0.1)) ? 200 : 150;
+    int max_iter_ramp = 500;
     REAL vlim_stage = R(0.1);
     for(int stage=0; stage < n_stages; stage++){
         REAL gmin = gmin_stages[stage];
@@ -2267,6 +2335,12 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
                     if(IS_NAN(v_new)){
                         v[j]=R(0.0); had_nan=1;
                     } else {
+                        /* P2.10: Absolute voltage clamp — prevent VBIAS fly-away.
+                         * Upper: Vmax+2V, Lower: -1V.  At full-power + strong gmin,
+                         * floating nodes can overshoot; this bounds them to physically
+                         * reasonable values without affecting the final solution. */
+                        if(v_new > Vmax+R(2.0)) v_new = Vmax+R(2.0);
+                        if(v_new < R(-1.0)) v_new = R(-1.0);
                         v[j]=v_new;
                         REAL ad=fabsf(dv); if(ad>max_dv) max_dv=ad;
                     }
