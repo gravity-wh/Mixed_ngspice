@@ -302,9 +302,9 @@ static BSIM4Param bsim4_default(void) {
     return p;
 }
 
-static inline REAL smooth_vdseff(REAL vds, REAL vdsat) {
-    REAL d=R(0.01), x=vdsat-vds-d;
-    return vdsat-R(0.5)*(x+sqrtf(x*x+R(4.0)*d*vdsat+R(1e-30)));
+static inline REAL smooth_vdseff(REAL vds, REAL vdsat, REAL delta) {
+    REAL x=vdsat-vds-delta;
+    return vdsat-R(0.5)*(x+sqrtf(x*x+R(4.0)*delta*vdsat+R(1e-30)));
 }
 
 BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
@@ -516,24 +516,29 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
 
     REAL vgsteff;
     /* === BSIM4v5 Effective Vgs with subthreshold (P1.6) ===
-     * n_eff = nfactor + cdsc*Vds + cdscd*Vds^2 + cdscb*Vbs
-     * Vgst  = Vgs - Vth - voffcv                   (voffcv shifts threshold)
+     * cdsc_total = cdsc + cit                        (cit enhances subthreshold swing)
+     * n_eff = nfactor + cdsc_total*Vds + cdscd*Vds^2 + cdscb*Vbs
+     * Vgst  = Vgs - Vth - voffcv - voff             (voff shifts subthreshold I-V)
      * Vgsteff = smooth(Vgst, n_eff*vt) — dual-branch for weak→strong inversion
      *
      * Without minv, uses the standard BSIM4 subthreshold slope.
-     * With minv>0, adds moderate-inversion linear region bridging.
+     * With minv>0, adds moderate-inversion linear region bridging,
+     *   with Vgst_hi = n_eff*vt*(2.0+minv) to coordinate with minv value.
      */
     {
-        /* Effective ideality factor with drain/body coupling */
+        /* Effective ideality factor with drain/body coupling.
+         * cit adds interface-state capacitance, enhancing subthreshold swing. */
+        REAL cdsc_total = pp->cdsc + pp->cit;
         REAL n_eff = pp->nfactor
-                   + pp->cdsc  * vds
+                   + cdsc_total * vds
                    + pp->cdscd * vds * vds
                    + pp->cdscb * vbs_c;
         if(n_eff < R(1.0)) n_eff = R(1.0);
         if(n_eff > R(10.0)) n_eff = R(10.0);
 
-        /* Gate overdrive shifted by voffcv (corrects subthreshold I-V) */
-        REAL Vgst = vgs - vth - pp->voffcv;
+        /* Gate overdrive shifted by voffcv (CV model offset) and voff
+         * (subthreshold I-V offset). Both shift Vgst for weak inversion. */
+        REAL Vgst = vgs - vth - pp->voffcv - pp->voff;
 
         /* BSIM4v5 dual-branch Vgsteff:
          * Strong inversion (Vgst > 0): direct linear → Vgsteff ≈ Vgst
@@ -557,7 +562,7 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
                  * When minv>0, blend classical single-exp with linear Vgst branch
                  * using a sigmoid weight for smooth transition. */
                 if(pp->minv>R(0.0)){
-                    REAL Vgst_hi=R(2.0)*n_eff*vt;  /* strong inversion reference */
+                    REAL Vgst_hi=n_eff*vt*(R(2.0)+pp->minv);  /* strong inversion reference coordinated with minv */
                     REAL denom=R(0.5)*n_eff*vt+R(1e-30);
                     REAL minv_w=R(1.0)/(R(1.0)+expf(-(Vgst-Vgst_hi)/denom));
                     REAL vg_classic=vgsteff;
@@ -703,12 +708,13 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
     o.EsatL=EsatL;
 
     /* Vdsat */
-    REAL vdsat=vgsteff*EsatL/(Abulk*(vgsteff+EsatL+R(1e-12)));
+    REAL lambda_term=R(1.0)+pp->a1*vgsteff+pp->a2;
+    REAL vdsat=vgsteff*EsatL/(Abulk*(vgsteff+EsatL*lambda_term)+R(1e-12));
     if(vdsat<R(1e-6)) vdsat=R(1e-6);
     o.vdsat=vdsat;
 
     /* Vdseff */
-    REAL vdseff=smooth_vdseff(vds,vdsat);
+    REAL vdseff=smooth_vdseff(vds,vdsat,pp->delta);
     o.vdseff=vdseff;
 
     /* Beta */
@@ -853,15 +859,17 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
          * Without this, R_eff is 1e6× too large → Ids divided by ~20,000×
          * → MOSFET appears to have zero current at any Vgs. */
         REAL weff_um = weff_clamp * R(1e6);
+        REAL weff_wr = powf(weff_um, pp->wr);  /* wr width exponent: Weff^wr scales Rds */
         REAL vgst4rds=vgsteff>R(0.0)?vgsteff:R(0.0);
-        /* Base rdsw per-side with gate-bias dependence — temperature-corrected (P1.8) */
+        /* Base rdsw per-side with gate-bias and body-bias dependence — temperature-corrected (P1.8) */
         REAL rdsw_T = pp->rdsw + pp->prt * dT_Tnom;
         if (rdsw_T < R(0.0)) rdsw_T = R(0.0);
-        REAL rs_rdsw = rdsw_T / (weff_um * (R(1.0) + pp->prwg * vgst4rds) + R(1e-30));
-        /* P5.5: rsw/rdw — independent source/drain resistance.
-         * Use max of rdsw-based and rsw/rdw per terminal. */
-        REAL rs_source=fmaxf(rs_rdsw, pp->rsw/(weff_um+R(1e-30)));
-        REAL rd_drain =fmaxf(rs_rdsw, pp->rdw/(weff_um+R(1e-30)));
+        REAL Vbseff4rds = (vbs_c < R(0.0)) ? vbs_c : R(0.0);  /* prwb: only reverse body bias modulates Rds */
+        REAL rs_rdsw = rdsw_T / (weff_wr * (R(1.0) + pp->prwg * vgst4rds
+                                            + pp->prwb * Vbseff4rds) + R(1e-30));
+        /* P5.5 / P46: rsw/rdw — independent source/drain resistance, additive with rdsw */
+        REAL rs_source = rs_rdsw + pp->rsw / (weff_wr + R(1e-30));
+        REAL rd_drain  = rs_rdsw + pp->rdw / (weff_wr + R(1e-30));
         REAL rout=rs_source+rd_drain;
         /* Source degeneration: gm and gmbs reduced */
         REAL src_degen=R(1.0)+o.gm*rs_source;
@@ -899,20 +907,20 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
             REAL Vde=o.vdseff;
             REAL delta=R(1e-6);
             REAL vt_c=R(8.617333e-5)*temp; if(vt_c<R(1e-6)) vt_c=R(0.02585);
-            REAL n_eff=pp->nfactor+pp->cdsc*vds+pp->cdscd*vds*vds+pp->cdscb*vbs_c;
+            REAL n_eff=pp->nfactor+(pp->cdsc+pp->cit)*vds+pp->cdscd*vds*vds+pp->cdscb*vbs_c;
             if(n_eff<R(1.0)) n_eff=R(1.0); if(n_eff>R(10.0)) n_eff=R(10.0);
             /* vgsteff helper for perturbed Vgs (keeping Vth/Abulk/Vdseff fixed) */
             #define VGSTP(vgs_p) ( \
-             ((vgs_p-o.vth-pp->voffcv)>R(0.1))?(vgs_p-o.vth-pp->voffcv): \
-             ((vgs_p-o.vth-pp->voffcv)<R(-0.1))?n_eff*vt_c*expf((vgs_p-o.vth-pp->voffcv)/(n_eff*vt_c+R(1e-15))): \
-             n_eff*vt_c*logf(R(1.0)+expf((vgs_p-o.vth-pp->voffcv)/(n_eff*vt_c+R(1e-15)))) )
+             ((vgs_p-o.vth-pp->voffcv-pp->voff)>R(0.1))?(vgs_p-o.vth-pp->voffcv-pp->voff): \
+             ((vgs_p-o.vth-pp->voffcv-pp->voff)<R(-0.1))?n_eff*vt_c*expf((vgs_p-o.vth-pp->voffcv-pp->voff)/(n_eff*vt_c+R(1e-15))): \
+             n_eff*vt_c*logf(R(1.0)+expf((vgs_p-o.vth-pp->voffcv-pp->voff)/(n_eff*vt_c+R(1e-15)))) )
             /* Cgs = dQg/dVgs */
             {REAL vp=VGSTP(vgs+delta),vm=VGSTP(vgs-delta);
              o.cgs=Cox*((vp-R(0.5)*Ab*Vde)-(vm-R(0.5)*Ab*Vde))/(R(2.0)*delta);
              if(pp->cgsl>R(0.0)) o.cgs+=pp->cgsl*weff*(vgs-o.vth);}
             /* Cgd = dQg/dVds via Vdseff perturbation */
             {REAL dp=vds+delta,dm=vds-delta;
-             REAL vp=smooth_vdseff(dp,vdsat),vm=smooth_vdseff(dm,vdsat);
+             REAL vp=smooth_vdseff(dp,vdsat,pp->delta),vm=smooth_vdseff(dm,vdsat,pp->delta);
              o.cgd=Cox*R(0.5)*Ab*((vgsteff-R(0.5)*Ab*vm)-(vgsteff-R(0.5)*Ab*vp))/(R(2.0)*delta);
              REAL vgd=vgs-vds;
              if(pp->cgdl>R(0.0)) o.cgd+=pp->cgdl*weff*(vgd-o.vth);}
@@ -922,7 +930,7 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
              REAL sqp=sqrtf(phis-vcp+R(1e-12)),sqm=sqrtf(phis-vcm+R(1e-12));
              REAL vthp=pp->vth0+pp->k1*(sqp-sqrt_phis)-pp->k2*vcp;
              REAL vthm=pp->vth0+pp->k1*(sqm-sqrt_phis)-pp->k2*vcm;
-             REAL Vgstp=vgs-vthp-pp->voffcv,Vgstm=vgs-vthm-pp->voffcv;
+             REAL Vgstp=vgs-vthp-pp->voffcv-pp->voff,Vgstm=vgs-vthm-pp->voffcv-pp->voff;
              REAL vgp,vgm;
              if(Vgstp>R(0.1)) vgp=Vgstp; else if(Vgstp<R(-0.1)) vgp=n_eff*vt_c*expf(Vgstp/(n_eff*vt_c+R(1e-15))); else vgp=n_eff*vt_c*logf(R(1.0)+expf(Vgstp/(n_eff*vt_c+R(1e-15))));
              if(Vgstm>R(0.1)) vgm=Vgstm; else if(Vgstm<R(-0.1)) vgm=n_eff*vt_c*expf(Vgstm/(n_eff*vt_c+R(1e-15))); else vgm=n_eff*vt_c*logf(R(1.0)+expf(Vgstm/(n_eff*vt_c+R(1e-15))));
