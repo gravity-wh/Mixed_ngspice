@@ -234,17 +234,13 @@ typedef struct {
     REAL noia,noib,fnoimod,tnoimod;
     /* --- Physical / process (4) --- */
     REAL xj,ndep,nsd,at;
-    /* --- Gate resistance (1) --- */
-    REAL rgatemod;
+    /* --- Gate resistance (4) --- */
+    REAL rgatemod, xrcrg1, xrcrg2, rshg;
     /* --- Body resistance network (6) --- */
     REAL rbodymod, rbdb, rbsb, rbpb, rbps, rbpd;
     /* --- Gate tunneling (P2.1) --- */
     REAL igcmod,aigc,bigc,cigc,nigc,ntox,pigcd,poxedge,toxref;
-    /* --- GIDL gate-induced drain/source leakage (P2.2 / #50) --- */
-    REAL agidl;   /* GIDL pre-factor (A/m, default 0 = off) */
-    REAL bgidl;   /* GIDL field exponent (V/m, typical 2e9) */
-    REAL cgidl;   /* body-junction correction factor (V³, typical 0.5) */
-    REAL egidl;   /* band-bending offset voltage (V, typical 0.8) */
+    REAL agidl,bgidl,cgidl,egidl;  /* GIDL (P2.2) */
 } BSIM4Param;
 
 typedef struct {
@@ -254,6 +250,7 @@ typedef struct {
     REAL ibs,ibd,gbs,gbd;  /* junction currents + conductances */
     REAL rbody;  /* equivalent body resistance Ω (simplified single-resistor model) */
     REAL igc;    /* gate-to-channel tunneling current (P2.1) */
+    REAL rg;     /* gate resistance Ω (P2.5) */
 } BSIM4Out;
 
 static BSIM4Param bsim4_default(void) {
@@ -865,6 +862,37 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
     o.gmbs=-o.gm*dvth_dvb;
     if(fabsf(o.gmbs)<R(1e-15)) o.gmbs=R(0.0);
 
+    /* === P2.2: GIDL — gate-induced drain/source leakage (BSIM4v5 §8.3) === */
+    REAL Igidl = R(0.0), Igisl = R(0.0);
+    if (pp->agidl > R(0.0) && pp->bgidl > R(0.0) && pp->cgidl > R(0.0)) {
+        REAL T0 = R(3.0) * toxe_safe;
+        /* Drain-side: T1 = (Vds - Vgsteff - egidl)/(3*toxe) */
+        REAL T1d = (vds - vgsteff - pp->egidl) / (T0 + R(1e-30));
+        REAL Vbd = vbs - vds;
+        if (T1d > R(0.0) && Vbd < R(0.0)) {
+            REAL T2 = pp->bgidl / (T1d + R(1e-30));
+            if (T2 < R(100.0)) {
+                Igidl = pp->agidl * weff * T1d * expf(-T2);
+                REAL Vbd3 = Vbd * Vbd * Vbd;
+                Igidl *= Vbd3 / (pp->cgidl + Vbd3 + R(1e-30));
+                if (Igidl < R(0.0)) Igidl = R(0.0);
+            }
+        }
+        /* Source-side: T1 = (-Vds - Vgd_eff - egidl)/(3*toxe) */
+        REAL Vgd_eff = vgsteff - vds;
+        REAL T1s = (-vds - Vgd_eff - pp->egidl) / (T0 + R(1e-30));
+        if (T1s > R(0.0) && vbs_c < R(0.0)) {
+            REAL T2 = pp->bgidl / (T1s + R(1e-30));
+            if (T2 < R(100.0)) {
+                Igisl = pp->agidl * weff * T1s * expf(-T2);
+                REAL Vbs3 = vbs_c * vbs_c * vbs_c;
+                Igisl *= Vbs3 / (pp->cgidl + Vbs3 + R(1e-30));
+                if (Igisl < R(0.0)) Igisl = R(0.0);
+            }
+        }
+    }
+    o.ids -= (Igidl + Igisl);
+
     /* === P2.1: Gate-to-channel tunneling current (igcMod=1) ===
      * BSIM4v5 §8.2. Igc flows from gate into the channel, partitioned
      * between drain (pigcd) and source (1-pigcd).
@@ -1066,38 +1094,6 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
         if(fabsf(o.gbd)<R(1e-18)) o.gbd=R(0.0);
     }
 
-    /* === P2.2: GIDL — gate-induced drain/source leakage (BSIM4v5 §8.3) === */
-    REAL Igidl = R(0.0), Igisl = R(0.0);
-    if (pp->agidl > R(0.0) && pp->bgidl > R(0.0) && pp->cgidl > R(0.0)) {
-        REAL T0 = R(3.0) * toxe_safe;
-        /* ---- Drain-side GIDL ---- */
-        REAL T1_d = (vds - o.vgsteff - pp->egidl) / (T0 + R(1e-30));
-        REAL Vbd   = vbs_c - vds;
-        if (T1_d > R(0.0) && Vbd < R(0.0)) {
-            REAL T2 = pp->bgidl / (T1_d + R(1e-30));
-            if (T2 < R(100.0)) {
-                Igidl = pp->agidl * weff * T1_d * expf(-T2);
-                REAL Vbd3 = Vbd * Vbd * Vbd;
-                Igidl *= Vbd3 / (pp->cgidl + Vbd3 + R(1e-30));
-                if (Igidl < R(0.0)) Igidl = R(0.0);
-            }
-        }
-        /* ---- Source-side GIDL ---- */
-        REAL Vgd_eff = o.vgsteff - vds;  /* approximate Vgd */
-        REAL T1_s = (-vds - Vgd_eff - pp->egidl) / (T0 + R(1e-30));
-        if (T1_s > R(0.0) && vbs_c < R(0.0)) {
-            REAL T2 = pp->bgidl / (T1_s + R(1e-30));
-            if (T2 < R(100.0)) {
-                Igisl = pp->agidl * weff * T1_s * expf(-T2);
-                REAL Vbs3 = vbs_c * vbs_c * vbs_c;
-                Igisl *= Vbs3 / (pp->cgidl + Vbs3 + R(1e-30));
-                if (Igisl < R(0.0)) Igisl = R(0.0);
-            }
-        }
-    }
-    /* GIDL affects terminal currents: drain loses Igidl, source loses Igisl */
-    o.ids -= (Igidl + Igisl);
-
     /* === P2.4: Body resistance network ===
      * Simplified single-resistor model: rbody = rbdb||rbsb||rbpb
      * PTM LP: rbdb=15, rbsb=15, rbpb=5 → rbody ≈ 3.75Ω
@@ -1111,6 +1107,22 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
         o.rbody = R(0.0);
     }
 
+    /* === P2.5: Gate electrode resistance (BSIM4v5 §11) ===
+     * rgatemod=0: off (default). rgatemod=1: simplified single-R model.
+     * Rgelt = (rshg * Weff/Leff + xrcrg1/Weff + xrcrg2*Weff) / Nfinger
+     * Nfinger=1 (simplified).  Rgelt distributed between gate node and
+     * internal gate via a series resistance — for this simplified model,
+     * we compute rg as an output-only parameter (no Jacobian split).
+     * Future: split gate node into external + internal for AC accuracy. */
+    REAL rg = R(0.0);
+    if (pp->rgatemod > R(0.5)) {
+        rg = pp->rshg * weff / (leff + R(1e-30))
+           + pp->xrcrg1 / (weff + R(1e-30))
+           + pp->xrcrg2 * weff;
+        if (rg < R(0.0)) rg = R(0.0);
+    }
+    o.rg = rg;
+
     /* NaN firewall: divergent Newton step → return safe off-state */
     if(IS_NAN(o.ids)||IS_NAN(o.gm)||IS_NAN(o.gds)||IS_NAN(o.gmbs)
         ||IS_NAN(o.ibs)||IS_NAN(o.ibd)||IS_NAN(o.gbs)||IS_NAN(o.gbd)){
@@ -1118,6 +1130,7 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
         o.vgsteff=R(0.0);
         o.ibs=R(0.0); o.ibd=R(0.0); o.gbs=R(0.0); o.gbd=R(0.0);
         o.rbody=R(0.0);
+        o.rg=R(0.0);
     }
 
     /* P2.8: PMOS sign convention — negate Ids (current flows source→drain).
@@ -1402,8 +1415,11 @@ static void bsim4_from_model(BSIM4Param *pp, const Model *m) {
     /* --- Physical / process (4) --- */
     pp->xj=model_get(m,"xj",pp->xj); pp->ndep=model_get(m,"ndep",pp->ndep);
     pp->nsd=model_get(m,"nsd",pp->nsd); pp->at=model_get(m,"at",pp->at);
-    /* --- Gate resistance (1) --- */
+    /* --- Gate resistance (4) --- */
     pp->rgatemod=model_get(m,"rgatemod",pp->rgatemod);
+    pp->xrcrg1=model_get(m,"xrcrg1",pp->xrcrg1);
+    pp->xrcrg2=model_get(m,"xrcrg2",pp->xrcrg2);
+    pp->rshg=model_get(m,"rshg",pp->rshg);
     /* --- Body resistance network (6) --- */
     pp->rbodymod=model_get(m,"rbodymod",pp->rbodymod);
     pp->rbdb    =model_get(m,"rbdb",    pp->rbdb);
@@ -2261,6 +2277,16 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
                         if(!vfixed[m->b]) {
                             a[m->b + m->b*N] += gb;
                             rhs[m->b] -= gb * v[m->b];
+                        }
+                    }
+                    /* P2.5: Gate resistance stamping.
+                     * Simplified: add conductance gg = 1/rg from gate to GND.
+                     * This provides DC bias stability for floating gate nodes. */
+                    if (o.rg > R(1e-6)) {
+                        REAL gg = R(1.0) / o.rg;
+                        if (!vfixed[m->g]) {
+                            a[m->g + m->g*N] += gg;
+                            rhs[m->g] -= gg * v[m->g];
                         }
                     }
                 }
