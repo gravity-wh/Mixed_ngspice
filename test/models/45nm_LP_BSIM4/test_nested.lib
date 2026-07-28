@@ -1,0 +1,8 @@
+* Test library with nested .include — for float_spice #58 AC2 validation
+.lib nmos_nested_inc
+.include ptm45lp.lib
+.endl nmos_nested_inc
+
+.lib nmos_nested_lib
+.lib 'test_section.lib' nmos_section
+.endl nmos_nested_lib

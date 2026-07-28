@@ -1,0 +1,4 @@
+* AC2b: Section with .include inside — real PTM model file
+.lib tt
+.include "../test/models/45nm_LP_BSIM4/ptm45lp.lib"
+.endl tt

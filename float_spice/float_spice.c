@@ -123,6 +123,30 @@ typedef struct {
     int ic_nodes[MAX_IC];
     REAL ic_vals[MAX_IC];
     int tran_uic;  /* .tran uic flag */
+    /* P3.6: .nodeset DC convergence hints */
+    #define MAX_NS 64
+    int nns;
+    int ns_nodes[MAX_NS];
+    REAL ns_vals[MAX_NS];
+    /* P6.2: .meas measurement storage (parse only; evaluation in #67) */
+    #define MAX_MEAS 64
+    struct {
+        char name[32];
+        char analysis[8];       /* TRAN, AC, DC */
+        char func[8];           /* AVG, MAX, MIN, PP, RMS, WHEN, INTEG, DERIV, TRIG, PARAM */
+        char sig[64];           /* v(node) or i(vsrc) — functional form */
+        REAL from_val, to_val, at_val;
+        /* TRIG/TARG form */
+        char trig_sig[64];
+        REAL trig_val;
+        int  trig_rise;
+        char targ_sig[64];
+        REAL targ_val;
+        int  targ_rise;
+        /* PARAM form */
+        char param_expr[256];
+    } meas[MAX_MEAS];
+    int nmeas;
 } Circuit;
 
 /* ===== Dense Matrix + Float LU ===== */
@@ -1150,6 +1174,9 @@ BSIM4Out bsim4_eval(REAL vgs, REAL vds, REAL vbs, REAL weff, REAL leff,
 /* P5.1: emit device parameter table after DC solve.
  * Iterates all MOSFETs, evaluates BSIM4 at converged voltages,
  * stores key params keyed as "M1.gm", "M2.ids", etc. */
+/* Forward declarations — used by emit_device_param_table */
+static Model* find_model(Circuit *c, const char *name);
+static REAL dio_model_get(Model *m, const char *key, REAL def);
 static void emit_device_param_table(Circuit *c, REAL *v, BSIM4Param *const *pp_arr) {
     c->ndev_param=0;
     for(int j=0;j<c->nm && c->ndev_param+8 <= MAX_DEVICE_PARAMS;j++){
@@ -1164,6 +1191,30 @@ static void emit_device_param_table(Circuit *c, REAL *v, BSIM4Param *const *pp_a
         REAL vals[]={o.ids,o.gm,o.gds,o.gmbs,o.vth,o.vdsat,o.vgsteff,o.beta};
         for(int k=0;k<8;k++){
             snprintf(c->dev_param_names[c->ndev_param],63,"%s.%s",m->name,keys[k]);
+            c->dev_param_vals[c->ndev_param]=vals[k];
+            c->ndev_param++;
+        }
+    }
+    /* P5.5: Diode device params for @dname[id] */
+    for(int j=0;j<c->nd && c->ndev_param+2 <= MAX_DEVICE_PARAMS;j++){
+        Diode *d=&c->dio[j];
+        REAL Vd=v[d->p]-v[d->n];
+        Model *dm=find_model(c,d->model);
+        REAL IS=dio_model_get(dm,"IS",R(1e-14));
+        REAL N =dio_model_get(dm,"N",R(1.0));
+        if(IS<R(1e-20)) IS=R(1e-14);
+        if(N<R(1e-6)) N=R(1.0);
+        REAL Vt=R(0.02585);
+        REAL safe_exp=Vd/(N*Vt);
+        if(safe_exp>R(80.0)) safe_exp=R(80.0);
+        if(safe_exp<R(-80.0)) safe_exp=R(-80.0);
+        REAL Id=IS*d->area*(expf(safe_exp)-R(1.0));
+        REAL gd=IS*d->area*expf(safe_exp)/(N*Vt+R(1e-30));
+        if(IS_NAN(Id)||IS_NAN(gd)){Id=R(0.0);gd=R(1e-12);}
+        const char *keys[]={"id","gd"};
+        REAL vals[]={Id,gd};
+        for(int k=0;k<2;k++){
+            snprintf(c->dev_param_names[c->ndev_param],63,"%s.%s",d->name,keys[k]);
             c->dev_param_vals[c->ndev_param]=vals[k];
             c->ndev_param++;
         }
@@ -1439,6 +1490,9 @@ static void bsim4_from_model(BSIM4Param *pp, const Model *m) {
     pp->cgidl=model_get(m,"cgidl",pp->cgidl);
     pp->egidl=model_get(m,"egidl",pp->egidl);
 }
+/* Issue #58: forward declaration for recursive .lib calls from parse_include() */
+static void parse_lib_section(Circuit *c, const char *line, const char *pdir);
+
 static void parse_model_line(Circuit *c, const char *line) {
     Model m; memset(&m,0,sizeof(m));
     /* P2.8 fix: read name+type via sscanf; locate param start via pointer
@@ -1500,6 +1554,9 @@ static void parse_include(Circuit *c, const char *line, const char *pdir) {
         }else if(!strncmp(s,".include",8)){
             if(in_model&&acc[0]){parse_model_line(c,acc);in_model=0;}
             parse_include(c,s,idir);
+        }else if(!strncmp(s,".lib",4)&&(s[4]==0||s[4]==' '||s[4]=='\t')){
+            if(in_model&&acc[0]){parse_model_line(c,acc);in_model=0;}
+            parse_lib_section(c,s,idir);
         }else{
             /* P2.8 fix: blank lines do NOT terminate an ongoing .model block.
              * PTM .lib files have blank lines between .model header and
@@ -1515,6 +1572,152 @@ static void parse_include(Circuit *c, const char *line, const char *pdir) {
     if(in_model&&acc[0]) parse_model_line(c,acc); /* flush model at EOF */
     fclose(fp);
 }
+
+/* Issue #58: case-insensitive prefix match for dot commands in lib files.
+ * Returns 1 if s (after leading whitespace) starts with "." + cmd
+ * (case-insensitive) followed by whitespace or end-of-string.
+ * Used for matching .LIB/.lib and .ENDL/.endl inside library definition
+ * files where convention uses uppercase. */
+static int dot_match_ci(const char *s, const char *cmd) {
+    while (*s == ' ' || *s == '\t') s++;
+    if (*s != '.') return 0;
+    s++;
+    int n = (int)strlen(cmd);
+    for (int i = 0; i < n; i++)
+        if (tolower((unsigned char)s[i]) != tolower((unsigned char)cmd[i]))
+            return 0;
+    char c = s[n];
+    return (c == 0 || c == ' ' || c == '\t' || c == '\n' || c == '\r');
+}
+
+/* Issue #58: .lib 'filename' section_name support.
+ * Opens the library file, locates .lib section_name ... .endl,
+ * and processes .model / +continuation / .include / nested .lib
+ * within the section.  Uses the same acc/in_model accumulator
+ * pattern as parse_include(). */
+static void parse_lib_section(Circuit *c, const char *line, const char *pdir) {
+    /* --- extract filename (possibly quoted) --- */
+    const char *p = line + 4;              /* skip ".lib" */
+    while (*p == ' ' || *p == '\t') p++;
+    char fn[512]; int fi = 0;
+    if (*p == '\'' || *p == '"') {
+        char q = *p; p++;
+        while (*p && *p != q && fi < 511) fn[fi++] = *p++;
+        if (*p == q) p++;
+    } else {
+        while (*p && *p != ' ' && *p != '\t' && *p != '\n' && *p != '\r' && fi < 511)
+            fn[fi++] = *p++;
+    }
+    fn[fi] = 0;
+    if (fn[0] == 0) return;
+
+    /* --- extract section name --- */
+    while (*p == ' ' || *p == '\t') p++;
+    char section[256]; int si = 0;
+    while (*p && *p != ' ' && *p != '\t' && *p != '\n' && *p != '\r' && si < 255)
+        section[si++] = *p++;
+    section[si] = 0;
+    if (section[0] == 0) {
+        printf("[WARN] .lib missing section name for file %s\n", fn);
+        return;
+    }
+
+    /* --- resolve file path (same logic as parse_include) --- */
+    char full[1024];
+    if (fn[0] == '/' || (fn[0] && fn[1] == ':'))
+        { strncpy(full, fn, 1023); full[1023] = 0; }
+    else
+        { snprintf(full, 1023, "%s/%s", pdir, fn); }
+    FILE *fp = fopen(full, "r");
+    if (!fp) fp = fopen(fn, "r");
+    if (!fp) {
+        printf("[WARN] .lib file not found: %s\n", fn);
+        return;
+    }
+
+    /* --- directory for nested includes / libs --- */
+    char idir[1024];
+    strncpy(idir, full, 1023); idir[1023] = 0;
+    char *sl = strrchr(idir, '/');
+    if (sl) *sl = 0; else strcpy(idir, ".");
+
+    /* --- scan for .lib section_name ... .endl --- */
+    char buf[MAX_LINE], acc[MAX_LINE * 2] = "";
+    int in_model = 0, in_section = 0;
+    while (fgets(buf, MAX_LINE, fp)) {
+        char *s = buf;
+        while (*s == ' ' || *s == '\t') s++;
+
+        if (!in_section) {
+            /* looking for section header: .lib section_name */
+            if (dot_match_ci(s, "lib")) {
+                char *sp = s;
+                while (*sp == ' ' || *sp == '\t') sp++;
+                if (*sp == '.') sp++;  /* skip the dot */
+                /* skip "lib" keyword */
+                while (*sp && *sp != ' ' && *sp != '\t') sp++;
+                while (*sp == ' ' || *sp == '\t') sp++;
+                char sec[256]; int ssi = 0;
+                while (*sp && *sp != ' ' && *sp != '\t' && *sp != '\n' && *sp != '\r' && ssi < 255)
+                    sec[ssi++] = *sp++;
+                sec[ssi] = 0;
+                /* strip quotes if section name is quoted (rare) */
+                if (ssi >= 2 && (sec[0] == '\'' || sec[0] == '"') && sec[0] == sec[ssi - 1]) {
+                    memmove(sec, sec + 1, ssi - 2);
+                    sec[ssi - 2] = 0;
+                }
+                if (!strcmp(sec, section))
+                    in_section = 1;
+            }
+            continue;
+        }
+
+        /* inside the target section — look for .endl */
+        if (dot_match_ci(s, "endl")) {
+            if (in_model && acc[0]) parse_model_line(c, acc);
+            break;
+        }
+
+        /* --- process content (same state machine as parse_include) --- */
+        if (*s == '+') {
+            if (in_model) {
+                int alen = (int)strlen(acc);
+                while (alen > 0 && (acc[alen - 1] == '\n' || acc[alen - 1] == '\r'))
+                    acc[--alen] = 0;
+                char cont_line[MAX_LINE];
+                strncpy(cont_line, s + 1, MAX_LINE - 1); cont_line[MAX_LINE - 1] = 0;
+                int clen = (int)strlen(cont_line);
+                while (clen > 0 && (cont_line[clen - 1] == '\n' || cont_line[clen - 1] == '\r'
+                                 || cont_line[clen - 1] == ' ' || cont_line[clen - 1] == '\t'))
+                    cont_line[--clen] = 0;
+                snprintf(acc + alen, sizeof(acc) - alen, " %s", cont_line);
+            }
+        } else if (!strncmp(s, ".model", 6)) {
+            if (in_model && acc[0]) parse_model_line(c, acc);
+            int slen = (int)strlen(s);
+            while (slen > 0 && (s[slen - 1] == '\n' || s[slen - 1] == '\r')) slen--;
+            memcpy(acc, s, slen); acc[slen] = 0;
+            in_model = 1;
+        } else if (!strncmp(s, ".include", 8)) {
+            if (in_model && acc[0]) { parse_model_line(c, acc); in_model = 0; }
+            parse_include(c, s, idir);
+        } else if (!strncmp(s, ".lib", 4) && (s[4] == 0 || s[4] == ' ' || s[4] == '\t')) {
+            if (in_model && acc[0]) { parse_model_line(c, acc); in_model = 0; }
+            parse_lib_section(c, s, idir);
+        } else {
+            if (!in_model) continue;
+            if (*s == '\0' || *s == '\n' || *s == '\r') continue;
+            if (*s == '*') continue;
+            parse_model_line(c, acc); acc[0] = 0; in_model = 0;
+        }
+    }
+    if (in_model && acc[0]) parse_model_line(c, acc);
+    fclose(fp);
+
+    if (!in_section)
+        printf("[WARN] .lib section '%s' not found in %s\n", section, fn);
+}
+
 static int parse_instance(Circuit *c, const char *s) {
     if(*s=='M'||*s=='m'){
         Mosfet m; memset(&m,0,sizeof(m)); m.m=1;
@@ -1696,6 +1899,127 @@ static void parse_param(Circuit *c, const char *s) {
 static void parse_temp(Circuit *c, const char *s) {
     REAL tc; if(sscanf(s,".temp %f",&tc)==1) c->temp=R(tc+273.15);
 }
+/* ===== P6.2: .meas parser — 3 forms: functional, TRIG/TARG, PARAM ===== */
+static void parse_meas(Circuit *c, const char *s) {
+    if (c->nmeas >= MAX_MEAS) return;
+    typeof(c->meas[0]) *m = &c->meas[c->nmeas];
+    /* zero-initialize the slot (calloc doesn't cover stack struct copies) */
+    memset(m, 0, sizeof(*m));
+
+    /* skip leading whitespace */
+    while (*s == ' ' || *s == '\t') s++;
+
+    /* extract ANALYSIS token: TRAN, AC, DC */
+    {   const char *p = s; while (*p && *p != ' ' && *p != '\t') p++;
+        int len = (int)(p - s); if (len > 7) len = 7;
+        strncpy(m->analysis, s, len); m->analysis[len] = 0;
+        s = p; while (*s == ' ' || *s == '\t') s++;
+    }
+
+    /* extract NAME token */
+    {   const char *p = s; while (*p && *p != ' ' && *p != '\t') p++;
+        int len = (int)(p - s); if (len > 31) len = 31;
+        strncpy(m->name, s, len); m->name[len] = 0;
+        s = p; while (*s == ' ' || *s == '\t') s++;
+    }
+
+    /* Determine form by peeking at next token */
+    if (!strncmp(s, "TRIG", 4) && (s[4] == 0 || s[4] == ' ' || s[4] == '\t')) {
+        /* --- TRIG/TARG form --- */
+        strcpy(m->func, "TRIG");
+        s += 4; while (*s == ' ' || *s == '\t') s++;
+        /* TRIG signal: v(...) or i(...) */
+        if (*s == 'v' || *s == 'V' || *s == 'i' || *s == 'I') {
+            char kind = (char)tolower((unsigned char)*s); s++;
+            if (*s == '(') {
+                s++; const char *st = s;
+                while (*s && *s != ')') s++;
+                int len = (int)(s - st); if (len > 63) len = 63;
+                snprintf(m->trig_sig, 64, "%c(%.*s)", kind, len, st);
+                if (*s == ')') s++;
+            }
+        }
+        /* TRIG VAL= */
+        {   const char *v = strstr(s, "VAL=");
+            if (v) m->trig_val = parse_eng(v + 4);
+        }
+        /* TRIG RISE= */
+        {   const char *r = strstr(s, "RISE=");
+            if (r) m->trig_rise = atoi(r + 5);
+        }
+        /* Find TARG keyword */
+        {   const char *tg = strstr(s, "TARG");
+            if (tg) {
+                tg += 4; while (*tg == ' ' || *tg == '\t') tg++;
+                /* TARG signal */
+                if (*tg == 'v' || *tg == 'V' || *tg == 'i' || *tg == 'I') {
+                    char kind = (char)tolower((unsigned char)*tg); tg++;
+                    if (*tg == '(') {
+                        tg++; const char *st = tg;
+                        while (*tg && *tg != ')') tg++;
+                        int len = (int)(tg - st); if (len > 63) len = 63;
+                        snprintf(m->targ_sig, 64, "%c(%.*s)", kind, len, st);
+                        if (*tg == ')') tg++;
+                    }
+                }
+                /* TARG VAL= — search from TARG position onward */
+                {   const char *v = strstr(tg, "VAL=");
+                    if (v) m->targ_val = parse_eng(v + 4);
+                }
+                /* TARG RISE= */
+                {   const char *r = strstr(tg, "RISE=");
+                    if (r) m->targ_rise = atoi(r + 5);
+                }
+            }
+        }
+    } else if (!strncmp(s, "PARAM", 5) && (s[5] == 0 || s[5] == ' ' || s[5] == '\t' || s[5] == '=')) {
+        /* --- PARAM form: PARAM='expression' --- */
+        strcpy(m->func, "PARAM");
+        s += 5; while (*s == ' ' || *s == '\t') s++;
+        if (*s == '=') {
+            s++; while (*s == ' ' || *s == '\t') s++;
+            if (*s == '\'') {
+                s++; const char *st = s;
+                while (*s && *s != '\'') s++;
+                int len = (int)(s - st); if (len > 255) len = 255;
+                strncpy(m->param_expr, st, len); m->param_expr[len] = 0;
+            }
+        }
+    } else {
+        /* --- Functional form: FUNC sig [FROM=x] [TO=y] [AT=z] --- */
+        /* extract FUNC token */
+        {   const char *p = s; while (*p && *p != ' ' && *p != '\t') p++;
+            int len = (int)(p - s); if (len > 7) len = 7;
+            strncpy(m->func, s, len); m->func[len] = 0;
+            s = p; while (*s == ' ' || *s == '\t') s++;
+        }
+        /* extract signal: v(...) or i(...) */
+        while (*s) {
+            if ((*s == 'v' || *s == 'V' || *s == 'i' || *s == 'I') && *(s + 1) == '(') {
+                char kind = (char)tolower((unsigned char)*s); s += 2;
+                const char *st = s;
+                while (*s && *s != ')') s++;
+                int len = (int)(s - st); if (len > 63) len = 63;
+                snprintf(m->sig, 64, "%c(%.*s)", kind, len, st);
+                if (*s == ')') s++;
+                break;
+            }
+            s++;
+        }
+        /* optional FROM= / TO= / AT= */
+        {   const char *f = strstr(s, "FROM=");
+            if (f) m->from_val = parse_eng(f + 5);
+        }
+        {   const char *t = strstr(s, "TO=");
+            if (t) m->to_val = parse_eng(t + 3);
+        }
+        {   const char *a = strstr(s, "AT=");
+            if (a) m->at_val = parse_eng(a + 3);
+        }
+    }
+    c->nmeas++;
+}
+
 /* ===== P3.3: .subckt parser — capture body lines until .ends ===== */
 static void parse_subckt(Circuit *c, const char *filename, const char *first_line) {
     if(c->nsubckt>=MAX_SUBCKT) return;
@@ -1795,6 +2119,7 @@ static void parse_netlist(Circuit *c, const char *filename) {
             char *c2=cs; while(*c2==' '||*c2=='\t') c2++;
             if(!strncmp(c2,".model",6)) parse_model_line(c,c2);
             else if(!strncmp(c2,".include",8)) parse_include(c,c2,dir);
+            else if(!strncmp(c2,".lib",4)&&(c2[4]==0||c2[4]==' '||c2[4]=='\t')) parse_lib_section(c,c2,dir);
             else if(!strncmp(c2,".dc",3)){c->do_dc=1;
                 int nf=sscanf(c2,".dc %31s %f %f %f %31s %f %f %f",
                        c->dc_src,&c->dc_start,&c->dc_stop,&c->dc_step,
@@ -1808,6 +2133,7 @@ static void parse_netlist(Circuit *c, const char *filename) {
             }else if(!strncmp(c2,".option",7)) parse_option(c,c2);
             else if(!strncmp(c2,".param",6)) parse_param(c,c2);
             else if(!strncmp(c2,".temp",5)) parse_temp(c,c2);
+            else if(!strncmp(c2,".meas",5)) parse_meas(c, c2+5);
             else if(!strncmp(c2,".subckt",7)) parse_subckt(c,filename,c2);
             cont[0]=0;
         }
@@ -1815,6 +2141,7 @@ static void parse_netlist(Circuit *c, const char *filename) {
         param_subst(c,s);
         if(!strncmp(s,".model",6)){strncpy(cont,s,MAX_LINE-1);cont[MAX_LINE-1]=0;}
         else if(!strncmp(s,".include",8)) parse_include(c,s,dir);
+        else if(!strncmp(s,".lib",4)&&(s[4]==0||s[4]==' '||s[4]=='\t')) parse_lib_section(c,s,dir);
         else if(!strncmp(s,".subckt",7)) parse_subckt(c,filename,s);
         else if(!strncmp(s,".ends",5)){}
         else if(!strncmp(s,".op",3)) c->do_op=1;
@@ -1848,6 +2175,26 @@ static void parse_netlist(Circuit *c, const char *filename) {
                     while(*p2&&*p2!=' '&&*p2!='\t'&&*p2!=')') p2++;
                 }else break;
             }
+        }
+        else if(!strncmp(s,".nodeset",8)&&(s[8]==0||s[8]==' ')){
+            /* P3.6: .nodeset v(node)=value ... — DC initial guess hints */
+            char *p2=s+8;
+            while(*p2){
+                while(*p2==' '||*p2=='\t') p2++;
+                if(!strncmp(p2,"v(",2)||!strncmp(p2,"V(",2)){
+                    p2+=2; char nbuf[32]; int ni=0;
+                    while(*p2&&*p2!=')'&&ni<31) nbuf[ni++]=*p2++;
+                    nbuf[ni]=0; if(*p2==')') p2++;
+                    while(*p2==' '||*p2=='='||*p2=='\t') p2++;
+                    REAL val=parse_eng(p2);
+                    int nd=find_or_add_node(c,nbuf);
+                    if(nd>=0&&c->nns<MAX_NS){c->ns_nodes[c->nns]=nd;c->ns_vals[c->nns]=val;c->nns++;}
+                    while(*p2&&*p2!=' '&&*p2!='\t'&&*p2!=')') p2++;
+                }else break;
+            }
+        }
+        else if(!strncmp(s,".meas",5)&&(s[5]==0||s[5]==' ')){
+            parse_meas(c, s+5);
         }
         else if(!strncmp(s,".control",8)){ c->in_control=1; }
         else if(!strncmp(s,".endc",5)){ c->in_control=0; }
@@ -1908,6 +2255,9 @@ static void parse_netlist(Circuit *c, const char *filename) {
                 char *msg=s+4; while(*msg==' '||*msg=='"') msg++;
                 int mlen=(int)strlen(msg); while(mlen>0&&(msg[mlen-1]=='"'||msg[mlen-1]=='\n')) mlen--;
                 if(mlen>0) printf("%.*s\n",mlen,msg);
+            }
+            else if(!strncmp(s,"meas",4)&&(s[4]==0||s[4]==' ')){
+                parse_meas(c, s+4);
             }
         }
         else if(!strncmp(s,".end",4)) break;
@@ -2094,6 +2444,11 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
     int *vs_mna=calloc(c->nv,sizeof(int));  /* -1=grounded, else MNA row/col index */
     int n_float=0;
     for(int j=0;j<c->nn;j++) v[j]=R(0.0);
+    /* P3.6: apply .nodeset hints as Newton initial guess */
+    for(int j=0;j<c->nns;j++){
+        if(c->ns_nodes[j]>=0 && c->ns_nodes[j]<c->nn)
+            v[c->ns_nodes[j]]=c->ns_vals[j];
+    }
     for(int j=0;j<c->nv;j++) iv[j]=R(0.0);
     for(int j=0;j<c->nv;j++){
         if(c->vsrc[j].n==gnd){
@@ -2494,8 +2849,8 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
             if(!had_nan && !stage_converged && stage >= 3 && iter > 50
                && max_dv < R(10.0)*abstol){
                 stage_converged = 1;
-                printf("  [soft_converge] ramp=%.0e stage=%d iter=%d\n",
-                       (double)alpha, stage, iter);
+                printf("  [soft_converge] ramp=%s stage=%d iter=%d\n",
+                       real_to_str(alpha, 'e', 0), stage, iter);
                 break;
             }
             if(!had_nan && max_dv<abstol){ stage_converged=1; break; }
@@ -2839,6 +3194,15 @@ static void tran_solve(Circuit *c, BSIM4Param *const *pp_arr, REAL tstop, REAL t
     free(mos_v_prev);free(mos_cap_i);
 }
 
+/* ===== P6.2: print meas results placeholder (evaluation deferred to #67) ===== */
+static void print_meas_results(const Circuit *c) {
+    if (c->nmeas == 0) return;
+    printf("\n  --- Measurement Results ---\n");
+    for (int i = 0; i < c->nmeas; i++) {
+        printf("  %s = %s\n", c->meas[i].name, real_to_str(R(0.0), 'f', 6));
+    }
+}
+
 /* ===== Float printer (P0.7: zero cvtss2sd) =====
  * Converts REAL → string using only float + integer arithmetic.
  * printf("%f", x) forces float→double promotion (cvtss2sd).
@@ -2920,6 +3284,8 @@ int main(int argc, char **argv) {
     parse_netlist(c,argv[1]);
     printf("Circuit: %s\n  Nodes: %d  Res: %d  MOSFETs: %d  Vsrcs: %d  Caps: %d\n",
            argv[1],c->nn,c->nr,c->nm,c->nv,c->nc);
+    printf("Device count: %d mos, %d R, %d C, %d V, %d I, %d D\n",
+           c->nm,c->nr,c->nc,c->nv,c->ni,c->nd);
 
     BSIM4Param pp_nmos=bsim4_default(), pp_pmos=bsim4_default();
     /* PMOS defaults: negate Vth, use hole mobility (SPICE convention) */
@@ -2978,6 +3344,7 @@ int main(int argc, char **argv) {
         printf("\nTRAN: tstop=%s tstep=%s\n",
                real_to_str(c->tran_tstop,'e',4),real_to_str(c->tran_tstep,'e',4));
         tran_solve(c,mos_pp,c->tran_tstop,c->tran_tstep);
+        print_meas_results(c);
     } else if(c->do_dc && c->dc_src[0]){
         /* Find sweep source(s) */
         int sidx=-1, sidx2=-1;
@@ -3091,6 +3458,7 @@ int main(int argc, char **argv) {
                 }
             }
         }
+        print_meas_results(c);
         /* P4.3: ngspice-compatible output format.
          * Headers use "Node    Voltage" / "Source    Current" conventions
          * so that compare_fp.py can parse float_spice output with the same

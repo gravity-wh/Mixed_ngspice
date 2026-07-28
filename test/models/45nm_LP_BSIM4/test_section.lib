@@ -1,0 +1,10 @@
+* Test library with sections — Issue #58 AC1
+.lib pmos_section
+.model pmos pmos level=54
++u0=0.021 toxe=1.82e-09 vth0=-0.587
+.endl pmos_section
+
+.lib nmos_section
+.model nmos nmos level=54
++vth0=0.6226 u0=0.049 toxe=1.8e-09
+.endl nmos_section

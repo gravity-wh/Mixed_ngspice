@@ -1,0 +1,5 @@
+* AC2: Recursive .include within .lib section
+.lib include_section
+.model nmos_inc nmos level=54
++vth0=0.6226 u0=0.049 toxe=1.8e-09
+.endl include_section
