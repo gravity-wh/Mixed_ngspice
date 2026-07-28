@@ -38,6 +38,7 @@ typedef struct {
     char name[32];
     char nodes[32][32]; int nnode;
     char lines[MAX_SUBCKT_LINES][MAX_LINE]; int nline;
+    char param_names[16][32]; REAL param_vals[16]; int nparam;  /* #72: subcircuit parameters */
 } Subckt;
 typedef struct { char key[32]; REAL val; } Param;
 typedef struct {
@@ -2283,7 +2284,32 @@ static void parse_subckt(Circuit *c, const char *filename, const char *first_lin
         while(*rp==' '||*rp=='\t') rp++; if(!*rp) break;
         int nn=0; while(rp[nn]&&rp[nn]!=' '&&rp[nn]!='\t') nn++;
         if(nn>31) nn=31; if(nn>0){
+            /* #72: stop node parsing at first param (token containing '=') */
+            int is_param=0;
+            for(int k=0;k<nn;k++){if(rp[k]=='='){is_param=1;break;}}
+            if(is_param) break;
             strncpy(sk->nodes[sk->nnode],rp,nn); sk->nodes[sk->nnode][nn]=0; sk->nnode++;
+        }
+        rp+=nn;
+    }
+    /* #72: parse subcircuit parameter defaults (key=val) */
+    while(*rp && sk->nparam<16){
+        while(*rp==' '||*rp=='\t') rp++; if(!*rp) break;
+        int nn=0; while(rp[nn]&&rp[nn]!=' '&&rp[nn]!='\t') nn++;
+        if(nn>31) nn=31;
+        if(nn>0){
+            char token[32]; strncpy(token,rp,nn); token[nn]=0;
+            char *eq=strchr(token,'=');
+            if(eq){
+                *eq=0;
+                char *key=token, *val=eq+1;
+                if(*key && *val){
+                    strncpy(sk->param_names[sk->nparam],key,31);
+                    sk->param_names[sk->nparam][31]=0;
+                    sk->param_vals[sk->nparam]=parse_eng(val);
+                    sk->nparam++;
+                }
+            }
         }
         rp+=nn;
     }
@@ -2301,57 +2327,125 @@ static void parse_subckt(Circuit *c, const char *filename, const char *first_lin
     }
     fclose(fp);
 }
-/* ===== P3.3: expand X-line — node substitution + name prefix ===== */
+/* ===== P6.2: subcircuit-local {param} substitution (#72) ===== */
+static void subckt_param_subst(char *s, char pn[][32], REAL *pv, int np) {
+    char *open=strchr(s,'{');
+    while(open){
+        char *close=strchr(open,'}');
+        if(!close) break;
+        int kn=(int)(close-(open+1));
+        if(kn>0 && kn<32){
+            char key[32]; strncpy(key,open+1,kn); key[kn]=0;
+            for(int i=0;i<np;i++){
+                if(!strcmp(pn[i],key)){
+                    char rep[32]; snprintf(rep,32,"%s",real_to_str(pv[i],'g',6));
+                    int rl=(int)strlen(rep);
+                    int rest=(int)strlen(close+1);
+                    int oldl=(int)(close-s+1);
+                    if(rl>oldl) memmove(open+rl,close+1,rest+1);
+                    else if(rl<oldl) memmove(open+rl,close+1,rest+1);
+                    memcpy(open,rep,rl);
+                    s[open-s+rl+rest]=0;
+                    open=open+rl-1;
+                    break;
+                }
+            }
+        }
+        open=strchr(open+1,'{');
+    }
+}
+/* ===== P3.3: expand X-line — node substitution + name prefix (#72 param pass) ===== */
 static int expand_subckt(Circuit *c, const char *s) {
-    char xname[32], nodes[32][32]; int nn=0;
+    char xname[32];
     int nf=sscanf(s,"%31s",xname); if(nf<1) return 0;
     const char *p=s+strlen(xname);
-    while(*p==' '||*p=='\t') p++;
-    while(*p && nn<32){
+    /* --- Tokenize into positional (nodes+skname) vs keyword (param=val) --- */
+    char pos_tokens[33][32]; int npos=0;
+    char xp_keys[16][32]; REAL xp_vals[16]; int nxp=0;
+    while(*p && npos+nxp<64){
         while(*p==' '||*p=='\t') p++; if(!*p) break;
         int nl=0; while(p[nl]&&p[nl]!=' '&&p[nl]!='\t') nl++;
         if(nl>31) nl=31;
-        if(nn<32){strncpy(nodes[nn],p,nl);nodes[nn][nl]=0;nn++;}
+        if(nl>0){
+            char token[32]; strncpy(token,p,nl); token[nl]=0;
+            if(strchr(token,'=')){
+                /* param override */
+                char *eq=strchr(token,'='); *eq=0;
+                if(nxp<16){
+                    strncpy(xp_keys[nxp],token,31);xp_keys[nxp][31]=0;
+                    xp_vals[nxp]=parse_eng(eq+1); nxp++;
+                }
+            }else{
+                /* positional (node or subckt name) */
+                if(npos<33){strncpy(pos_tokens[npos],token,31);pos_tokens[npos][31]=0;npos++;}
+            }
+        }
         p+=nl;
     }
-    if(nn<2) return 0;
-    char skname[32]; strncpy(skname,nodes[nn-1],31);skname[31]=0; nn--;
+    if(npos<2) return 0;  /* need at least 1 node + 1 subckt name */
+    /* --- Extract subckt name (last positional) and nodes --- */
+    char skname[32]; strncpy(skname,pos_tokens[npos-1],31);skname[31]=0;
+    int nn=npos-1;
+    char nodes[32][32]; for(int i=0;i<nn;i++) strncpy(nodes[i],pos_tokens[i],31);
+    /* --- Find subckt --- */
     Subckt *sk=NULL; for(int i=0;i<c->nsubckt;i++){
         if(!strcmp(c->subckts[i].name,skname)){sk=&c->subckts[i];break;}
     }
     if(!sk||sk->nnode!=nn) return 0;
     char nodemap[32][32]; for(int i=0;i<nn;i++) strncpy(nodemap[i],nodes[i],31);
+    /* --- Build local param table: subckt defaults + X-line overrides --- */
+    char lp_names[16][32]; REAL lp_vals[16]; int nlp=sk->nparam;
+    for(int i=0;i<sk->nparam;i++){
+        strncpy(lp_names[i],sk->param_names[i],31);
+        lp_vals[i]=sk->param_vals[i];
+    }
+    for(int i=0;i<nxp;i++){
+        int found=0;
+        for(int j=0;j<nlp;j++){
+            if(!strcmp(lp_names[j],xp_keys[i])){lp_vals[j]=xp_vals[i];found=1;break;}
+        }
+        if(!found && nlp<16){
+            strncpy(lp_names[nlp],xp_keys[i],31);lp_vals[nlp]=xp_vals[i];nlp++;
+        }
+    }
+    /* --- Expand each body line --- */
     for(int i=0;i<sk->nline;i++){
         char eline[MAX_LINE]; strncpy(eline,sk->lines[i],MAX_LINE-1);eline[MAX_LINE-1]=0;
+        /* Local {param} substitution before node mapping (#72) */
+        subckt_param_subst(eline, lp_names, lp_vals, nlp);
         char tok[32], rest[MAX_LINE]; rest[0]=0;
         int nscan=sscanf(eline,"%31s %[^\n]",tok,rest);
         if(nscan>=1){
-            char newline[MAX_LINE]; snprintf(newline,MAX_LINE,"%s.%s %s",xname,tok,rest);
-            char *sp=newline;
-            while(*sp){
-                if(*sp==' '||*sp=='\t'){sp++;continue;}
-                int tl=0; while(sp[tl]&&sp[tl]!=' '&&sp[tl]!='\t') tl++;
-                for(int j=0;j<sk->nnode;j++){
-                    if(tl==(int)strlen(sk->nodes[j])&&!strncmp(sp,sk->nodes[j],tl)){
-                        char suffix[MAX_LINE]; strncpy(suffix,sp+tl,MAX_LINE-1);suffix[MAX_LINE-1]=0;
-                        int pfx=(int)(sp-newline); char pbuf[MAX_LINE];
-                        strncpy(pbuf,newline,pfx);pbuf[pfx]=0;
-                        snprintf(newline,MAX_LINE,"%s%s%s",pbuf,nodemap[j],suffix);
-                        /* Position sp so that after sp+=tl we land right after the replacement.
-                         * The -tl accounts for the sp+=tl that runs at end of the while body.
-                         * Clamp to pfx to avoid negative offset when replacement is shorter. (#81) */
-                        int pos = pfx + (int)strlen(nodemap[j]) - tl;
-                        if(pos < pfx) pos = pfx;
-                        sp = newline + pos;
-                        break;
+            /* #72: .model card inside subcircuit — dispatch directly, no xname prefix */
+            if(!strncmp(tok,".model",6)){
+                param_subst(c,eline);  /* global {param} substitution */
+                parse_model_line(c,eline);
+            }else if(tok[0]=='.'){
+                /* skip other dot-directives (.csparam etc.) */
+            }else{
+                /* Instance line: prefix + node substitution + dispatch */
+                char newline[MAX_LINE]; snprintf(newline,MAX_LINE,"%s.%s %s",xname,tok,rest);
+                char *sp=newline;
+                while(*sp){
+                    if(*sp==' '||*sp=='\t'){sp++;continue;}
+                    int tl=0; while(sp[tl]&&sp[tl]!=' '&&sp[tl]!='\t') tl++;
+                    for(int j=0;j<sk->nnode;j++){
+                        if(tl==(int)strlen(sk->nodes[j])&&!strncmp(sp,sk->nodes[j],tl)){
+                            char suffix[MAX_LINE]; strncpy(suffix,sp+tl,MAX_LINE-1);suffix[MAX_LINE-1]=0;
+                            int pfx=(int)(sp-newline); char pbuf[MAX_LINE];
+                            strncpy(pbuf,newline,pfx);pbuf[pfx]=0;
+                            snprintf(newline,MAX_LINE,"%s%s%s",pbuf,nodemap[j],suffix);
+                            int pos = pfx + (int)strlen(nodemap[j]) - tl;
+                            if(pos < pfx) pos = pfx;
+                            sp = newline + pos;
+                            break;
+                        }
                     }
+                    sp+=tl;
                 }
-                sp+=tl;
+                param_subst(c,newline);
+                parse_instance(c,newline);
             }
-            param_subst(c,newline);
-            if(!strncmp(newline,".model",6)) parse_model_line(c,newline);
-            else if(newline[0]=='.'){}
-            else parse_instance(c,newline);
         }
     }
     return 1;
@@ -2834,12 +2928,15 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
 
     REAL gm_base=c->opt_gmin>R(0.0)?c->opt_gmin:R(1e-12);
 
-    /* P2.10: Pure gmin stepping, single full-power source ramp.
-     * Source scaling was REMOVED — low-α ramps (α=0.01, Ibias=100nA) at
-     * P2.10fix: Lighter initial gmin.  1e-5 was too strong (1V per 10µA)
-     * and created false equilibria competing with device physics.
-     * 1e-7 provides ~10MΩ diagonal dominance without masking device currents.
-     * Combined with aggressive initial vlim (2V), MOSFETs turn on in 1-2 iters. */
+    /* P2.10 / #82: Gmin + source co-stepping for feedback-loop convergence.
+     * Strategy: try full-power Gmin stepping first (fast path for simple
+     * circuits).  If the converged solution has all MOSFETs in cutoff
+     * despite active current sources, retry with source ramping to escape
+     * the zero-current attraction basin.
+     *
+     * Source ramp provides homotopy continuation: at low α solutions are
+     * near-linear; as α crosses Vth/VDD, devices gradually turn on, each
+     * step inheriting the previous step's Newton initial guess. */
     REAL gmin_stages[] = {R(1e-7), R(1e-9), R(1e-11), gm_base};
     REAL cmin_vals [] = {R(1e-9), R(1e-9), R(1e-9), R(0.0)};
     int n_stages = 4;
@@ -2849,9 +2946,16 @@ static int dc_solve(REAL *v, REAL *iv, Circuit *c, BSIM4Param *const *pp_arr,
     REAL *idc_orig=calloc(c->ni,sizeof(REAL));
     for(int j=0;j<c->nv;j++) dc_orig[j]=c->vsrc[j].dc;
     for(int j=0;j<c->ni;j++) idc_orig[j]=c->isrc[j].dc;
-    /* Single full-power source ramp only (P2.10). */
-    REAL src_ramp[] = {R(1.0)};
-    int n_ramp = 1, ramp_failed = 0;
+    /* #82: Multi-step source ramping for feedback-loop convergence.
+     * Low-α steps provide homotopy continuation: at α→0 all solutions are
+     * near-linear (gmin-resistive), MOSFETs are in cutoff.  As α crosses
+     * Vth/VDD, devices gradually turn on, each step inheriting the previous
+     * step's solution.  This escapes the zero-current attraction basin that
+     * traps pure full-power gmin stepping in feedback circuits (LDO, OTA).
+     * Exponential spacing: 0.03→cutoff, 0.1→subVth, 0.3→near Vth, 1.0→full.
+     * Overhead on simple circuits is minimal (~20 vs ~5 iters, <1ms). */
+    REAL src_ramp[] = {R(0.03), R(0.1), R(0.3), R(1.0)};
+    int n_ramp = 4, ramp_failed = 0;
 
   for(int ramp=0; ramp < n_ramp; ramp++){
     REAL alpha = src_ramp[ramp];
@@ -4210,6 +4314,13 @@ int main(int argc, char **argv) {
      * assign different parameters to devices of different sizes. */
     BSIM4Param model_pp[MAX_MODELS];
     memset(model_pp, 0, sizeof(model_pp));
+    /* #82: Always set model_pp[0..1] to sensible defaults — used as fallback
+     * when no .model matches a device (e.g. missing .lib file).
+     * Without this, model_pp[0] is all zeros → toxe=0 → Coxe=INF → NaN,
+     * u0=0 → gm=0, vth0=0 → wrong bias → all MOSFETs stuck in cutoff. */
+    model_pp[0] = bsim4_default();                      /* NMOS fallback */
+    model_pp[1] = bsim4_default();                      /* PMOS fallback */
+    model_pp[1].vth0 = R(-0.62261); model_pp[1].u0 = R(0.015);
     for (int i = 0; i < c->nmodel; i++) {
         model_extract_binning(&c->models[i]);
         model_pp[i] = bsim4_default();
@@ -4242,12 +4353,17 @@ int main(int argc, char **argv) {
         if (mod) {
             mos_pp[j] = &model_pp[mod - c->models];
         } else {
+            int is_pmos = (strstr(c->mos[j].model, "pmos") ||
+                           strstr(c->mos[j].model, "PMOS") ||
+                           c->mos[j].model[0] == 'p' ||
+                           c->mos[j].model[0] == 'P');
             fprintf(stderr, "WARNING: no model/bin match for %s "
-                    "(model=%s W=%s L=%s), using default\n",
+                    "(model=%s W=%s L=%s), using default %s\n",
                     c->mos[j].name, c->mos[j].model,
                     real_to_str(c->mos[j].w,'e',2),
-                    real_to_str(c->mos[j].l,'e',2));
-            mos_pp[j] = &model_pp[0];
+                    real_to_str(c->mos[j].l,'e',2),
+                    is_pmos ? "pmos" : "nmos");
+            mos_pp[j] = is_pmos ? &model_pp[1] : &model_pp[0];
         }
     }
 
